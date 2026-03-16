@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.625rem;
+  --background: 250 250 250;
+  --foreground: 15 23 42;
+  --border: 226 232 240;
+  --muted-foreground: 100 116 139;
+  --card: 255 255 255;
+  --sidebar: 15 23 42;
+  --sidebar-foreground: 248 250 252;
+  --sidebar-muted: 148 163 184;
+}
+
+html,
+body,
+#__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+input,
+button,
+textarea {
+  font: inherit;
+}
+
+/* Consistent focus ring */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary-500/20 ring-offset-2 ring-offset-white;
+}
