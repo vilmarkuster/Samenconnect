@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode } from "react";
-import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
 type PageHeaderProps = {
@@ -22,13 +21,13 @@ export function ZorentaPageHeader({
   return (
     <div className="mb-6 sm:mb-8">
       {backHref && (
-        <Link
+        <a
           href={backHref}
           className="mb-3 inline-flex items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 sm:-ml-1 sm:px-1"
         >
           <ChevronLeft className="h-4 w-4 shrink-0" />
           {backLabel}
-        </Link>
+        </a>
       )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">

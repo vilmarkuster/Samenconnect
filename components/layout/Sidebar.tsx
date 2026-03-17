@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +13,7 @@ import {
   Search,
   User,
   LogOut,
-  Heart,
+  Shield,
 } from "lucide-react";
 
 export const ZORENTA_NAV_ITEMS = [
@@ -32,63 +31,65 @@ export const ZORENTA_NAV_ITEMS = [
 type SidebarProps = {
   onNavigate?: () => void;
   onLogout?: () => void;
+  isAdmin?: boolean;
 };
 
-export function Sidebar({ onNavigate, onLogout }: SidebarProps) {
+export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
   const pathname = usePathname();
+  const navItems = isAdmin
+    ? [...ZORENTA_NAV_ITEMS, { href: "/zorenta/admin", label: "Admin", icon: Shield }]
+    : ZORENTA_NAV_ITEMS;
 
   return (
-    <aside className="flex w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="flex h-14 items-center border-b border-slate-200 px-5">
-        <Link href="/zorenta" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
-            <Heart className="h-4 w-4" />
-          </span>
-          <span className="font-semibold text-slate-900">Zorenta</span>
-        </Link>
+    <div className="flex h-full flex-col">
+      <div className="px-4 pt-3">
+        <div className="rounded-md bg-pink-600 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white shadow">
+          SIDEBAR
+        </div>
       </div>
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {ZORENTA_NAV_ITEMS.map((item) => {
+      <div className="border-b border-slate-200 px-6 py-5">
+        <div className="text-lg font-semibold text-slate-900">SamenConnect</div>
+      </div>
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
+        {navItems.map((item) => {
           const active =
             pathname === item.href ||
             (item.href !== "/zorenta/dashboard" && pathname?.startsWith(item.href));
           const Icon = item.icon;
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                active ? "bg-emerald-50 text-emerald-700" : "text-slate-700 hover:bg-slate-100"
               )}
             >
-              <Icon className="h-4 w-4 shrink-0 opacity-80" />
+              <Icon className="h-4 w-4 shrink-0" />
               {item.label}
-            </Link>
+            </a>
           );
         })}
       </nav>
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-slate-200 p-4">
         {onLogout && (
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             Uitloggen
           </button>
         )}
-        <Link
+        <a
           href="/dashboard"
-          className="mt-0.5 flex items-center rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+          className="mt-2 flex items-center rounded-lg px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
         >
-          ← Back to App
-        </Link>
+          ← Terug naar AI App
+        </a>
       </div>
-    </aside>
+    </div>
   );
 }

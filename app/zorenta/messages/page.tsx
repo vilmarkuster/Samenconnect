@@ -77,7 +77,13 @@ export default function MessagesPage() {
     return () => { cancelled = true; };
   }, [startProfileId, router, loading, starting]);
 
-  if (loading || (startProfileId && starting)) return <ZorentaPageSkeleton />;
+  if (loading || (startProfileId && starting)) {
+    return (
+      <ZorentaPageContainer maxWidth="default" className="space-y-6">
+        <ZorentaPageSkeleton />
+      </ZorentaPageContainer>
+    );
+  }
 
   return (
     <ZorentaPageContainer maxWidth="default" className="space-y-6">

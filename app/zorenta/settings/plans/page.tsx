@@ -72,11 +72,11 @@ function PlanCard({
           <Button
             size="sm"
             className="w-full"
-            variant={plan.highlighted ? "default" : "outline"}
+            variant={plan.highlighted ? "primary" : "outline"}
             onClick={() => onUpgrade(plan.slug)}
             disabled={!isPaid}
           >
-            {isPaid ? plan.ctaLabel : plan.ctaLabel}
+            {plan.ctaLabel}
           </Button>
         )}
       </CardContent>
@@ -129,7 +129,13 @@ export default function PlansPage() {
     if (data?.message) alert(data.message);
   }
 
-  if (loading) return <ZorentaPageSkeleton />;
+  if (loading) {
+    return (
+      <ZorentaPageContainer maxWidth="wide" className="space-y-6">
+        <ZorentaPageSkeleton />
+      </ZorentaPageContainer>
+    );
+  }
 
   const plans = role ? getPlansForRole(role) : getPlansForRole("client");
 

@@ -45,7 +45,13 @@ export default function BillingPage() {
     };
   }, []);
 
-  if (loading) return <ZorentaPageSkeleton />;
+  if (loading) {
+    return (
+      <ZorentaPageContainer maxWidth="default" className="space-y-6">
+        <ZorentaPageSkeleton />
+      </ZorentaPageContainer>
+    );
+  }
 
   const plan = status?.planSlug ? getPlanBySlug(status.planSlug as "free" | "pro" | "team" | "featured") : null;
 

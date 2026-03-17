@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 
@@ -31,9 +30,12 @@ export default function ZorentaError({
         <Button variant="outline" onClick={reset}>
           Opnieuw proberen
         </Button>
-        <Link href="/zorenta/dashboard">
-          <Button>Naar dashboard</Button>
-        </Link>
+        <a
+          href="/zorenta/dashboard"
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"
+        >
+          Naar dashboard
+        </a>
       </div>
     </div>
   );

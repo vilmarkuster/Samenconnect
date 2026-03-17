@@ -14,6 +14,7 @@ import {
   LogOut,
   Heart,
   Shield,
+  Activity,
 } from "lucide-react";
 
 const ADMIN_NAV_ITEMS = [
@@ -24,6 +25,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/zorenta/admin/reviews", label: "Reviews", icon: Star },
   { href: "/zorenta/admin/conversations", label: "Gesprekken", icon: MessageSquare },
   { href: "/zorenta/admin/billing", label: "Facturatie", icon: CreditCard },
+  { href: "/zorenta/admin/growth", label: "Growth", icon: Activity },
 ] as const;
 
 type AdminSidebarProps = {
@@ -69,13 +71,13 @@ export function AdminSidebar({ onNavigate, onLogout }: AdminSidebarProps) {
         })}
       </nav>
       <div className="border-t border-slate-200 p-3">
-        <Link
+        <a
           href="/zorenta/dashboard"
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
           <Heart className="h-4 w-4 shrink-0" />
           Naar Zorenta
-        </Link>
+        </a>
         {onLogout && (
           <button
             type="button"

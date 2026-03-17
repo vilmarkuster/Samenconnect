@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MatchBadge } from "@/components/match/MatchBadge";
-import { MapPin, Star, MessageSquare, User } from "lucide-react";
+import { StartMessageButton } from "@/components/zorenta/start-message-button";
+import { MapPin, Star, User } from "lucide-react";
 
 export type CaregiverCardProps = {
   profileId: string;
@@ -95,13 +96,14 @@ export function CaregiverCard({
                 Bekijk profiel
               </Button>
             </Link>
-            <Link href={`/zorenta/messages?start=${profileId}`}>
-              <Button size="sm" className="gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Stuur bericht
-              </Button>
-            </Link>
-            <Button variant="ghost" size="sm" className="text-slate-500" disabled title="Binnenkort beschikbaar">
+            <StartMessageButton otherUserId={profileId} size="sm" label="Stuur bericht" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-500"
+              disabled
+              title="Binnenkort beschikbaar"
+            >
               Bewaren
             </Button>
           </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { useAuth } from "@/lib/auth-context";
 import { trackZorentaEvent } from "@/lib/zorenta/analytics";
@@ -13,6 +12,8 @@ import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { ZorentaFormField } from "@/components/zorenta/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
+import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { FileText, ChevronRight, ChevronLeft, Save } from "lucide-react";
 
 const STEPS = [
@@ -117,7 +118,13 @@ export default function IntakePage() {
     }
   };
 
-  if (authLoading || loading) return <ZorentaPageSkeleton />;
+  if (authLoading || loading) {
+    return (
+      <PageContainer maxWidth="narrow" className="space-y-6 sm:space-y-8">
+        <ZorentaPageSkeleton />
+      </PageContainer>
+    );
+  }
 
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
@@ -244,20 +251,27 @@ export default function IntakePage() {
           {currentStep.key === "location" && (
             <>
               <ZorentaFormField label="Stad / plaats">
-                <Input
-                  placeholder="Bijv. Amsterdam"
-                  value={String(form.preferred_city ?? "")}
-                  onChange={(e) => update("preferred_city", e.target.value)}
-                  className="mt-1"
-                />
+                <div className="mt-1">
+                  <CityAutocomplete
+                    value={String(form.preferred_city ?? "")}
+                    onChange={(v) => update("preferred_city", v)}
+                    placeholder="Bijv. Amsterdam"
+                  />
+                </div>
               </ZorentaFormField>
-              <ZorentaFormField label="Regio">
-                <Input
-                  placeholder="Regio"
+              <ZorentaFormField label="Regio / provincie">
+                <select
                   value={String(form.preferred_region ?? "")}
-                  onChange={(e) => update("preferred_region", e.target.value)}
-                  className="mt-1"
-                />
+                  onChange={(e) => update("preferred_region", e.target.value || "")}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="">Selecteer een provincie</option>
+                  {DUTCH_PROVINCES.map((prov) => (
+                    <option key={prov} value={prov}>
+                      {prov}
+                    </option>
+                  ))}
+                </select>
               </ZorentaFormField>
               <ZorentaFormField label="Urgentie">
                 <select
@@ -312,12 +326,12 @@ export default function IntakePage() {
       </Card>
 
       <p className="text-center text-sm text-slate-500">
-        <Link
+        <a
           href="/zorenta/dashboard"
           className="font-medium text-slate-600 underline hover:text-slate-900"
         >
           Terug naar dashboard
-        </Link>
+        </a>
       </p>
     </PageContainer>
   );

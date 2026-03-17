@@ -8,7 +8,9 @@ const apiCounts = new Map<string, { count: number; resetAt: number }>();
 
 function isZorentaPublic(pathname: string): boolean {
   if (!pathname.startsWith("/zorenta")) return true;
-  return ZORENTA_PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  // Only treat the three explicit routes as public; all other /zorenta/*
+  // paths must go through the authenticated Zorenta shell.
+  return ZORENTA_PUBLIC.includes(pathname);
 }
 
 function getSupabaseAuthCookieName(): string {
@@ -36,6 +38,12 @@ function checkApiRateLimit(req: NextRequest): NextResponse | null {
   return null;
 }
 
+function nextWithPathname(req: NextRequest, pathname: string) {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
@@ -46,14 +54,11 @@ export function middleware(req: NextRequest) {
   }
 
   if (!pathname.startsWith("/zorenta")) return NextResponse.next();
-  if (isZorentaPublic(pathname)) return NextResponse.next();
 
-  const cookieName = getSupabaseAuthCookieName();
-  if (cookieName && req.cookies.get(cookieName)?.value) return NextResponse.next();
-
-  const login = new URL("/zorenta/login", req.url);
-  login.searchParams.set("redirect", pathname);
-  return NextResponse.redirect(login);
+  // For all /zorenta routes (public and authenticated), just attach x-pathname
+  // so the Zorenta layout can resolve the correct shell. Authentication and
+  // redirects are handled inside the app using Supabase session state.
+  return nextWithPathname(req, pathname);
 }
 
 export const config = {

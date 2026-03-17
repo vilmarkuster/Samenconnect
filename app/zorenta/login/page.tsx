@@ -34,12 +34,14 @@ export default function ZorentaLoginPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Inloggen</h1>
-        <p className="mt-1 text-sm text-slate-500">Zorgmarktplaats voor zorgverleners en opdrachtgevers.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          SamenConnect verbindt zorgverleners, cliënten en organisaties.
+        </p>
       </div>
       <Card className="border-slate-200/80 shadow-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-lg">Sign in to Zorenta</CardTitle>
-          <CardDescription>Vul je gegevens in om in te loggen.</CardDescription>
+          <CardTitle className="text-lg">Inloggen bij SamenConnect</CardTitle>
+          <CardDescription>Vul je gegevens in om verder te gaan.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

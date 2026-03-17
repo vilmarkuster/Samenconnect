@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Briefcase, Search } from "lucide-react";
+import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 
 type JobRow = {
   id: string;
@@ -28,7 +29,9 @@ export default function AdminJobsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
-  const [q, setQ] = useState("");
+  const [title, setTitle] = useState("");
+  const [city, setCity] = useState("");
+  const [careType, setCareType] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +42,9 @@ export default function AdminJobsPage() {
       }
       const params = new URLSearchParams();
       if (status) params.set("status", status);
-      if (q) params.set("q", q);
+      if (title) params.set("title", title);
+      if (city) params.set("city", city);
+      if (careType) params.set("care_type", careType);
       params.set("limit", "50");
       fetch(`/api/zorenta/admin/jobs?${params}`, { headers: zorentaHeaders(token) })
         .then((r) => r.json())
@@ -53,7 +58,7 @@ export default function AdminJobsPage() {
           if (!cancelled) setLoading(false);
         });
     });
-  }, [status, q]);
+  }, [status, title, city, careType]);
 
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
@@ -64,13 +69,28 @@ export default function AdminJobsPage() {
           <CardTitle className="text-base">Filters</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 min-w-[200px]">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 min-w-[200px] flex-1">
             <Search className="h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Titel of plaats…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              placeholder="Titel…"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="border-0 bg-transparent focus-visible:ring-0"
+            />
+          </div>
+          <div className="min-w-[180px]">
+            <CityAutocomplete
+              value={city}
+              onChange={setCity}
+              placeholder="Plaats (stad)…"
+            />
+          </div>
+          <div>
+            <Input
+              placeholder="Type zorg…"
+              value={careType}
+              onChange={(e) => setCareType(e.target.value)}
+              className="min-w-[160px]"
             />
           </div>
           <select

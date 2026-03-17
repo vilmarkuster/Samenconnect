@@ -1,9 +1,9 @@
-"use client";
+ "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
-  Heart,
   Shield,
   Users,
   FileText,
@@ -22,6 +22,15 @@ export function ZorentaLandingPage() {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-slate-200/80 bg-gradient-to-br from-emerald-50/90 via-white to-slate-50/50 px-4 py-20 md:py-28">
         <div className="mx-auto max-w-4xl text-center">
+          <div className="mb-6 flex justify-center">
+            <Image
+              src="/branding/samenconnect-logo.png"
+              alt="SamenConnect"
+              width={180}
+              height={46}
+              priority
+            />
+          </div>
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-medium text-emerald-800 shadow-sm">
             <Sparkles className="h-4 w-4" />
             Zorg die bij je past
@@ -32,7 +41,7 @@ export function ZorentaLandingPage() {
             <span className="text-emerald-600">of je volgende opdracht</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
-            Zorenta verbindt zorgverleners, cliënten en organisaties. Snel, betrouwbaar en veilig.
+            SamenConnect verbindt zorgverleners, cliënten en organisaties. Snel, betrouwbaar en veilig.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link href="/zorenta/register?role=client">
@@ -80,7 +89,7 @@ export function ZorentaLandingPage() {
       <section className="border-b border-slate-200/80 px-4 py-16 md:py-20">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-center text-2xl font-semibold text-slate-900 md:text-3xl">
-            Waarom Zorenta?
+            Waarom SamenConnect?
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
             Een veilig platform voor matching tussen zorgvraag en aanbod in Nederland.
@@ -217,7 +226,7 @@ export function ZorentaLandingPage() {
             ))}
           </div>
           <p className="mt-6 text-center text-xs text-slate-500">
-            Berichten worden binnen Zorenta bewaard. Deel geen betaalgegevens of persoonsgegevens buiten het platform.
+            Berichten worden binnen SamenConnect bewaard. Deel geen betaalgegevens of persoonsgegevens buiten het platform.
           </p>
         </div>
       </section>
@@ -241,9 +250,9 @@ export function ZorentaLandingPage() {
           </h2>
           <dl className="mt-8 space-y-6">
             {[
-              { q: "Voor wie is Zorenta?", a: "Voor zorgverleners die opdrachten zoeken, cliënten en PGB-houders die zorg nodig hebben, en organisaties die zorg inkopen." },
+              { q: "Voor wie is SamenConnect?", a: "Voor zorgverleners die opdrachten zoeken, cliënten en PGB-houders die zorg nodig hebben, en organisaties die zorg inkopen." },
               { q: "Hoe werkt de matching?", a: "Op basis van je profiel of intake (zorgtype, locatie, vaardigheden, beschikbaarheid en budget) tonen we passende matches met een score." },
-              { q: "Is Zorenta gratis?", a: "Registreren en een profiel aanmaken is gratis. Voor bepaalde diensten kunnen in de toekomst kosten gelden." },
+              { q: "Is SamenConnect gratis?", a: "Registreren en een profiel aanmaken is gratis. Voor bepaalde diensten kunnen in de toekomst kosten gelden." },
             ].map(({ q, a }) => (
               <div key={q}>
                 <dt className="font-medium text-slate-900">{q}</dt>
@@ -281,8 +290,12 @@ export function ZorentaLandingPage() {
       <footer className="border-t border-slate-200/80 px-4 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
           <Link href="/zorenta" className="flex items-center gap-2 font-semibold text-slate-900">
-            <Heart className="h-5 w-5 text-emerald-500" />
-            Zorenta
+            <Image
+              src="/branding/samenconnect-logo.png"
+              alt="SamenConnect"
+              width={140}
+              height={36}
+            />
           </Link>
           <nav className="flex flex-wrap justify-center gap-6 text-sm text-slate-600">
             <Link href="/zorenta" className="hover:text-slate-900">Home</Link>
@@ -292,7 +305,7 @@ export function ZorentaLandingPage() {
           </nav>
         </div>
         <p className="mx-auto mt-6 max-w-6xl text-center text-xs text-slate-500">
-          © Zorenta. Privacy-vriendelijk en veilig communiceren.
+          © SamenConnect. Privacy-vriendelijk en veilig communiceren.
         </p>
       </footer>
     </div>

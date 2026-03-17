@@ -53,7 +53,13 @@ export default function NotificationsPage() {
     );
   }
 
-  if (loading) return <ZorentaPageSkeleton />;
+  if (loading) {
+    return (
+      <ZorentaPageContainer maxWidth="default" className="space-y-6">
+        <ZorentaPageSkeleton />
+      </ZorentaPageContainer>
+    );
+  }
 
   return (
     <ZorentaPageContainer maxWidth="default" className="space-y-6">

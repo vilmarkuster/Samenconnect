@@ -11,6 +11,8 @@ import { ZorentaPageContainer } from "@/components/zorenta/page-container";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaEmptyState } from "@/components/zorenta/empty-state";
 import { CaregiverCard } from "@/components/caregiver/CaregiverCard";
+import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
+import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { Search, Briefcase, User, Filter, SlidersHorizontal } from "lucide-react";
 
 type Caregiver = {
@@ -38,6 +40,7 @@ type Job = {
 const CARE_TYPES = ["", "Thuiszorg", "Verpleeghuis", "Gehandicaptenzorg", "Dementiezorg", "Palliatieve zorg", "Kraamzorg", "Overig"];
 const AVAILABILITY_OPTIONS = ["", "Fulltime", "Parttime", "Flexibel", "Per diem", "Overig"];
 const RATING_OPTIONS = ["", "1", "2", "3", "4", "5"];
+const RADIUS_OPTIONS = ["5", "10", "25", "50", "100"] as const;
 
 export default function SearchPage() {
   const [tab, setTab] = useState<"caregivers" | "jobs">("caregivers");
@@ -46,6 +49,7 @@ export default function SearchPage() {
   const [careType, setCareType] = useState("");
   const [skills, setSkills] = useState("");
   const [availability, setAvailability] = useState("");
+  const [radius, setRadius] = useState<string>("25");
   const [minRating, setMinRating] = useState("");
   const [minExperience, setMinExperience] = useState("");
   const [maxHourlyRate, setMaxHourlyRate] = useState("");
@@ -61,6 +65,7 @@ export default function SearchPage() {
     const params = new URLSearchParams();
     params.set("type", "caregivers");
     if (city.trim()) params.set("city", city.trim());
+    if (radius) params.set("radius", radius);
     if (region.trim()) params.set("region", region.trim());
     if (careType.trim()) params.set("care_type", careType.trim());
     if (skills.trim()) params.set("skills", skills.trim().replace(/\s*,\s*/g, ","));
@@ -78,7 +83,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [city, region, careType, skills, availability, minRating, minExperience, maxHourlyRate]);
+  }, [city, region, careType, skills, availability, minRating, minExperience, maxHourlyRate, radius]);
 
   const sortedCaregivers = [...caregivers].sort((a, b) => {
     if (caregiverSort === "rating") {
@@ -105,6 +110,7 @@ export default function SearchPage() {
     const params = new URLSearchParams();
     params.set("type", "jobs");
     if (city.trim()) params.set("city", city.trim());
+    if (radius) params.set("radius", radius);
     if (careType.trim()) params.set("care_type", careType.trim());
     try {
       const res = await fetch(`/api/zorenta/search?${params}`, {
@@ -115,15 +121,19 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [city, careType]);
+  }, [city, careType, radius]);
 
   const handleSearch = () => {
     if (tab === "caregivers") searchCaregivers();
     else searchJobs();
   };
 
-  const hasSearchedCaregivers = caregivers.length > 0 || (tab === "caregivers" && (city || region || careType || skills || availability || minRating || minExperience || maxHourlyRate));
-  const hasSearchedJobs = jobs.length > 0 || (tab === "jobs" && (city || careType));
+  const hasSearchedCaregivers =
+    caregivers.length > 0 ||
+    (tab === "caregivers" &&
+      (city || region || careType || skills || availability || minRating || minExperience || maxHourlyRate));
+  const hasSearchedJobs =
+    jobs.length > 0 || (tab === "jobs" && (city || careType || radius));
   const emptyCaregivers = tab === "caregivers" && !loading && hasSearchedCaregivers && caregivers.length === 0;
   const emptyJobs = tab === "jobs" && !loading && hasSearchedJobs && jobs.length === 0;
 
@@ -159,41 +169,70 @@ export default function SearchPage() {
               <span className="text-slate-500">{showFilters ? "Verbergen" : "Tonen"}</span>
             </button>
             {showFilters && (
-              <CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-5">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Plaats (stad)</label>
-                  <Input
-                    placeholder="bijv. Amsterdam"
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Plaats (stad)
+                  </label>
+                  <CityAutocomplete
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="rounded-lg border-slate-200 bg-white"
+                    onChange={setCity}
+                    placeholder="bijv. Amsterdam"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Regio</label>
-                  <Input
-                    placeholder="bijv. Noord-Holland"
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Radius (km)
+                  </label>
+                  <select
+                    value={radius}
+                    onChange={(e) => setRadius(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    {RADIUS_OPTIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r} km
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Regio / provincie
+                  </label>
+                  <select
                     value={region}
                     onChange={(e) => setRegion(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="rounded-lg border-slate-200 bg-white"
-                  />
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Alle provincies</option>
+                    {DUTCH_PROVINCES.map((prov) => (
+                      <option key={prov} value={prov}>
+                        {prov}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Type zorg / specialisatie</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Type zorg / specialisatie
+                  </label>
                   <select
                     value={careType}
                     onChange={(e) => setCareType(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
                     {CARE_TYPES.map((t) => (
-                      <option key={t || "any"} value={t}>{t || "Alle"}</option>
+                      <option key={t || "any"} value={t}>
+                        {t || "Alle"}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Vaardigheden (komma)</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Vaardigheden (komma)
+                  </label>
                   <Input
                     placeholder="bijv. Dementiezorg, VOG"
                     value={skills}
@@ -203,14 +242,18 @@ export default function SearchPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Beschikbaarheid</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">
+                    Beschikbaarheid
+                  </label>
                   <select
                     value={availability}
                     onChange={(e) => setAvailability(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                   >
                     {AVAILABILITY_OPTIONS.map((o) => (
-                      <option key={o || "any"} value={o}>{o || "Alle"}</option>
+                      <option key={o || "any"} value={o}>
+                        {o || "Alle"}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -256,15 +299,27 @@ export default function SearchPage() {
           </Card>
         )}
 
-        {/* Job filters (simple) */}
+        {/* Job filters (city + radius + type zorg) */}
         {tab === "jobs" && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Input
-              placeholder="Plaats (stad)"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-40 rounded-lg bg-white"
-            />
+            <div className="w-40">
+              <CityAutocomplete
+                value={city}
+                onChange={setCity}
+                placeholder="Plaats (stad)"
+              />
+            </div>
+            <select
+              value={radius}
+              onChange={(e) => setRadius(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r} km
+                </option>
+              ))}
+            </select>
             <select
               value={careType}
               onChange={(e) => setCareType(e.target.value)}

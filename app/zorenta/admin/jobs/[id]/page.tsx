@@ -74,11 +74,15 @@ export default function AdminJobDetailPage() {
 
       <Card className="border-slate-200">
         <CardHeader>
-          <CardTitle className="text-lg">{String(j.title)}</CardTitle>
+          <CardTitle className="text-lg">{String(j.title ?? "")}</CardTitle>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{String(j.status)}</Badge>
-            {j.poster_type && <Badge variant="secondary">{String(j.poster_type)}</Badge>}
-            {j.featured_until && <Badge className="bg-amber-100 text-amber-800">Uitgelicht</Badge>}
+            <Badge variant="outline">{String(j.status ?? "")}</Badge>
+            {Boolean(j.poster_type) && (
+              <Badge variant="secondary">{String(j.poster_type ?? "")}</Badge>
+            )}
+            {Boolean(j.featured_until) && (
+              <Badge className="bg-amber-100 text-amber-800">Uitgelicht</Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-600">

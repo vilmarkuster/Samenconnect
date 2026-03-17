@@ -102,7 +102,13 @@ function IntakeResultsContent() {
     if (data.id) router.push(`/zorenta/jobs/${data.id}?created=1`);
   };
 
-  if (loading) return <ZorentaPageSkeleton />;
+  if (loading) {
+    return (
+      <PageContainer maxWidth="default" className="space-y-8">
+        <ZorentaPageSkeleton />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer maxWidth="default" className="space-y-8">

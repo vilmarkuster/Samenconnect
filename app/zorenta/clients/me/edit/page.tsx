@@ -11,6 +11,9 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaFormField } from "@/components/zorenta/form-field";
 import { ZorentaFormSection } from "@/components/zorenta/form-section";
+import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
+import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
+import { COUNTRIES } from "@/lib/zorenta/countries";
 
 type ClientProfile = {
   id: string;
@@ -137,25 +140,38 @@ export default function ClientProfileEditPage() {
         <ZorentaFormSection title="Locatie" description="Waar zoek je zorg?">
           <div className="grid gap-4 sm:grid-cols-3">
             <ZorentaFormField label="Stad">
-              <Input
+              <CityAutocomplete
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                onChange={setCity}
+                placeholder="Bijv. Amsterdam"
               />
             </ZorentaFormField>
             <ZorentaFormField label="Regio">
-              <Input
+              <select
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
-              />
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              >
+                <option value="">Selecteer een provincie</option>
+                {DUTCH_PROVINCES.map((prov) => (
+                  <option key={prov} value={prov}>
+                    {prov}
+                  </option>
+                ))}
+              </select>
             </ZorentaFormField>
             <ZorentaFormField label="Land">
-              <Input
+              <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
-              />
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </ZorentaFormField>
           </div>
         </ZorentaFormSection>
@@ -169,11 +185,12 @@ export default function ClientProfileEditPage() {
           <Button type="submit" disabled={saving}>
             {saving ? "Opslaan…" : "Opslaan"}
           </Button>
-          <Link href="/zorenta/dashboard">
-            <Button type="button" variant="outline">
-              Annuleren
-            </Button>
-          </Link>
+          <a
+            href="/zorenta/dashboard"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium hover:bg-slate-50"
+          >
+            Annuleren
+          </a>
         </div>
       </form>
     </PageContainer>

@@ -11,6 +11,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { ZorentaEmptyState } from "@/components/zorenta/empty-state";
+import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import {
   MapPin,
   Euro,
@@ -19,7 +20,6 @@ import {
   Briefcase,
   Clock,
   Award,
-  MessageSquare,
   Shield,
 } from "lucide-react";
 
@@ -41,45 +41,6 @@ type Data = {
   averageRating: number | null;
   reviewCount: number;
 };
-
-function StartMessageButton({ otherUserId }: { otherUserId: string }) {
-  const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-
-  async function start() {
-    setLoading(true);
-    const token = await getZorentaAccessToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    const res = await fetch("/api/zorenta/conversations", {
-      method: "POST",
-      headers: zorentaHeaders(token),
-      body: JSON.stringify({ other_user_id: otherUserId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setLoading(false);
-    if (data.id) setConversationId(data.id);
-  }
-
-  if (conversationId) {
-    return (
-      <Link href={`/zorenta/messages/${conversationId}`}>
-        <Button className="gap-2">
-          <MessageSquare className="h-4 w-4" />
-          Open gesprek
-        </Button>
-      </Link>
-    );
-  }
-  return (
-    <Button onClick={start} disabled={loading} className="gap-2">
-      <MessageSquare className="h-4 w-4" />
-      {loading ? "Bezig…" : "Stuur bericht"}
-    </Button>
-  );
-}
 
 function StarRating({ value, max = 5 }: { value: number; max?: number }) {
   const full = Math.floor(value);
@@ -117,7 +78,13 @@ export default function CaregiverProfilePage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  if (loading) return <ZorentaPageSkeleton />;
+  if (loading) {
+    return (
+      <PageContainer maxWidth="narrow" className="space-y-6">
+        <ZorentaPageSkeleton />
+      </PageContainer>
+    );
+  }
 
   if (!data) {
     return (

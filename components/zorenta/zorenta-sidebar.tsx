@@ -17,9 +17,10 @@ import {
   Heart,
   ClipboardList,
   CreditCard,
+  Shield,
 } from "lucide-react";
 
-const navItems = [
+const baseNavItems = [
   { href: "/zorenta/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/zorenta/jobs", label: "Vacatures", icon: Briefcase },
   { href: "/zorenta/intake", label: "Zorgvraag intake", icon: ClipboardList },
@@ -34,12 +35,17 @@ const navItems = [
 
 type ZorentaSidebarProps = {
   onNavigate?: () => void;
+  isAdmin?: boolean;
 };
 
-export function ZorentaSidebar({ onNavigate }: ZorentaSidebarProps) {
+export function ZorentaSidebar({ onNavigate, isAdmin }: ZorentaSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+
+  const navItems = isAdmin
+    ? [...baseNavItems, { href: "/zorenta/admin", label: "Admin", icon: Shield }]
+    : baseNavItems;
 
   async function handleLogout() {
     await logout();

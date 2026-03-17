@@ -90,13 +90,15 @@ function RegisterForm() {
           {completeOnly ? "Profiel afronden" : "Account aanmaken"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          {completeOnly ? "Kies je rol om door te gaan." : "Registreer als zorgverlener, cliënt of organisatie."}
+          {completeOnly
+            ? "Kies je rol om door te gaan."
+            : "Registreer bij SamenConnect als zorgverlener, cliënt of organisatie."}
         </p>
       </div>
       <Card className="border-slate-200/80 shadow-sm">
         <CardHeader className="space-y-1">
           <CardTitle className="text-lg">
-            {completeOnly ? "Profiel afronden" : "Zorenta account"}
+            {completeOnly ? "Profiel afronden" : "SamenConnect account"}
           </CardTitle>
           <CardDescription>
             {completeOnly ? "Kies je rol om door te gaan." : "Vul je gegevens in."}
