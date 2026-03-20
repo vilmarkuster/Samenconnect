@@ -92,6 +92,36 @@ function formatMessageTime(iso: string) {
   return new Date(iso).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Same calendar day (local time). */
+function isSameCalendarDay(isoA: string, isoB: string): boolean {
+  const a = new Date(isoA);
+  const b = new Date(isoB);
+  return (
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear()
+  );
+}
+
+/** Label for date separators: "Vandaag" | "Gisteren" | "21 maart 2026". */
+function formatDateSeparatorLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  if (sameDay) return "Vandaag";
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+  if (isYesterday) return "Gisteren";
+  return d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+}
+
 function formatListTime(iso: string | null | undefined) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -1514,7 +1544,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2.5">
-                      {messages.map((m) => {
+                      {messages.map((m, i) => {
+                        const prevIso = i > 0 ? messages[i - 1].created_at : null;
+                        const showDateSeparator =
+                          !prevIso || !isSameCalendarDay(prevIso, m.created_at);
                         const mine = meId != null && m.sender_id === meId;
                         const outgoingRead =
                           mine &&
@@ -1526,10 +1559,21 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                           m.delivered_at != null &&
                           String(m.delivered_at).trim() !== "";
                         return (
-                          <div
-                            key={m.id}
-                            className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                          >
+                          <div key={m.id} className="contents">
+                            {showDateSeparator && (
+                              <div
+                                className="flex justify-center py-3"
+                                role="separator"
+                                aria-label={formatDateSeparatorLabel(m.created_at)}
+                              >
+                                <span className="rounded-full bg-slate-200/60 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">
+                                  {formatDateSeparatorLabel(m.created_at)}
+                                </span>
+                              </div>
+                            )}
+                            <div
+                              className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                            >
                             <div
                               className={cn(
                                 "max-w-[70%] md:max-w-[62%] lg:max-w-[58%] text-sm leading-relaxed",
@@ -1578,6 +1622,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                                   {formatMessageTime(m.created_at)}
                                 </p>
                               )}
+                            </div>
                             </div>
                           </div>
                         );
