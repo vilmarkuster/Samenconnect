@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
@@ -95,6 +95,33 @@ function formatListTime(iso: string | null | undefined) {
     d.getFullYear() === now.getFullYear();
   if (sameDay) return formatMessageTime(iso);
   return d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+/** Client-only relative time (presence “last seen” or conversation activity). */
+function formatRelativeNl(ms: number): string {
+  const sec = Math.floor((Date.now() - ms) / 1000);
+  if (sec < 45) return "zojuist";
+  if (sec < 3600) return `${Math.floor(sec / 60)} min geleden`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)} u geleden`;
+  return new Date(ms).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatIsoRelativeNl(iso: string | undefined): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  return formatRelativeNl(t);
+}
+
+/** Supabase presenceState() keys are participant presence keys (UUID strings). */
+function presenceStateHasUser(state: Record<string, unknown>, userId: string): boolean {
+  for (const k of Object.keys(state)) {
+    if (idsEqual(k, userId)) {
+      const v = state[k];
+      return Array.isArray(v) && v.length > 0;
+    }
+  }
+  return false;
 }
 
 /** The other participant in the thread (not the current user). */
@@ -309,6 +336,20 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const remoteTypingHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Synced each render: header name of the other participant (for typing label). */
   const threadOtherDisplayNameRef = useRef("Contact");
+
+  /** Supabase Presence: other user online in this thread’s presence channel. */
+  const [otherPresenceOnline, setOtherPresenceOnline] = useState(false);
+  /** When we observed the other user leave presence this session (not persisted). */
+  const [otherPresenceLeftAtMs, setOtherPresenceLeftAtMs] = useState<number | null>(null);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const presencePrevOtherOnlineRef = useRef(false);
+
+  const otherParticipantId = useMemo(() => {
+    if (!selectedId || !meId) return null;
+    const c = conversations.find((x) => x.id === selectedId);
+    if (!c) return null;
+    return getOtherParticipantId(c, meId);
+  }, [selectedId, meId, conversations]);
 
   const prefillParam = searchParams.get("prefill");
 
@@ -835,6 +876,76 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     };
   }, [token, selectedId]);
 
+  // Presence (other participant online) — separate channel from typing + postgres; only while thread selected.
+  useEffect(() => {
+    if (!token || !selectedId || !meId || !otherParticipantId) {
+      setOtherPresenceOnline(false);
+      presencePrevOtherOnlineRef.current = false;
+      return;
+    }
+    const otherId = otherParticipantId;
+    const supabase = getSupabaseClient();
+    let cancelled = false;
+    const channelName = `zorenta-presence:${selectedId}`;
+
+    void (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled || !session?.user) return;
+
+      const ch = supabase.channel(channelName, {
+        config: {
+          presence: {
+            key: meId,
+          },
+        },
+      });
+
+      const applyPresence = () => {
+        if (cancelled) return;
+        const state = ch.presenceState() as Record<string, unknown>;
+        const online = presenceStateHasUser(state, otherId);
+        if (presencePrevOtherOnlineRef.current && !online) {
+          setOtherPresenceLeftAtMs(Date.now());
+        }
+        presencePrevOtherOnlineRef.current = online;
+        setOtherPresenceOnline(online);
+      };
+
+      ch.on("presence", { event: "sync" }, applyPresence)
+        .on("presence", { event: "join" }, applyPresence)
+        .on("presence", { event: "leave" }, ({ key }) => {
+          if (idsEqual(String(key), otherId)) {
+            setOtherPresenceLeftAtMs(Date.now());
+          }
+          applyPresence();
+        });
+
+      ch.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void ch.track({ user_id: meId, online: true }).then(() => {
+            if (!cancelled) applyPresence();
+          });
+        }
+      });
+
+      if (cancelled) {
+        void supabase.removeChannel(ch);
+        return;
+      }
+      presenceChannelRef.current = ch;
+    })();
+
+    return () => {
+      cancelled = true;
+      presencePrevOtherOnlineRef.current = false;
+      const ch = presenceChannelRef.current;
+      presenceChannelRef.current = null;
+      if (ch) void supabase.removeChannel(ch);
+    };
+  }, [token, selectedId, meId, otherParticipantId]);
+
   // Current user id (for bubble alignment)
   useEffect(() => {
     if (!token) return;
@@ -927,6 +1038,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       remoteTypingHideTimeoutRef.current = null;
     }
     lastTypingBroadcastSentRef.current = 0;
+    setOtherPresenceOnline(false);
+    setOtherPresenceLeftAtMs(null);
+    presencePrevOtherOnlineRef.current = false;
   }, [selectedId]);
 
   function handleSelectConversation(id: string) {
@@ -1026,6 +1140,15 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   threadOtherDisplayNameRef.current = displayName;
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
+  const convActivityIso = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at ?? "";
+
+  const presenceStatusLine = otherPresenceOnline
+    ? { type: "online" as const }
+    : otherPresenceLeftAtMs != null
+      ? { type: "seen", rel: formatRelativeNl(otherPresenceLeftAtMs) }
+      : convActivityIso
+        ? { type: "activity", rel: formatIsoRelativeNl(convActivityIso) }
+        : { type: "offline" as const };
 
   if (!authChecked) {
     return (
@@ -1262,7 +1385,22 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">Actief</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {presenceStatusLine.type === "online" ? (
+                            <span className="font-medium text-emerald-700">Online</span>
+                          ) : presenceStatusLine.type === "seen" ? (
+                            <>
+                              Laatst gezien <span className="text-slate-600">{presenceStatusLine.rel}</span>
+                            </>
+                          ) : presenceStatusLine.type === "activity" ? (
+                            <>
+                              Laatst actief in dit gesprek:{" "}
+                              <span className="text-slate-600">{presenceStatusLine.rel}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400">Niet online</span>
+                          )}
+                        </p>
                         {selectedJobTitle ? (
                           <div className="mt-1.5 space-y-0.5">
                             <p className="text-[11px] leading-tight text-slate-500">
