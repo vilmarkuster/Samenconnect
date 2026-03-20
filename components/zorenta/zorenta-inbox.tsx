@@ -14,6 +14,7 @@ import { MessageCircle, Clock, ArrowLeft, Check, CheckCheck } from "lucide-react
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { normalizeUuidString } from "@/lib/zorenta/uuid";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** Compare conversation / profile ids from URL, Realtime, or API without casing mismatches. */
 function idsEqual(a: string | null, b: string | null | undefined): boolean {
@@ -299,6 +300,15 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     new Map()
   );
   const conversationListBootstrappedRef = useRef(false);
+
+  /** Ephemeral typing (Broadcast) — other participant’s display name for the open thread. */
+  const [remoteTypingName, setRemoteTypingName] = useState<string | null>(null);
+  const typingChannelRef = useRef<RealtimeChannel | null>(null);
+  const typingChannelReadyRef = useRef(false);
+  const lastTypingBroadcastSentRef = useRef(0);
+  const remoteTypingHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Synced each render: header name of the other participant (for typing label). */
+  const threadOtherDisplayNameRef = useRef("Contact");
 
   const prefillParam = searchParams.get("prefill");
 
@@ -748,6 +758,83 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     };
   }, [token]);
 
+  // Typing indicator: Broadcast-only channel per conversation (no DB; separate from postgres_changes).
+  useEffect(() => {
+    if (!token || !selectedId) {
+      typingChannelReadyRef.current = false;
+      typingChannelRef.current = null;
+      return;
+    }
+    const supabase = getSupabaseClient();
+    let cancelled = false;
+    const channelName = `zorenta-typing:${selectedId}`;
+
+    void (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled || !session?.user) return;
+
+      const ch = supabase
+        .channel(channelName)
+        .on(
+          "broadcast",
+          { event: "typing" },
+          (msg: { payload?: Record<string, unknown> } & Record<string, unknown>) => {
+            const body = (msg.payload ?? msg) as Record<string, unknown>;
+            const convId = String(body.conversation_id ?? "");
+            const uid = String(body.user_id ?? "");
+            if (!idsEqual(selectedIdRef.current, convId)) return;
+            if (idsEqual(meIdRef.current, uid)) return;
+            const typing = body.typing !== false;
+            if (!typing) {
+              if (remoteTypingHideTimeoutRef.current) {
+                clearTimeout(remoteTypingHideTimeoutRef.current);
+                remoteTypingHideTimeoutRef.current = null;
+              }
+              setRemoteTypingName(null);
+              return;
+            }
+            if (remoteTypingHideTimeoutRef.current) {
+              clearTimeout(remoteTypingHideTimeoutRef.current);
+            }
+            const label = threadOtherDisplayNameRef.current.trim() || "Contact";
+            setRemoteTypingName(label);
+            remoteTypingHideTimeoutRef.current = setTimeout(() => {
+              setRemoteTypingName(null);
+              remoteTypingHideTimeoutRef.current = null;
+            }, 4000);
+          }
+        )
+        .subscribe((status) => {
+          typingChannelReadyRef.current = status === "SUBSCRIBED";
+          if (status === "SUBSCRIBED") {
+            lastTypingBroadcastSentRef.current = 0;
+          }
+        });
+
+      if (cancelled) {
+        typingChannelReadyRef.current = false;
+        void supabase.removeChannel(ch);
+        return;
+      }
+      typingChannelRef.current = ch;
+    })();
+
+    return () => {
+      cancelled = true;
+      typingChannelReadyRef.current = false;
+      if (remoteTypingHideTimeoutRef.current) {
+        clearTimeout(remoteTypingHideTimeoutRef.current);
+        remoteTypingHideTimeoutRef.current = null;
+      }
+      setRemoteTypingName(null);
+      const ch = typingChannelRef.current;
+      typingChannelRef.current = null;
+      if (ch) void supabase.removeChannel(ch);
+    };
+  }, [token, selectedId]);
+
   // Current user id (for bubble alignment)
   useEffect(() => {
     if (!token) return;
@@ -834,6 +921,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
 
   useEffect(() => {
     setFakeTypingAfterSend(false);
+    setRemoteTypingName(null);
+    if (remoteTypingHideTimeoutRef.current) {
+      clearTimeout(remoteTypingHideTimeoutRef.current);
+      remoteTypingHideTimeoutRef.current = null;
+    }
+    lastTypingBroadcastSentRef.current = 0;
   }, [selectedId]);
 
   function handleSelectConversation(id: string) {
@@ -844,6 +937,37 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   function handleClearSelectionMobile() {
     setSelectedId(null);
     onUrlConversationChange(null);
+  }
+
+  /** Throttle ~1.8s: first burst sends immediately; avoids per-keystroke traffic. */
+  function scheduleTypingBroadcast() {
+    const ch = typingChannelRef.current;
+    if (!ch || !typingChannelReadyRef.current) return;
+    const conv = selectedIdRef.current;
+    const me = meIdRef.current;
+    if (!conv || !me) return;
+    const now = Date.now();
+    if (now - lastTypingBroadcastSentRef.current < 1800) return;
+    lastTypingBroadcastSentRef.current = now;
+    void ch.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { conversation_id: conv, user_id: me, typing: true },
+    });
+  }
+
+  function sendTypingStopBroadcast() {
+    const ch = typingChannelRef.current;
+    if (!ch || !typingChannelReadyRef.current) return;
+    const conv = selectedIdRef.current;
+    const me = meIdRef.current;
+    if (!conv || !me) return;
+    lastTypingBroadcastSentRef.current = 0;
+    void ch.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { conversation_id: conv, user_id: me, typing: false },
+    });
   }
 
   async function handleSendReply() {
@@ -858,6 +982,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     const data = await res.json().catch(() => ({}));
     setSending(false);
     if (res.ok && data?.id) {
+      sendTypingStopBroadcast();
       trackZorentaEvent("message_sent", { conversation_id: selectedId });
       const createdAt =
         typeof data?.created_at === "string"
@@ -898,6 +1023,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const selectedConvo = conversations.find((c) => c.id === selectedId);
   const displayName =
     getPresentableOtherName(selectedConvo, meId, resolvedOtherNames)?.trim() || "Contact";
+  threadOtherDisplayNameRef.current = displayName;
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
 
@@ -1245,6 +1371,15 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                   )}
                 </div>
 
+                {!loadingMessages && selectedId && remoteTypingName ? (
+                  <div className="shrink-0 border-t border-emerald-100/80 bg-emerald-50/40 px-3 py-2 sm:px-4">
+                    <p className="text-xs text-slate-600">
+                      <span className="font-medium text-slate-800">{remoteTypingName}</span>{" "}
+                      <span className="italic text-slate-500">is aan het typen…</span>
+                    </p>
+                  </div>
+                ) : null}
+
                 {!loadingMessages && selectedId && fakeTypingAfterSend ? (
                   <div className="shrink-0 border-t border-slate-100/80 bg-slate-50/60 px-3 py-2 sm:px-4">
                     <p className="text-xs text-slate-500">
@@ -1259,7 +1394,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     <textarea
                       rows={2}
                       value={composerBody}
-                      onChange={(e) => setComposerBody(e.target.value)}
+                      onChange={(e) => {
+                        setComposerBody(e.target.value);
+                        scheduleTypingBroadcast();
+                      }}
                       placeholder="Typ je bericht..."
                       className="min-h-[44px] flex-1 resize-none rounded-2xl border border-slate-200/90 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#40ada8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#40ada8]/18"
                       onKeyDown={(e) => {
