@@ -14,6 +14,13 @@ import { MessageCircle, Clock, ArrowLeft, Check, CheckCheck } from "lucide-react
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { normalizeUuidString } from "@/lib/zorenta/uuid";
+import {
+  getBrowserNotificationPermission,
+  isBrowserNotificationSupported,
+  requestBrowserNotificationPermission,
+  shouldShowMessageNotificationForIncoming,
+  showIncomingMessageBrowserNotification,
+} from "@/lib/zorenta/browser-notifications";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** Compare conversation / profile ids from URL, Realtime, or API without casing mismatches. */
@@ -207,6 +214,17 @@ function getPresentableOtherName(
   return formatted || null;
 }
 
+function getNotificationTitleForConversation(
+  convId: string,
+  list: ApiConversation[],
+  meId: string | null,
+  resolvedNames: Record<string, string>
+): string {
+  const c = list.find((x) => idsEqual(x.id, convId));
+  const name = c ? getPresentableOtherName(c, meId, resolvedNames) : null;
+  return name?.trim() || "Bericht";
+}
+
 function initialFromDisplayLabel(label: string): string {
   const w = label.trim().split(/\s+/)[0] ?? "";
   const ch = w.charAt(0);
@@ -309,12 +327,25 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   selectedIdRef.current = selectedId;
 
   const [messages, setMessages] = useState<ApiMessage[]>([]);
+  const messagesRef = useRef<ApiMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
 
   const [meId, setMeId] = useState<string | null>(null);
   /** display names keyed by other user's profile id when missing from GET /conversations */
   const [resolvedOtherNames, setResolvedOtherNames] = useState<Record<string, string>>({});
+  const conversationsRef = useRef<ApiConversation[]>([]);
+  const resolvedOtherNamesRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+  useEffect(() => {
+    resolvedOtherNamesRef.current = resolvedOtherNames;
+  }, [resolvedOtherNames]);
   const attemptedCaregiverNameFetchRef = useRef<Set<string>>(new Set());
   /** Only the latest GET /conversations may apply; avoids stale responses overwriting newer unread_count. */
   const conversationsLoadRequestIdRef = useRef(0);
@@ -343,6 +374,27 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const [otherPresenceLeftAtMs, setOtherPresenceLeftAtMs] = useState<number | null>(null);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const presencePrevOtherOnlineRef = useRef(false);
+
+  /** Browser notifications: ask once per mount on first explicit user gesture (conversation pick). */
+  const notificationPermissionPromptedRef = useRef(false);
+  const [browserNotificationPermission, setBrowserNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("unsupported");
+  useEffect(() => {
+    if (!isBrowserNotificationSupported()) {
+      setBrowserNotificationPermission("unsupported");
+      return;
+    }
+    setBrowserNotificationPermission(getBrowserNotificationPermission());
+  }, []);
+
+  function tryRequestNotificationPermissionOnUserGesture() {
+    if (notificationPermissionPromptedRef.current) return;
+    if (!isBrowserNotificationSupported()) return;
+    if (Notification.permission !== "default") return;
+    notificationPermissionPromptedRef.current = true;
+    void requestBrowserNotificationPermission().then((p) => setBrowserNotificationPermission(p));
+  }
 
   const otherParticipantId = useMemo(() => {
     if (!selectedId || !meId) return null;
@@ -629,6 +681,30 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
           insertConversationId: convId,
           matchedOpenThread,
         });
+
+        if (incomingFromOther) {
+          const dupInOpenThread =
+            matchedOpenThread && messagesRef.current.some((m) => m.id === msg.id);
+          if (
+            !dupInOpenThread &&
+            shouldShowMessageNotificationForIncoming({
+              messageBelongsToOpenThread: matchedOpenThread,
+            })
+          ) {
+            const title = getNotificationTitleForConversation(
+              convId,
+              conversationsRef.current,
+              meIdRef.current,
+              resolvedOtherNamesRef.current
+            );
+            showIncomingMessageBrowserNotification({
+              title,
+              body: msg.body,
+              conversationId: convId,
+              messageId: msg.id,
+            });
+          }
+        }
 
         if (!matchedOpenThread) {
           // eslint-disable-next-line no-console -- temporary Realtime debug
@@ -1044,6 +1120,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   }, [selectedId]);
 
   function handleSelectConversation(id: string) {
+    tryRequestNotificationPermissionOnUserGesture();
     setSelectedId(id);
     onUrlConversationChange(id);
   }
@@ -1086,6 +1163,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
 
   async function handleSendReply() {
     if (!token || !selectedId || !composerBody.trim() || sending) return;
+    tryRequestNotificationPermissionOnUserGesture();
     const text = composerBody.trim();
     setSending(true);
     const res = await fetch("/api/zorenta/messages", {
@@ -1555,19 +1633,36 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       Versturen
                     </Button>
                   </div>
-                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
                       <MessageCircle className="h-3 w-3" />
                       Veilig berichten via SamenConnect
                     </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 border-slate-200 text-xs"
-                      onClick={() => router.push("/zorenta/matches")}
-                    >
-                      Nieuw bericht
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {browserNotificationPermission === "default" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-slate-200 text-xs"
+                          onClick={() => {
+                            void requestBrowserNotificationPermission().then((p) =>
+                              setBrowserNotificationPermission(p)
+                            );
+                          }}
+                        >
+                          Meldingen voor nieuwe berichten
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 border-slate-200 text-xs"
+                        onClick={() => router.push("/zorenta/matches")}
+                      >
+                        Nieuw bericht
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </>
