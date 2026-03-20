@@ -61,15 +61,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) {
       // eslint-disable-next-line no-console
-      console.error("Supabase login error", error);
-      throw error;
+      console.error("Supabase login error", {
+        message: error.message,
+        name: error.name,
+        status: (error as { status?: number }).status,
+      });
+      throw new Error(error.message || "Inloggen mislukt.");
     }
 
     if (!data.session) {
-      throw new Error("No session returned from Supabase.");
+      // eslint-disable-next-line no-console
+      console.error("Supabase login: no session in response", { user: data.user?.id });
+      throw new Error("Geen sessie ontvangen. Controleer je e-mailbevestiging.");
     }
 
-    // Optimistically update; onAuthStateChange will keep this in sync.
+    // eslint-disable-next-line no-console
+    console.log("Supabase login OK", {
+      userId: data.session.user.id,
+      expiresAt: data.session.expires_at,
+    });
+
+    // Sync session to cookies (createBrowserClient) then confirm
+    const { data: sessionCheck } = await supabase.auth.getSession();
+    // eslint-disable-next-line no-console
+    console.log("Session after signIn", { hasSession: !!sessionCheck.session });
+
     setIsAuthenticated(true);
   }, []);
 

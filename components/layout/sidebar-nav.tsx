@@ -17,7 +17,7 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/zorenta", label: "Zorenta", icon: Heart },
+  { href: "/zorenta", label: "SamenConnect", icon: Heart },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/workflows", label: "Workflows", icon: GitBranch },

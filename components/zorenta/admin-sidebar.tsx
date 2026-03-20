@@ -43,7 +43,7 @@ export function AdminSidebar({ onNavigate, onLogout }: AdminSidebarProps) {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-700 text-white">
             <Shield className="h-4 w-4" />
           </span>
-          <span className="font-semibold text-slate-900">Zorenta Admin</span>
+          <span className="font-semibold text-slate-900">SamenConnect Admin</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -76,7 +76,7 @@ export function AdminSidebar({ onNavigate, onLogout }: AdminSidebarProps) {
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
           <Heart className="h-4 w-4 shrink-0" />
-          Naar Zorenta
+          Naar SamenConnect
         </a>
         {onLogout && (
           <button

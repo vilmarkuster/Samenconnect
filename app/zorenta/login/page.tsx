@@ -2,15 +2,22 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+function safePostLoginPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/zorenta/dashboard";
+  if (!next.startsWith("/zorenta")) return "/zorenta/dashboard";
+  return next;
+}
+
 export default function ZorentaLoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -22,9 +29,19 @@ export default function ZorentaLoginPage() {
     setError(null);
     try {
       await login(email, password);
-      router.replace("/zorenta/dashboard");
+      const dest = safePostLoginPath(searchParams.get("next"));
+      // eslint-disable-next-line no-console
+      console.log("Login redirect", { dest });
+      // Full navigation so middleware sees fresh auth cookies on the next request
+      window.location.assign(dest);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Inloggen mislukt.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }

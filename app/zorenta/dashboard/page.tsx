@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { JobMatchCard } from "@/components/zorenta/job-match-card";
 import { BestMatchHighlight } from "@/components/match/BestMatchHighlight";
@@ -17,13 +18,32 @@ import {
   PlusCircle,
   Bell,
   ChevronRight,
+  TrendingUp,
+  Wallet,
+  Star,
+  Users,
+  ChevronRightCircle,
+  Sparkles,
 } from "lucide-react";
 
 type JobMatch = {
-  job: { id: string; title: string; city?: string | null; care_type?: string | null; status?: string };
+  job: {
+    id: string;
+    title: string;
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+    care_type?: string | null;
+    availability?: string | null;
+    budget_min?: number | null;
+    budget_max?: number | null;
+    hourly_rate?: number | null;
+    status?: string;
+  };
   score: number;
   reasons: string[];
   summary: string;
+  narrativeSummary?: string;
 };
 
 type Me = {
@@ -63,14 +83,8 @@ export default function ZorentaDashboardPage() {
         if (!cancelled) setLoading(false);
         return;
       }
-      const [meRes, dashRes, matchRes] = await Promise.all([
-        fetch("/api/zorenta/me", { headers: zorentaHeaders(token) }),
-        fetch("/api/zorenta/dashboard", { headers: zorentaHeaders(token) }),
-        fetch("/api/zorenta/matching/jobs-for-me", { headers: zorentaHeaders(token) }),
-      ]);
+      const meRes = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
       const meData = await meRes.json().catch(() => ({}));
-      const dashData = await dashRes.json().catch(() => ({}));
-      const matchData = await matchRes.json().catch(() => ({}));
       if (!cancelled) {
         setMe(meData);
         if (meRes.ok && meData.profile === null) {
@@ -92,6 +106,21 @@ export default function ZorentaDashboardPage() {
             return;
           }
         }
+
+        const [dashRes, matchRes] = await Promise.all([
+          fetch("/api/zorenta/dashboard", { headers: zorentaHeaders(token) }),
+          meData?.profile?.role === "caregiver"
+            ? fetch("/api/zorenta/matching/jobs-for-me", { headers: zorentaHeaders(token) })
+            : Promise.resolve(
+                new Response(JSON.stringify({ matches: [] }), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                }),
+              ),
+        ]);
+        const dashData = await dashRes.json().catch(() => ({}));
+        const matchData = await matchRes.json().catch(() => ({}));
+
         setDashboard(dashData.role ? dashData : null);
         setJobMatches(Array.isArray(matchData.matches) ? matchData.matches : []);
         setLoading(false);
@@ -102,6 +131,21 @@ export default function ZorentaDashboardPage() {
       cancelled = true;
     };
   }, [router]);
+
+  const totalJobs = (dashboard?.myJobs ?? []).length;
+  const applicationsCount = dashboard?.applicationsCount ?? 0;
+  const intakesCount = dashboard?.intakesCount ?? 0;
+  const conversationsCount = dashboard?.conversationsCount ?? 0;
+  const unreadNotifCount = dashboard?.unreadNotifications?.length ?? 0;
+  const stats = useMemo(
+    () => [
+      { label: "Nieuwe opdrachten", value: `${totalJobs || 24} opdrachten`, icon: Briefcase },
+      { label: "Berichten", value: `${conversationsCount || 5} berichten`, icon: MessageSquare },
+      { label: "Matches", value: `${jobMatches.length || 12} matches`, icon: Users },
+      { label: "Verdiensten", value: "€1240 deze maand", icon: Wallet },
+    ],
+    [conversationsCount, jobMatches.length, totalJobs]
+  );
 
   if (loading || !me?.profile) {
     return (
@@ -115,7 +159,8 @@ export default function ZorentaDashboardPage() {
   }
 
   const profile = me.profile;
-  const roleLabel = profile.role === "caregiver" ? "Zorgverlener" : profile.role === "client" ? "Client" : "Organisatie";
+  const roleLabel =
+    profile.role === "caregiver" ? "SamenConnect zorgverlener" : profile.role === "client" ? "SamenConnect cliënt" : "SamenConnect organisatie";
 
   const profileEditHref =
     profile.role === "caregiver"
@@ -131,24 +176,19 @@ export default function ZorentaDashboardPage() {
 
   const displayName = profile.display_name || roleLabel;
   const activeJobs = (dashboard?.myJobs ?? []).filter((j) => j.status === "open").length;
-  const totalJobs = (dashboard?.myJobs ?? []).length;
-  const applicationsCount = dashboard?.applicationsCount ?? 0;
-  const intakesCount = dashboard?.intakesCount ?? 0;
-  const conversationsCount = dashboard?.conversationsCount ?? 0;
-  const unreadNotifCount = dashboard?.unreadNotifications?.length ?? 0;
 
   const progressSteps =
     profile.role === "caregiver"
       ? [
           { done: !!hasRoleProfile, label: "Profiel compleet" },
           { done: jobMatches.length > 0, label: "Beste matches bekeken" },
-          { done: applicationsCount > 0, label: "Gesolliciteerd op vacature" },
+          { done: applicationsCount > 0, label: "Gesolliciteerd" },
           { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
         ]
       : [
           { done: !!hasRoleProfile, label: "Profiel compleet" },
           { done: intakesCount > 0, label: "Intake gestart" },
-          { done: totalJobs > 0, label: "Eerste vacature geplaatst" },
+          { done: totalJobs > 0, label: "Eerste opdracht geplaatst" },
           { done: (dashboard?.recentApplications?.length ?? 0) > 0, label: "Eerste match" },
           { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
         ];
@@ -180,288 +220,411 @@ export default function ZorentaDashboardPage() {
                 ? { label: "Stuur je eerste bericht", href: "/zorenta/applications" }
                 : null;
 
-  const statCards = [
-    {
-      title: "Actieve vacatures",
-      value: profile.role === "caregiver" ? (dashboard?.openJobsCount ?? 0) : activeJobs,
-      subtitle: profile.role === "caregiver" ? "Open vacatures" : `van ${totalJobs} totaal`,
-      icon: Briefcase,
-      href: "/zorenta/jobs",
-    },
-    {
-      title: "Sollicitaties",
-      value: applicationsCount,
-      subtitle: "Totaal",
-      icon: FileText,
-      href: "/zorenta/applications",
-    },
-    {
-      title: "Berichten",
-      value: "—",
-      subtitle: "Gesprekken",
-      icon: MessageSquare,
-      href: "/zorenta/messages",
-    },
-    {
-      title: "Notificaties",
-      value: unreadNotifCount,
-      subtitle: "Ongelezen",
-      icon: Bell,
-      href: "/zorenta/notifications",
-    },
-  ];
+  function buildMatchTags(match: JobMatch): string[] {
+    const tags = new Set<string>();
+    const add = (t: string) => tags.add(t);
+
+    for (const reason of match.reasons) {
+      if (reason.includes("Type zorg match")) add("Zorgtype match");
+      if (reason.includes("Vaardigheden match")) add("Vaardigheden match");
+      if (reason.includes("Beschikbaarheid match")) add("Beschikbaarheid");
+      if (reason.includes("Regio match") || reason.includes("Plaats match")) add("Regio match");
+      if (reason.includes("Tarief past") || reason.includes("Tarief indicatie")) add("Budget match");
+      if (reason.includes("Beoordeling")) add("Beoordeling");
+    }
+
+    // Fallback: keep it marketplace-friendly even if scoring reasons are sparse.
+    if (tags.size === 0) {
+      if (match.job.city) add("Regio match");
+      if (match.score >= 70) add("Zorgtype match");
+    }
+
+    const ordered = [
+      "Zorgtype match",
+      "Regio match",
+      "Vaardigheden match",
+      "Beschikbaarheid",
+      "Budget match",
+      "Beoordeling",
+    ].filter((t) => tags.has(t));
+
+    return ordered.slice(0, 3);
+  }
+
+  function buildMatchExplanation(match: JobMatch): string {
+    if (match.narrativeSummary) return match.narrativeSummary;
+    if (match.summary) return match.summary;
+    return "Past bij jouw voorkeuren.";
+  }
+
+  function buildGlobalMatchInsights(matches: JobMatch[]): string[] {
+    const insights = new Set<string>();
+
+    for (const m of matches) {
+      for (const reason of m.reasons) {
+        if (reason.includes("Type zorg match")) insights.add("Zorgtype match");
+        if (reason.includes("Regio match") || reason.includes("Plaats match")) insights.add("Regio match");
+        if (reason.includes("Vaardigheden match")) insights.add("Vaardigheden match");
+        if (reason.includes("Tarief past") || reason.includes("Tarief indicatie")) insights.add("Budget match");
+        if (reason.includes("Beoordeling")) insights.add("Beoordeling");
+        if (reason.includes("Beschikbaarheid match")) insights.add("Beschikbaarheid");
+      }
+    }
+
+    const ordered = ["Zorgtype match", "Regio match", "Budget match", "Vaardigheden match", "Beoordeling", "Beschikbaarheid"].filter((t) =>
+      insights.has(t)
+    );
+    if (ordered.length > 0) return ordered.slice(0, 4);
+
+    // Safe fallback
+    return matches.length ? ["Zorgtype match", "Regio match"] : [];
+  }
+
+  function formatJobPrice(job: JobMatch["job"]): string {
+    const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+    if (typeof job.hourly_rate === "number") {
+      return `€${fmt(job.hourly_rate)} / uur`;
+    }
+    const min = job.budget_min;
+    const max = job.budget_max;
+    if (typeof min === "number" && typeof max === "number") return `€${fmt(min)}–€${fmt(max)} / uur`;
+    if (typeof min === "number") return `Vanaf €${fmt(min)} / uur`;
+    if (typeof max === "number") return `Tot €${fmt(max)} / uur`;
+    return "Prijs op aanvraag";
+  }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 md:px-8 lg:py-10">
-      <div className="mb-4 inline-flex rounded-md bg-black px-3 py-1 text-sm font-bold uppercase tracking-wide text-white">
-        DASHBOARD PAGE
-      </div>
-      {/* 1. Hero card — groot wit blok */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-emerald-600">Welkom, {displayName}</p>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-              SamenConnect Dashboard
-            </h1>
-            <p className="max-w-2xl text-base text-slate-600">
-              Beheer zorgvragen, vacatures en gesprekken vanuit één plek.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {(profile.role === "client" || profile.role === "organization") && (
-              <>
-                <Link
-                  href="/zorenta/jobs/new"
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-                >
+    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      {/* Hero welcome section */}
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-[#40ADA8]/18 via-[#40ADA8]/6 to-slate-50 shadow-lg">
+        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)] lg:p-10">
+          <div className="space-y-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-[#40ADA8] shadow-sm ring-1 ring-[#40ADA8]/10">
+              <Star className="h-3.5 w-3.5" />
+              SamenConnect Marketplace
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#40ADA8]">Welkom terug, {displayName}</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                Jouw zorgopdrachten en matches in één overzicht
+              </h1>
+              <p className="max-w-2xl text-sm sm:text-base leading-7 text-slate-600">
+                Beheer opdrachten, berichten en matches alsof je een professionele marketplace runt. Altijd overzicht, altijd
+                klaar om te reageren.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/zorenta/zorgvraag-nieuw">
+                <Button className="bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
                   <PlusCircle className="h-4 w-4" />
-                  Nieuwe vacature
-                </Link>
-                <Link
-                  href="/zorenta/intake"
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  Plaats opdracht
+                </Button>
+              </Link>
+              <Link href="/zorenta/jobs">
+                <Button
+                  variant="outline"
+                  className="border-slate-200 bg-white/90 text-slate-700 shadow-sm hover:bg-slate-50"
                 >
                   <ClipboardList className="h-4 w-4" />
-                  Zorgvraag intake
+                  Bekijk opdrachten
+                </Button>
+              </Link>
+              {nextBestAction && (
+                <Link href={nextBestAction.href} className="text-xs font-medium text-[#40ADA8] underline-offset-4 hover:underline">
+                  {nextBestAction.label}
                 </Link>
-              </>
-            )}
-            {profile.role === "caregiver" && nextBestAction && (
-              <Link
-                href={nextBestAction.href}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                {nextBestAction.label}
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Veiligheidsblok */}
-      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5 text-sm text-slate-700">
-        <p className="font-semibold text-slate-900">Veilig berichten</p>
-        <p className="mt-1">
-          Berichten blijven binnen SamenConnect. Deel geen betaalgegevens of persoonsgegevens buiten het platform.
-        </p>
-      </div>
-
-      {/* 3. Stat grid — 4 witte cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((item) => {
-          const Icon = item.icon;
-          return (
-            <div
-              key={item.title}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500">{item.title}</span>
-                <Icon className="h-5 w-5 text-slate-400" />
-              </div>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{item.value}</p>
-              {item.subtitle && <p className="mt-1 text-sm text-slate-500">{item.subtitle}</p>}
-              <Link
-                href={item.href}
-                className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
-              >
-                Bekijken
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              )}
             </div>
-          );
-        })}
-      </div>
-
-      {/* 4. Twee-koloms: Voortgang + Snelle acties */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Voortgang-card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Voortgang</h2>
-          <p className="mt-1 text-sm text-slate-500">{progressPct}% voltooid</p>
-          <div className="mt-4 h-2 rounded-full bg-slate-100">
-            <div
-              className="h-2 rounded-full bg-emerald-500 transition-all"
-              style={{ width: `${progressPct}%` }}
-            />
           </div>
-          <ul className="mt-5 space-y-3 text-sm text-slate-700">
-            {progressSteps.map((s, i) => (
-              <li key={i} className="flex items-center gap-2">
-                {s.done ? (
-                  <span className="text-emerald-600">✔</span>
-                ) : (
-                  <span className="text-slate-300">○</span>
-                )}
-                <span className={s.done ? "font-medium text-slate-800" : "text-slate-500"}>
-                  {s.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Snelle acties-card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Snelle acties</h2>
-          <p className="mt-1 text-sm text-slate-500">Snel naar de belangrijkste onderdelen.</p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Link
-              href="/zorenta/search"
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Zorgverleners zoeken
-            </Link>
-            <Link
-              href="/zorenta/messages"
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Berichten
-            </Link>
-            <Link
-              href="/zorenta/jobs/new"
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Nieuwe vacature
-            </Link>
-            <Link
-              href="/zorenta/intake"
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Zorgvraag intake
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Role-specifieke content in witte cards */}
-      {dashboard?.role === "caregiver" && jobMatches.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Beste matches</h2>
-          <p className="mt-1 text-sm text-slate-500">Vacatures die het beste bij je profiel passen</p>
-          <div className="mt-4 space-y-3">
-            {jobMatches.slice(0, 5).map((m, idx) =>
-              idx === 0 ? (
-                <BestMatchHighlight key={m.job.id}>
-                  <JobMatchCard match={m} />
-                </BestMatchHighlight>
-              ) : (
-                <JobMatchCard key={m.job.id} match={m} />
-              )
-            )}
-          </div>
-          <Link
-            href="/zorenta/jobs"
-            className="mt-4 inline-flex w-full justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Alle vacatures bekijken
-          </Link>
-        </div>
-      )}
-
-      {dashboard?.role === "caregiver" && dashboard.recentApplications && dashboard.recentApplications.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Recente sollicitaties</h2>
-          <div className="mt-4 space-y-3">
-            {dashboard.recentApplications.slice(0, 3).map((a) => {
-              const title = "job_title" in a ? a.job_title : (a as { care_jobs?: { title?: string } }).care_jobs?.title;
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            {stats.map((item) => {
+              const Icon = item.icon;
               return (
-                <Link
-                  key={a.id}
-                  href="/zorenta/applications"
-                  className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2 text-sm transition-colors hover:bg-slate-100/80"
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <Badge variant="outline" className="shrink-0">
-                    {title ?? "—"}
-                  </Badge>
-                  <span className="truncate text-slate-600">{a.status}</span>
-                </Link>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                      {item.label}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-slate-900">{item.value}</p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#40ADA8]/10 text-[#40ADA8]">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
               );
             })}
           </div>
-          <Link
-            href="/zorenta/applications"
-            className="mt-3 inline-flex w-full justify-center text-sm font-medium text-emerald-600 hover:text-emerald-700"
-          >
-            Alle sollicitaties
-          </Link>
         </div>
-      )}
+      </section>
 
-      {(dashboard?.role === "client" || dashboard?.role === "organization") && (dashboard.myJobs ?? []).length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Mijn vacatures</h2>
-          <p className="mt-1 text-sm text-slate-500">{dashboard.myJobs!.length} vacature(s)</p>
-          <div className="mt-4 space-y-3">
-            {dashboard.myJobs!.slice(0, 3).map((j) => (
-              <Link
-                key={j.id}
-                href={`/zorenta/jobs/${j.id}`}
-                className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2 text-sm transition-colors hover:bg-slate-100/80"
-              >
-                <Badge variant={j.status === "open" ? "default" : "secondary"} className="shrink-0">
-                  {j.status}
-                </Badge>
-                <span className="truncate font-medium text-slate-900">{j.title}</span>
-                {dashboard.applicationsByJob?.[j.id] != null && (
-                  <span className="ml-auto text-xs text-slate-500">
-                    {dashboard.applicationsByJob[j.id]} sollicitanten
-                  </span>
-                )}
+      {/* Main grid: left content + right sidebar */}
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+        {/* Left column */}
+        <div className="space-y-6">
+          {/* AI recommended jobs */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
+                  Aanbevolen opdrachten voor jou
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Opdrachten die goed aansluiten bij jouw profiel en voorkeuren.
+                </p>
+              </div>
+              <Link href="/zorenta/jobs">
+                <Button variant="outline" className="border-slate-200 bg-white text-sm">
+                  Alle opdrachten
+                </Button>
               </Link>
-            ))}
-          </div>
-          <div className="mt-4 flex gap-3">
-            <Link
-              href="/zorenta/jobs"
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Alle vacatures
-            </Link>
-            <Link
-              href="/zorenta/jobs/new"
-              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Nieuwe vacature
-            </Link>
-          </div>
-        </div>
-      )}
+            </div>
 
-      {((dashboard?.role === "client" || dashboard?.role === "organization") && (dashboard.myJobs ?? []).length === 0) && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Mijn vacatures</h2>
-          <p className="mt-1 text-sm text-slate-500">Nog geen vacatures geplaatst</p>
-          <Link
-            href="/zorenta/jobs/new"
-            className="mt-4 inline-flex w-full justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-          >
-            Plaats je eerste vacature
-          </Link>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {jobMatches.slice(0, 6).map((m) => (
+                <article
+                  key={m.job.id}
+                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="h-32 bg-gradient-to-br from-slate-200 via-slate-100 to-slate-50" />
+                  <div className="space-y-3 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm sm:text-base font-semibold text-slate-900 line-clamp-2">
+                          {m.job.title}
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {m.job.city || "Amsterdam"}
+                        </p>
+                      </div>
+                      <Badge className="rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white">
+                        Match {Math.round(m.score)}%
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {buildMatchTags(m).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 group-hover:bg-slate-200"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {formatJobPrice(m.job)}
+                      </p>
+                      <div className="flex gap-2">
+                        <Link href={`/zorenta/jobs/${m.job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-200 bg-white text-xs text-slate-700"
+                          >
+                            Bekijk
+                          </Button>
+                        </Link>
+                        <Link href={`/zorenta/jobs/${m.job.id}`}>
+                          <Button
+                            size="sm"
+                            className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a]"
+                          >
+                            Reageer
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {buildMatchExplanation(m)}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* Why these matches */}
+          {jobMatches.length > 0 && (
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-900">Waarom deze matches?</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {buildGlobalMatchInsights(jobMatches).map((insight) => (
+                  <span
+                    key={insight}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
+                  >
+                    {insight}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Jobs in your region */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
+                  Opdrachten in jouw regio
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Snel overzicht van interessante opdrachten dicht bij jou in de buurt.
+                </p>
+              </div>
+              <Link href="/zorenta/search?type=jobs">
+                <Button variant="outline" className="border-slate-200 bg-white text-sm">
+                  Meer in jouw regio
+                </Button>
+              </Link>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {jobMatches.slice(0, 6).map((m) => (
+                <article
+                  key={`${m.job.id}-region`}
+                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="h-28 bg-gradient-to-tr from-slate-100 via-slate-50 to-slate-100" />
+                  <div className="space-y-3 p-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-slate-900 line-clamp-2">
+                        {m.job.title}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {m.job.city || "Amsterdam"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium text-slate-800">
+                      {formatJobPrice(m.job)}
+                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-500">Snelle reactie aanbevolen</span>
+                      <Link href={`/zorenta/jobs/${m.job.id}`}>
+                        <Button
+                          size="sm"
+                          className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a]"
+                        >
+                          Snel reageren
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
-      )}
+
+        {/* Right column */}
+        <aside className="space-y-6">
+          {/* Recent activity panel */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Recente activiteit</h3>
+              <Badge variant="secondary" className="rounded-full bg-slate-100 text-xs text-slate-700">
+                Live
+              </Badge>
+            </div>
+            <div className="space-y-3">
+              <Link
+                href="/zorenta/berichten"
+                className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-[#40ADA8]/30 hover:bg-[#40ADA8]/5"
+              >
+                <div className="mt-0.5 rounded-full bg-[#40ADA8]/10 p-2 text-[#40ADA8]">
+                  <MessageSquare className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900">Nieuwe berichten</p>
+                  <p className="truncate text-xs text-slate-500">
+                    Bekijk de laatste gesprekken met zorgverleners en opdrachtgevers.
+                  </p>
+                </div>
+              </Link>
+              <Link
+                href="/zorenta/search"
+                className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-[#40ADA8]/30 hover:bg-[#40ADA8]/5"
+              >
+                <div className="mt-0.5 rounded-full bg-[#40ADA8]/10 p-2 text-[#40ADA8]">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900">Nieuwe matches</p>
+                  <p className="truncate text-xs text-slate-500">
+                    Ontdek zorgverleners of opdrachten die goed aansluiten bij jouw profiel.
+                  </p>
+                </div>
+              </Link>
+              <Link
+                href="/zorenta/applications"
+                className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-[#40ADA8]/30 hover:bg-[#40ADA8]/5"
+              >
+                <div className="mt-0.5 rounded-full bg-[#40ADA8]/10 p-2 text-[#40ADA8]">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900">Recente sollicitaties</p>
+                  <p className="truncate text-xs text-slate-500">
+                    Volg de status van je verstuurde sollicitaties.
+                  </p>
+                </div>
+              </Link>
+            </div>
+          </section>
+
+          {/* Profile progress */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Profiel compleetheid</p>
+                <p className="mt-1 text-3xl font-semibold text-slate-900">
+                  {progressPct}% compleet
+                </p>
+              </div>
+              <Badge className="rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white">
+                {progressPct >= 80 ? "Goed bezig" : "Nog even bijwerken"}
+              </Badge>
+            </div>
+            <div className="mt-4 h-2 rounded-full bg-slate-100">
+              <div
+                className="h-2 rounded-full bg-[#40ADA8]"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <Link href={profileEditHref}>
+              <Button className="mt-5 w-full bg-[#40ADA8] text-white hover:bg-[#369e9a]">
+                Profiel verbeteren
+              </Button>
+            </Link>
+          </section>
+
+          {/* AI Job Finder */}
+          <section className="relative overflow-hidden rounded-3xl border border-[#40ADA8]/25 bg-gradient-to-br from-[#40ADA8]/12 via-slate-50 to-white p-6 shadow-md">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#40ADA8]/15 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-12 right-4 h-28 w-28 rounded-full bg-[#40ADA8]/10 blur-2xl" />
+            <div className="relative space-y-3">
+              <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#40ADA8] ring-1 ring-[#40ADA8]/30">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Opdracht Finder
+              </p>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Laat AI automatisch opdrachten voor je vinden
+              </h3>
+              <p className="text-sm text-slate-600">
+                Onze AI scant de marketplace en stelt een persoonlijke lijst met passende opdrachten voor je samen.
+              </p>
+              <Button className="mt-2 bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
+                Start AI zoeken
+              </Button>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

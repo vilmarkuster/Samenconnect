@@ -15,13 +15,8 @@ export default async function ZorentaLayout({ children }: { children: React.Reac
   const mode = resolveMode(pathname);
 
   return (
-    <>
-      <div className="fixed left-4 top-28 z-[9999] rounded-lg bg-blue-700 px-3 py-1 text-sm font-bold text-white shadow-lg">
-        ZORENTA SERVER LAYOUT
-      </div>
-      <ZorentaLayoutClient mode={mode} initialPathname={pathname}>
-        {children}
-      </ZorentaLayoutClient>
-    </>
+    <ZorentaLayoutClient mode={mode} initialPathname={pathname}>
+      {children}
+    </ZorentaLayoutClient>
   );
 }

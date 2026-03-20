@@ -63,7 +63,7 @@ export default function ReviewsPage() {
                 Zoek zorgverleners
               </Button>
             </Link>
-            <Link href="/zorenta/messages">
+            <Link href="/zorenta/berichten">
               <Button variant="outline" className="gap-2">
                 <MessageSquare className="h-4 w-4" />
                 Berichten

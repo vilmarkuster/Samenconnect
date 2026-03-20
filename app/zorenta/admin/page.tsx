@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
     getZorentaAccessToken()
       .then((token) => {
         if (!token) {
-          if (!cancelled) setError("Geen Zorenta-sessie gevonden.");
+          if (!cancelled) setError("Geen SamenConnect-sessie gevonden.");
           setLoading(false);
           return null;
         }
@@ -113,7 +113,7 @@ export default function AdminDashboardPage() {
         </h1>
       </div>
       <p className="text-sm text-slate-600">
-        Overzicht van de Zorenta-marktplaats voor interne admins.
+        Overzicht van de SamenConnect-marktplaats voor interne admins.
       </p>
 
       {error && (

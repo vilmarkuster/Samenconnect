@@ -3,10 +3,21 @@ import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
 import { scoreJobForCaregiver, type JobForScoring, type CaregiverForScoring } from "@/lib/zorenta/matching";
 
 export async function GET(req: NextRequest) {
+  // Log incoming Authorization for debugging
+  // eslint-disable-next-line no-console
+  console.log("[jobs-for-me] Incoming auth header", {
+    authHeader: req.headers.get("authorization") ?? null,
+  });
+
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
   const { supabase, userId, profile } = auth;
   if (profile.role !== "caregiver") {
+    // eslint-disable-next-line no-console
+    console.warn("[jobs-for-me] Forbidden for non-caregiver", {
+      userId,
+      role: profile.role,
+    });
     return jsonResponse({ error: "Alleen voor zorgverleners." }, 403);
   }
 
@@ -62,7 +73,19 @@ export async function GET(req: NextRequest) {
   const matches = jobs.map((job) => {
     const result = scoreJobForCaregiver(job as JobForScoring, caregiver, avgRating);
     return {
-      job: { id: job.id, title: job.title, city: job.city, care_type: job.care_type, status: job.status },
+      job: {
+        id: job.id,
+        title: job.title,
+        city: job.city,
+        region: job.region,
+        country: job.country,
+        care_type: job.care_type,
+        availability: job.availability,
+        budget_min: job.budget_min,
+        budget_max: job.budget_max,
+        hourly_rate: job.hourly_rate,
+        status: job.status,
+      },
       score: result.score,
       reasons: result.reasons,
       summary: result.summary,

@@ -130,17 +130,13 @@ export default function ApplicationsPage() {
                           Profiel bekijken
                         </Button>
                       </Link>
-                      <StartConversationButton applicantId={app.applicant_id} isAccepted={app.status === "accepted"} />
+                      <StartConversationButton
+                        applicantId={app.applicant_id}
+                        applicationId={app.id}
+                        jobId={app.job_id}
+                        isAccepted={app.status === "accepted"}
+                      />
                     </>
-                  )}
-                  {(myRole === "client" || myRole === "organization") && (
-                    <ApplicationActions
-                      applicationId={app.id}
-                      currentStatus={app.status}
-                      onConversationCreated={(conversationId) => {
-                        router.push(`/zorenta/messages/${conversationId}`);
-                      }}
-                    />
                   )}
                 </div>
               </CardContent>
@@ -170,32 +166,68 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function StartConversationButton({ applicantId, isAccepted }: { applicantId: string; isAccepted?: boolean }) {
+const SUGGESTED_APPLICATION_MESSAGE =
+  "Hoi! Ik heb net gesolliciteerd op deze vacature. Ik kom graag in contact.";
+
+function StartConversationButton({
+  applicantId,
+  applicationId,
+  jobId,
+  isAccepted,
+}: {
+  applicantId: string;
+  applicationId: string;
+  jobId: string;
+  isAccepted?: boolean;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   async function start() {
     setLoading(true);
+    setError(null);
     const token = await getZorentaAccessToken();
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      setError("Log in om een gesprek te starten.");
+      return;
+    }
     const res = await fetch("/api/zorenta/conversations", {
       method: "POST",
       headers: zorentaHeaders(token),
-      body: JSON.stringify({ other_user_id: applicantId }),
+      body: JSON.stringify({
+        other_user_id: applicantId,
+        application_id: applicationId,
+        job_id: jobId,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
-    if (data.id) router.push(`/zorenta/messages/${data.id}`);
+    if (data.id) {
+      if (data.created === true) {
+        router.push(
+          `/zorenta/berichten?conversation=${encodeURIComponent(data.id)}&prefill=${encodeURIComponent(SUGGESTED_APPLICATION_MESSAGE)}`
+        );
+      } else {
+        router.push(`/zorenta/berichten?conversation=${encodeURIComponent(data.id)}`);
+      }
+      return;
+    }
+    setError(typeof data?.error === "string" ? data.error : "Gesprek starten is mislukt.");
   }
   return (
-    <Button
-      size="sm"
-      variant={isAccepted ? "primary" : "outline"}
-      onClick={start}
-      disabled={loading}
-      className={isAccepted ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-    >
-      {loading ? "…" : isAccepted ? "Open gesprek" : "Bericht sturen"}
-    </Button>
+    <div className="space-y-1">
+      <Button
+        size="sm"
+        variant={isAccepted ? "primary" : "outline"}
+        onClick={start}
+        disabled={loading}
+        className={isAccepted ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+      >
+        {loading ? "…" : isAccepted ? "Open gesprek" : "Bericht sturen"}
+      </Button>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+    </div>
   );
 }
 

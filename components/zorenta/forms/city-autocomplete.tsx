@@ -2,55 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { DUTCH_LOCATIONS } from "@/lib/zorenta/locations";
 
 export type CityAutocompleteProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
 };
-
-const CITY_SUGGESTIONS = [
-  "Amsterdam",
-  "Rotterdam",
-  "Den Haag",
-  "Utrecht",
-  "Eindhoven",
-  "Tilburg",
-  "Groningen",
-  "Almere",
-  "Breda",
-  "Nijmegen",
-  "Arnhem",
-  "Apeldoorn",
-  "Haarlem",
-  "Enschede",
-  "Amersfoort",
-  "Zaanstad",
-  "Zwolle",
-  "Zoetermeer",
-  "Leiden",
-  "Dordrecht",
-  "Ede",
-  "Westland",
-  "Venlo",
-  "Delft",
-  "Deventer",
-  "Heerlen",
-  "Zevenaar",
-  "Hilversum",
-  "Hoorn",
-  "Oss",
-  "Roermond",
-  "Gouda",
-  "Veenendaal",
-  "Alkmaar",
-  "Assen",
-  "Lelystad",
-  "Maastricht",
-  "Leeuwarden",
-  "Emmen",
-  "Helmond",
-] as const;
 
 export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompleteProps) {
   const [query, setQuery] = useState(value ?? "");
@@ -65,8 +23,8 @@ export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompl
   const matches = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    const startsWith = CITY_SUGGESTIONS.filter((c) => c.toLowerCase().startsWith(q));
-    const includes = CITY_SUGGESTIONS.filter(
+    const startsWith = DUTCH_LOCATIONS.filter((c) => c.toLowerCase().startsWith(q));
+    const includes = DUTCH_LOCATIONS.filter(
       (c) => !startsWith.includes(c) && c.toLowerCase().includes(q),
     );
     return [...startsWith, ...includes].slice(0, 8);

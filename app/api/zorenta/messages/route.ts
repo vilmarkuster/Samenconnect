@@ -12,6 +12,33 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Forbidden." }, 403);
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit")) || 50, 200);
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get("offset")) || 0);
+
+  const now = new Date().toISOString();
+
+  // 1) Delivered: incoming messages only — recipient opened thread / is loading messages.
+  const { error: deliveredError } = await supabase
+    .from("messages")
+    .update({ delivered_at: now })
+    .eq("conversation_id", convId)
+    .neq("sender_id", userId)
+    .is("delivered_at", null);
+  if (deliveredError) {
+    // eslint-disable-next-line no-console -- non-fatal: chat must still load
+    console.log("[messages GET] delivered_at update error:", deliveredError.message, deliveredError);
+  }
+
+  // 2) Read: incoming messages only — same filters as mark-as-read.
+  const { error: markReadError } = await supabase
+    .from("messages")
+    .update({ read_at: now })
+    .eq("conversation_id", convId)
+    .neq("sender_id", userId)
+    .is("read_at", null);
+  if (markReadError) {
+    // eslint-disable-next-line no-console -- non-fatal: chat must still load
+    console.log("[messages GET] read_at update error:", markReadError.message, markReadError);
+  }
+
   const { data, error, count } = await supabase
     .from("messages")
     .select("*", { count: "exact" })
@@ -19,6 +46,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: true })
     .range(offset, offset + limit - 1);
   if (error) return jsonResponse({ error: error.message }, 500);
+
   return jsonResponse({ messages: data ?? [], total: count ?? 0, limit, offset });
 }
 

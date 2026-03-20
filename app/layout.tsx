@@ -21,9 +21,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="fixed left-4 top-4 z-[9999] rounded-lg bg-red-600 px-3 py-1 text-sm font-bold text-white shadow-lg">
-          ROOT LAYOUT
-        </div>
         <AuthProvider>
           <LayoutKeyWrapper>{children}</LayoutKeyWrapper>
         </AuthProvider>

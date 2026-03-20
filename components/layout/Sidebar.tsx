@@ -14,6 +14,8 @@ import {
   User,
   LogOut,
   Shield,
+  Heart,
+  Bookmark,
 } from "lucide-react";
 
 export const ZORENTA_NAV_ITEMS = [
@@ -21,7 +23,9 @@ export const ZORENTA_NAV_ITEMS = [
   { href: "/zorenta/jobs", label: "Vacatures", icon: Briefcase },
   { href: "/zorenta/intake", label: "Zorgvraag intake", icon: ClipboardList },
   { href: "/zorenta/applications", label: "Sollicitaties", icon: FileText },
-  { href: "/zorenta/messages", label: "Berichten", icon: MessageSquare },
+  { href: "/zorenta/favorites", label: "Favorieten", icon: Heart },
+  { href: "/zorenta/opgeslagen", label: "Opgeslagen", icon: Bookmark },
+  { href: "/zorenta/berichten", label: "Berichten", icon: MessageSquare },
   { href: "/zorenta/reviews", label: "Reviews", icon: Star },
   { href: "/zorenta/notifications", label: "Notificaties", icon: Bell },
   { href: "/zorenta/search", label: "Zorgverleners zoeken", icon: Search },
@@ -41,14 +45,10 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
     : ZORENTA_NAV_ITEMS;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-4 pt-3">
-        <div className="rounded-md bg-pink-600 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white shadow">
-          SIDEBAR
-        </div>
-      </div>
-      <div className="border-b border-slate-200 px-6 py-5">
-        <div className="text-lg font-semibold text-slate-900">SamenConnect</div>
+    <div className="flex h-full flex-col bg-[#0f766e] text-white">
+      <div className="border-b border-white/10 px-6 py-6">
+        <div className="text-xs uppercase tracking-[0.22em] text-white/60">SamenConnect</div>
+        <div className="mt-1 text-xl font-semibold">Care Workspace</div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
         {navItems.map((item) => {
@@ -62,8 +62,10 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-                active ? "bg-emerald-50 text-emerald-700" : "text-slate-700 hover:bg-slate-100"
+                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
+                active
+                  ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -72,12 +74,12 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
           );
         })}
       </nav>
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-white/10 p-4">
         {onLogout && (
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             Uitloggen
@@ -85,7 +87,7 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
         )}
         <a
           href="/dashboard"
-          className="mt-2 flex items-center rounded-lg px-3 py-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          className="mt-2 flex items-center rounded-2xl px-3 py-3 text-xs text-white/70 hover:bg-white/10 hover:text-white"
         >
           ← Terug naar AI App
         </a>

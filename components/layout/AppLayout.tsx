@@ -25,9 +25,6 @@ export function AppLayout({
 }: AppLayoutProps) {
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <div className="fixed right-4 top-16 z-[9999] rounded-lg bg-emerald-600 px-3 py-1 text-sm font-bold text-white shadow-lg">
-        APP LAYOUT
-      </div>
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
         <Sidebar onLogout={onLogout} isAdmin={isAdmin} />
       </aside>

@@ -46,6 +46,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   }, [pathname, currentMode]);
 
   const isPublic = currentMode === "public";
+  const isAdminRoute = pathname?.startsWith("/zorenta/admin") ?? false;
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isPublic) router.replace("/zorenta/login");
@@ -73,9 +74,6 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   if (isPublic) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <div className="fixed left-4 top-40 z-[9999] rounded-lg bg-indigo-600 px-3 py-1 text-sm font-bold text-white shadow-lg">
-          ZORENTA CLIENT LAYOUT (PUBLIC)
-        </div>
         <header className="border-b border-slate-200/80 bg-white">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 md:px-6">
             <SamenConnectLogo />
@@ -102,7 +100,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-          <p className="text-sm text-slate-500">Laden…</p>
+          <p className="text-sm text-slate-500">Laden...</p>
         </div>
       </div>
     );
@@ -111,7 +109,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Redirect naar inloggen…</p>
+        <p className="text-sm text-slate-500">Redirect naar inloggen...</p>
       </div>
     );
   }
@@ -121,16 +119,12 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
     router.push("/zorenta/login");
   }
 
-  if (isAdminPath(pathname)) {
+  if (isAdminRoute) {
     return <AdminShell onLogout={handleLogout}>{children}</AdminShell>;
   }
 
   return (
-    <>
-      <div className="fixed left-4 top-40 z-[9999] rounded-lg bg-indigo-600 px-3 py-1 text-sm font-bold text-white shadow-lg">
-        ZORENTA CLIENT LAYOUT (APP)
-      </div>
-      <AppLayout
+    <AppLayout
       sidebarOpen={sidebarOpen}
       setSidebarOpen={setSidebarOpen}
       userDisplayName={userDisplayName}
@@ -139,7 +133,6 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       isAdmin={isAdmin}
     >
       {children}
-      </AppLayout>
-    </>
+    </AppLayout>
   );
 }

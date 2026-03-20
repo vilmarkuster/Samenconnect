@@ -1,0 +1,190 @@
+export type CaregiverProfile = {
+  id: string;
+  name: string;
+  role: "ZZP zorgverlener" | "Mantelzorger" | "Vrijwilliger" | "Organisatie";
+  /**
+   * Optional link to a real platform user profile (public.profiles.id).
+   * When present, messaging and full profile flows can use this id.
+   */
+  linkedProfileId?: string | null;
+  provider_type?: string;
+  city: string;
+  rate?: number | null;
+  isVolunteer?: boolean;
+  tags: string[];
+  skills: string[];
+  experienceRange?:
+    | "Starter (0–1 jaar)"
+    | "Ervaren (1–3 jaar)"
+    | "Senior (3–5 jaar)"
+    | "Specialist (5+ jaar)";
+  certifications?:
+    | (
+        | "VOG"
+        | "BHV"
+        | "EHBO"
+        | "Medicatie bevoegd"
+        | "SKJ registratie"
+        | "Zorgdiploma"
+        | "BIG registratie"
+        | "AGB-code"
+        | "KIWA keurmerk"
+        | "HKZ certificering"
+      )[];
+  arrangement: "PGB" | "ZZP" | "Mantelzorg" | "Vrijwillig";
+  bio: string;
+};
+
+export const MOCK_CAREGIVERS: CaregiverProfile[] = [
+  {
+    id: "cg-1",
+    name: "Sanne de Vries",
+    role: "ZZP zorgverlener",
+    city: "Amsterdam",
+    rate: 38,
+    tags: [
+      "Thuiszorg",
+      "Begeleiding",
+      "Persoonlijke verzorging",
+      "Verpleging",
+      "Weerbaarheid",
+      "Omgaan met agressie",
+      "ADL ondersteuning",
+      "De-escaleren",
+      "Ouderenzorg",
+      "Coaching",
+      "Signaleren / rapporteren",
+    ],
+    skills: ["Medicatie toedienen", "ADL ondersteuning"],
+    experienceRange: "Senior (3–5 jaar)",
+    certifications: [
+      "Medicatie bevoegd",
+      "EHBO",
+      "BHV",
+      "BIG registratie",
+      "AGB-code",
+    ],
+    arrangement: "PGB",
+    bio: "Ervaren wijkverpleegkundige met focus op thuiszorg en begeleiding bij oudere cliënten.",
+  },
+  {
+    id: "cg-2",
+    name: "Mohammed El Amrani",
+    role: "ZZP zorgverlener",
+    city: "Utrecht",
+    rate: 42,
+    tags: [
+      "Dementie",
+      "Thuiszorg",
+      "Palliatieve zorg",
+      "Diabetes",
+      "Structuur bieden",
+      "GGZ / psychiatrie",
+      "NAH (niet-aangeboren hersenletsel)",
+    ],
+    skills: ["Dementie ervaring", "ADL ondersteuning"],
+    experienceRange: "Ervaren (1–3 jaar)",
+    certifications: [
+      "VOG",
+      "Medicatie bevoegd",
+      "SKJ registratie",
+      "HKZ certificering",
+    ],
+    arrangement: "PGB",
+    bio: "Gespecialiseerd in dementie, palliatieve zorg en ondersteuning bij complexe thuissituaties.",
+  },
+  {
+    id: "cg-3",
+    name: "Lisa Jansen",
+    role: "Mantelzorger",
+    city: "Amsterdam",
+    rate: null,
+    isVolunteer: true,
+    tags: [
+      "Gedragsproblematiek",
+      "Autisme",
+      "Begeleiding",
+      "Persoonlijke verzorging",
+      "Structuur bieden",
+      "Jeugdzorg",
+      "Coaching",
+    ],
+    skills: ["Gedragsproblematiek", "Autisme begeleiding"],
+    experienceRange: "Ervaren (1–3 jaar)",
+    certifications: ["Zorgdiploma", "EHBO"],
+    arrangement: "Mantelzorg",
+    bio: "Heeft jarenlange ervaring als mantelzorger en ondersteunt gezinnen met complexe zorgsituaties.",
+  },
+  {
+    id: "cg-4",
+    name: "Stichting Zorg aan Huis",
+    role: "Organisatie",
+    city: "Amsterdam",
+    rate: 45,
+    tags: [
+      "Thuiszorg",
+      "Persoonlijke verzorging",
+      "Huishoudelijke hulp",
+      "Verpleging",
+      "Weerbaarheid",
+      "Omgaan met agressie",
+      "ADL ondersteuning",
+    ],
+    skills: ["Medicatie toedienen", "Tillift"],
+    experienceRange: "Specialist (5+ jaar)",
+    certifications: ["VOG", "Zorgdiploma", "KIWA keurmerk"],
+    arrangement: "ZZP",
+    bio: "Kleine zorgorganisatie gespecialiseerd in maatwerk-thuiszorg in de regio Amsterdam.",
+  },
+  {
+    id: "cg-5",
+    name: "Jan van Dijk",
+    role: "Vrijwilliger",
+    city: "Haarlem",
+    rate: null,
+    isVolunteer: true,
+    tags: [
+      "Begeleiding",
+      "De-escaleren",
+      "Weerbaarheid",
+      "Structuur bieden",
+      "ADL ondersteuning",
+      "Dagbesteding",
+      "Signaleren / rapporteren",
+    ],
+    skills: ["Revalidatie ondersteuning"],
+    experienceRange: "Starter (0–1 jaar)",
+    certifications: ["EHBO", "AGB-code"],
+    arrangement: "Vrijwillig",
+    bio: "Vrijwilliger met ervaring in dagbesteding en ondersteunende begeleiding.",
+  },
+  {
+    id: "cg-6",
+    name: "Zorgbureau Noord-West",
+    role: "Organisatie",
+    city: "Zaandam",
+    rate: 40,
+    tags: [
+      "Thuiszorg",
+      "Huishoudelijke hulp",
+      "Mantelzorgondersteuning",
+      "Epilepsie",
+      "Gedragsproblematiek",
+      "Structuur bieden",
+      "ADL ondersteuning",
+      "Signaleren / rapporteren",
+    ],
+    skills: ["ADL ondersteuning"],
+    experienceRange: "Ervaren (1–3 jaar)",
+    certifications: [
+      "VOG",
+      "Medicatie bevoegd",
+      "BHV",
+      "BIG registratie",
+      "HKZ certificering",
+    ],
+    arrangement: "ZZP",
+    bio: "Zorgbureau dat samenwerkt met een netwerk van zelfstandige zorgverleners.",
+  },
+];
+

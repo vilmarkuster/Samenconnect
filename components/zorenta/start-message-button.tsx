@@ -54,7 +54,8 @@ export function StartMessageButton({
         return;
       }
 
-      router.push(`/zorenta/messages/${data.id}`);
+      // Canonical inbox + thread (DB-backed, ?conversation= survives refresh).
+      router.push(`/zorenta/berichten?conversation=${encodeURIComponent(data.id)}`);
     } catch {
       setError("Er ging iets mis bij het starten van een gesprek.");
     } finally {

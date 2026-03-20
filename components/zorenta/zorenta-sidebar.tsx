@@ -15,6 +15,7 @@ import {
   User,
   LogOut,
   Heart,
+  Bookmark,
   ClipboardList,
   CreditCard,
   Shield,
@@ -23,9 +24,11 @@ import {
 const baseNavItems = [
   { href: "/zorenta/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/zorenta/jobs", label: "Vacatures", icon: Briefcase },
+  { href: "/zorenta/favorites", label: "Favorieten", icon: Heart },
+  { href: "/zorenta/opgeslagen", label: "Opgeslagen", icon: Bookmark },
   { href: "/zorenta/intake", label: "Zorgvraag intake", icon: ClipboardList },
   { href: "/zorenta/applications", label: "Sollicitaties", icon: FileText },
-  { href: "/zorenta/messages", label: "Berichten", icon: MessageSquare },
+  { href: "/zorenta/berichten", label: "Berichten", icon: MessageSquare },
   { href: "/zorenta/reviews", label: "Reviews", icon: Star },
   { href: "/zorenta/notifications", label: "Notificaties", icon: Bell },
   { href: "/zorenta/search", label: "Zoeken / Zorgverleners", icon: Search },
@@ -59,7 +62,7 @@ export function ZorentaSidebar({ onNavigate, isAdmin }: ZorentaSidebarProps) {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white">
             <Heart className="h-4 w-4" />
           </span>
-          <span className="font-semibold text-slate-900">Zorenta</span>
+          <span className="font-semibold text-slate-900">SamenConnect</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-0.5 p-3">
@@ -99,7 +102,7 @@ export function ZorentaSidebar({ onNavigate, isAdmin }: ZorentaSidebarProps) {
           href="/dashboard"
           className="mt-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
         >
-          ← Back to App
+          ← Terug naar SamenConnect
         </Link>
       </div>
     </aside>

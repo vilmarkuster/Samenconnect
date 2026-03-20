@@ -10,7 +10,7 @@ export default function ZorentaGrowthPage() {
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
-          Zorenta Growth Engine
+          SamenConnect Growth Engine
         </h1>
         <p className="text-sm text-slate-600">
           Interne overzichtspagina voor groei, activatie en marktplaats‑gezondheid. Alleen zichtbaar

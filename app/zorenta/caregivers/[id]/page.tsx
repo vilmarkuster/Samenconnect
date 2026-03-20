@@ -301,7 +301,7 @@ export default function CaregiverProfilePage() {
       )}
 
       <p className="text-center text-xs text-slate-500">
-        Veilig berichten via Zorenta. We delen je gegevens niet zonder toestemming.
+        Veilig berichten via SamenConnect. We delen je gegevens niet zonder toestemming.
       </p>
     </PageContainer>
   );

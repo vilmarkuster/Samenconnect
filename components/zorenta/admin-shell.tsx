@@ -39,7 +39,7 @@ export function AdminShell({ children, onLogout }: AdminShellProps) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-medium text-slate-800">Zorenta Admin</span>
+          <span className="font-medium text-slate-800">SamenConnect Admin</span>
         </header>
         <main className="min-w-0 flex-1 overflow-auto bg-slate-50 p-4 md:p-6 lg:p-8">
           {children ?? <p className="text-sm text-slate-500">No content</p>}

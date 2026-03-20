@@ -9,7 +9,7 @@ import { LogOut, Menu, X } from "lucide-react";
 
 const mobileNavItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/zorenta", label: "Zorenta" },
+  { href: "/zorenta", label: "SamenConnect" },
   { href: "/chat", label: "AI Chat" },
   { href: "/agents", label: "Agents" },
   { href: "/workflows", label: "Workflows" },

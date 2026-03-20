@@ -17,17 +17,292 @@ import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { FileText, ChevronRight, ChevronLeft, Save } from "lucide-react";
 
 const STEPS = [
-  { key: "who", title: "Voor wie is de zorg?" },
+  { key: "who", title: "Voor wie is de zorg" },
   { key: "type", title: "Type zorg" },
   { key: "frequency", title: "Frequentie" },
   { key: "budget", title: "Budget" },
-  { key: "location", title: "Locatie" },
+  { key: "location", title: "Locatie & urgentie" },
+  { key: "summary", title: "Samenvatting" },
 ];
 
-const CARE_TYPES = ["Dementiezorg", "Thuiszorg", "Verpleging", "Begeleiding", "Verpleeghuis", "Gehandicaptenzorg", "Palliatieve zorg", "Kraamzorg", "Overig"];
-const AGE_GROUPS = ["0-12", "12-18", "18-65", "65+"];
+const FINANCING_OPTIONS = ["PGB", "Wlz", "Wmo", "Zvw", "Particulier"] as const;
+const CARE_TYPES = [
+  // General care
+  "Thuiszorg",
+  "Verpleging",
+  "Begeleiding",
+  "Persoonlijke verzorging",
+  "Huishoudelijke hulp",
+  "Dagbesteding",
+  "Nachtzorg",
+  "24-uurs zorg",
+  // Ouderenzorg
+  "Dementiezorg",
+  "Ouderenzorg",
+  // GGZ & mentale zorg
+  "GGZ begeleiding",
+  "Verslavingszorg",
+  "Autisme begeleiding",
+  "Trauma / PTSS begeleiding",
+  "Forensische zorg",
+  // Specialistische zorg
+  "Gehandicaptenzorg",
+  "NAH begeleiding",
+  "Palliatieve zorg",
+  // Jeugd & gezin
+  "Jeugdzorg",
+  "Gezinsbegeleiding",
+  "Opvoedondersteuning",
+  "Logeeropvang",
+  // Overig
+  "Kraamzorg",
+] as const;
+const ENGAGEMENT_TYPES = [
+  "Mantelzorg",
+  "Vrijwilligerswerk",
+  "ZZP-opdracht",
+  "Tijdelijke vervanging",
+  "Structurele ondersteuning",
+  "Spoedhulp",
+] as const;
+const TARGET_GROUP_OPTIONS = [
+  "Oudere",
+  "Kind",
+  "Jongere",
+  "Volwassene",
+  "Gezin",
+  "Meerdere cliënten",
+] as const;
+const CARE_LEVEL_OPTIONS = [
+  "Basis ondersteuning",
+  "Persoonlijke verzorging",
+  "Verpleging",
+  "Specialistische zorg",
+  "Intensieve zorg",
+  "24-uurs begeleiding",
+] as const;
+const SKILL_OPTIONS = [
+  "Medicatie toedienen",
+  "Tillift",
+  "ADL ondersteuning",
+  "Gedragsproblematiek",
+  "Autisme begeleiding",
+  "Dementie ervaring",
+  "Palliatieve zorg ervaring",
+  "Revalidatie ondersteuning",
+] as const;
+const AGE_GROUPS = [
+  "0–12 jaar",
+  "13–17 jaar",
+  "18–24 jaar",
+  "25–34 jaar",
+  "35–44 jaar",
+  "45–54 jaar",
+  "55–64 jaar",
+  "65+ jaar",
+];
 const FREQUENCIES = ["1x per week", "2-3x per week", "Dagelijks", "Flexibel"];
-const URGENCY_OPTIONS = ["Laag", "Medium", "Hoog"];
+const URGENCY_OPTIONS = [
+  "Spoed (binnen 24 uur)",
+  "Binnen enkele dagen",
+  "Binnen 1 week",
+  "Binnen 1 maand",
+  "Flexibel",
+] as const;
+
+function generateCareRequestTitle(form: Record<string, any>, seed = 0): string {
+  const skills: string[] = Array.isArray(form.skills_required)
+    ? (form.skills_required as string[])
+    : [];
+
+  const selectedCareTypes = CARE_TYPES.filter((t) => skills.includes(t));
+  const selectedLevels = CARE_LEVEL_OPTIONS.filter((t) => skills.includes(t));
+  const zorgTypes = [...selectedCareTypes, ...selectedLevels];
+
+  const rawCare =
+    (form.care_type as string) ||
+    zorgTypes.slice(0, 2).join(" en ") ||
+    "zorg";
+  // Never let doelgroep labels become the care type; if that happens, fall back to concrete care types
+  const mainCare = TARGET_GROUP_OPTIONS.includes(
+    rawCare as (typeof TARGET_GROUP_OPTIONS)[number]
+  )
+    ? zorgTypes.slice(0, 2).join(" en ") || "zorg"
+    : rawCare;
+
+  const city =
+    (form.city as string) ||
+    (form.preferred_city as string) ||
+    "Nederland";
+
+  const age = form.age_group ? ` (${form.age_group})` : "";
+
+  const rawWho = (form.who_needs_care as string) || "";
+  let relation = rawWho || "cliënt";
+  const lowerWho = rawWho.toLowerCase();
+  if (lowerWho.includes("moeder")) relation = "moeder";
+  else if (lowerWho.includes("vader")) relation = "vader";
+  else if (lowerWho.includes("kind")) relation = "kind";
+  else if (lowerWho.includes("zoon")) relation = "zoon";
+  else if (lowerWho.includes("dochter")) relation = "dochter";
+  else if (lowerWho.includes("vrouw")) relation = "vrouw";
+  else if (lowerWho.includes("man")) relation = "man";
+  // No generic doelgroep labels like "volwassene", "jongere", etc. as subject
+  if (
+    relation.toLowerCase().includes("volwassen") ||
+    TARGET_GROUP_OPTIONS.includes(
+      relation as (typeof TARGET_GROUP_OPTIONS)[number]
+    )
+  ) {
+    relation = "cliënt";
+  }
+
+  const freq =
+    (form.frequency as string) ||
+    (form.care_frequency as string) ||
+    "";
+
+  const budgetShort = form.budget_max
+    ? `€${form.budget_max}`
+    : "";
+
+  const financingShort =
+    FINANCING_OPTIONS.find((t) => skills.includes(t)) || "PGB-zorgvraag";
+
+  const variant = seed % 4;
+
+  // 1. Zakelijk / professioneel
+  if (variant === 0) {
+    return `${financingShort}: ${mainCare} voor ${relation}${age} in ${city}`;
+  }
+
+  // 2. Warm / persoonlijk
+  if (variant === 1) {
+    return `Voor mijn ${relation}${age} in ${city} zoek ik ${mainCare.toLowerCase()}`;
+  }
+
+  // 3. Marketplace / platformstijl
+  if (variant === 2) {
+    const freqPart = freq ? ` · ${freq}` : "";
+    const budgetPart = budgetShort ? ` · ${budgetShort}/u` : "";
+    return `${mainCare} gezocht in ${city}${freqPart}${budgetPart}`;
+  }
+
+  // 4. Kort en krachtig
+  return `${mainCare} gezocht voor ${relation}${age} in ${city}`;
+}
+
+function generateCareRequestSummary(form: Record<string, any>, seed = 0): string {
+  const freq =
+    (form.frequency as string) ||
+    (form.care_frequency as string) ||
+    "flexibel";
+
+  const budget = form.budget_max
+    ? `€${form.budget_max}/uur`
+    : "nader te bepalen";
+
+  const city =
+    (form.city as string) ||
+    (form.preferred_city as string) ||
+    "Nederland";
+
+  const skills: string[] = Array.isArray(form.skills_required)
+    ? (form.skills_required as string[])
+    : [];
+
+  const selectedCareTypes = CARE_TYPES.filter((t) => skills.includes(t));
+  const selectedLevels = CARE_LEVEL_OPTIONS.filter((t) => skills.includes(t));
+  const zorgOmschrijving =
+    [...selectedCareTypes, ...selectedLevels].slice(0, 2).join(" en ") || "zorg";
+
+  const engagement =
+    ENGAGEMENT_TYPES.find((t) => skills.includes(t)) ||
+    "een zorgprofessional (ZZP)";
+
+  const schedule =
+    (form.preferred_schedule as string) ||
+    "";
+
+  const importantSkills = SKILL_OPTIONS.filter((t) => skills.includes(t)).slice(0, 2);
+
+  const age = form.age_group ? ` (${form.age_group})` : "";
+  const rawWho = (form.who_needs_care as string) || "";
+  let relation = rawWho || "";
+  const lowerWho = rawWho.toLowerCase();
+  if (lowerWho.includes("moeder")) relation = "mijn moeder";
+  else if (lowerWho.includes("vader")) relation = "mijn vader";
+  else if (lowerWho.includes("kind")) relation = "mijn kind";
+  else if (lowerWho.includes("zoon")) relation = "mijn zoon";
+  else if (lowerWho.includes("dochter")) relation = "mijn dochter";
+  if (!relation) relation = "mijn cliënt";
+
+  const financing =
+    FINANCING_OPTIONS.find((t) => skills.includes(t)) || null;
+
+  const line1 = `Voor ${relation}${age} in ${city} zoek ik ondersteuning bij ${zorgOmschrijving}.`;
+  const line2 = schedule
+    ? `De hulp is nodig ${freq.toLowerCase()} in de ${schedule.toLowerCase()}.`
+    : `De hulp is nodig ${freq.toLowerCase()}.`;
+  const line3 = financing
+    ? `Het gaat om een ${financing.toLowerCase()}-zorgvraag met een richtbudget van ${budget}.`
+    : `Het richtbudget ligt rond ${budget}.`;
+  const skillsLine =
+    importantSkills.length > 0
+      ? `Ervaring met ${importantSkills.join(" en ")} is gewenst.`
+      : "";
+
+  const variant = seed % 4;
+
+  // 1. Zakelijk / professioneel
+  if (variant === 0) {
+    return [
+      line1.replace("zoek ik", "zoeken wij"),
+      line2,
+      `De inzet is bedoeld voor ${engagement}.`,
+      line3,
+      skillsLine,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  // 2. Warm / persoonlijk
+  if (variant === 1) {
+    return [
+      line1,
+      line2,
+      line3,
+      skillsLine && skillsLine.replace("Ervaring met", "Belangrijk is dat je ervaring hebt met"),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  // 3. Marketplace / platformstijl
+  if (variant === 2) {
+    return [
+      `Zorgopdracht in ${city} voor ${zorgOmschrijving}.`,
+      `Frequentie: ${freq.toLowerCase()}${schedule ? ` (${schedule.toLowerCase()})` : ""}.`,
+      `Budget: ${budget}.`,
+      financing ? `Type regeling: ${financing}.` : "",
+      importantSkills.length > 0
+        ? `Gewenste vaardigheden: ${importantSkills.join(" en ")}.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  // 4. Kort en krachtig
+  return [
+    `Gezocht: ${zorgOmschrijving} voor ${relation}${age} in ${city}.`,
+    `Inzet ${freq.toLowerCase()}${schedule ? `, bij voorkeur in de ${schedule.toLowerCase()}` : ""}.`,
+    line3,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 const defaultForm: Record<string, string | string[] | number | null> = {
   who_needs_care: "",
@@ -44,16 +319,54 @@ const defaultForm: Record<string, string | string[] | number | null> = {
   budget_min: null,
   budget_max: null,
   notes: "",
+   // Optional AI-generated care request fields
+  generated_title: "",
+  generated_summary: "",
 };
+
+const ZORGVRAGEN_DRAFT_KEY = "samenconnect_zorgvraag_draft";
+
+function inferIntakeStepFromDbRow(row: {
+  who_needs_care?: unknown;
+  care_type?: unknown;
+  care_frequency?: unknown;
+  preferred_schedule?: unknown;
+  budget_min?: unknown;
+  budget_max?: unknown;
+  preferred_city?: unknown;
+}): number {
+  const who = typeof row.who_needs_care === "string" ? row.who_needs_care.trim() : "";
+  const careType = typeof row.care_type === "string" ? row.care_type.trim() : "";
+  const careFreq = typeof row.care_frequency === "string" ? row.care_frequency.trim() : "";
+  const preferredSchedule = typeof row.preferred_schedule === "string" ? row.preferred_schedule.trim() : "";
+  const city = typeof row.preferred_city === "string" ? row.preferred_city.trim() : "";
+  const hasBudgetMin = typeof row.budget_min === "number";
+  const hasBudgetMax = typeof row.budget_max === "number";
+
+  if (!who) return 0; // who
+  if (!careType) return 1; // type
+  if (!careFreq && !preferredSchedule) return 2; // frequency
+  if (!hasBudgetMin && !hasBudgetMax) return 3; // budget
+  if (!city) return 4; // location
+  return 5; // summary
+}
 
 export default function IntakePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Record<string, string | string[] | number | null>>(defaultForm);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [intakeId, setIntakeId] = useState<string | null>(null);
+  const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
+  const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
+  const [generationSeed, setGenerationSeed] = useState(0);
+  const [hasStoredIntake, setHasStoredIntake] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [dbLatestDraft, setDbLatestDraft] = useState<any | null>(null);
+  const [dbDraftLoaded, setDbDraftLoaded] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) trackZorentaEvent("intake_started", {});
@@ -67,25 +380,153 @@ export default function IntakePage() {
     if (!isAuthenticated) return;
     getZorentaAccessToken().then((token) => {
       if (!token) return;
-      fetch("/api/zorenta/me", { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.profile?.role !== "client" && d.profile?.role !== "organization") {
-            router.replace("/zorenta/dashboard");
-            return;
-          }
-          setLoading(false);
-        });
+      Promise.all([
+        fetch("/api/zorenta/me", { headers: zorentaHeaders(token) })
+          .then((r) => r.json())
+          .catch(() => ({})),
+        fetch("/api/zorenta/intake", { headers: zorentaHeaders(token) })
+          .then((r) => r.json())
+          .catch(() => ({})),
+      ]).then(([meData, intakeData]) => {
+        const meRole: string | null = meData?.profile?.role ?? null;
+        setRole(meRole);
+        const intakes = Array.isArray(intakeData?.intakes) ? intakeData.intakes : [];
+        // Prefer a saved draft; fall back to the latest intake.
+        const latest =
+          intakes.find((i: any) => i?.status === "draft") ??
+          intakes
+            .slice()
+            .sort((a: any, b: any) => String(b?.updated_at ?? "").localeCompare(String(a?.updated_at ?? "")))[0] ??
+          null;
+        setDbLatestDraft(latest);
+        setDbDraftLoaded(true);
+        // Laat de intake altijd laden voor ingelogde gebruikers;
+        // gebruik veilige defaults i.p.v. terug te sturen naar het dashboard.
+        setLoading(false);
+      });
     });
   }, [authLoading, isAuthenticated, router]);
+
+  // Helper to hydrate state from stored draft
+  const hydrateFromDraft = (keepBanner: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      // HYDRATE debug logs
+      // eslint-disable-next-line no-console
+      console.log("HYDRATE: starting");
+      const raw = window.localStorage.getItem(ZORGVRAGEN_DRAFT_KEY);
+      if (!raw) {
+        // No local draft. If the DB draft isn't loaded yet, wait.
+        if (!dbDraftLoaded) return;
+
+        if (dbLatestDraft) {
+          const row = dbLatestDraft as any;
+          const nextForm: Record<string, string | string[] | number | null> = {
+            ...defaultForm,
+            who_needs_care: typeof row.who_needs_care === "string" ? row.who_needs_care : "",
+            age_group: typeof row.age_group === "string" ? row.age_group : "",
+            care_type: typeof row.care_type === "string" ? row.care_type : "",
+            care_frequency: typeof row.care_frequency === "string" ? row.care_frequency : "",
+            preferred_schedule:
+              typeof row.preferred_schedule === "string" ? row.preferred_schedule : "",
+            preferred_city: typeof row.preferred_city === "string" ? row.preferred_city : "",
+            preferred_region:
+              typeof row.preferred_region === "string" ? row.preferred_region : "",
+            preferred_country:
+              typeof row.preferred_country === "string" ? row.preferred_country : "Nederland",
+            urgency: typeof row.urgency === "string" ? row.urgency : "",
+            language_preference:
+              typeof row.language_preference === "string" ? row.language_preference : "Nederlands",
+            skills_required: Array.isArray(row.skills_required) ? row.skills_required : [],
+            budget_min: typeof row.budget_min === "number" ? row.budget_min : null,
+            budget_max: typeof row.budget_max === "number" ? row.budget_max : null,
+            notes: typeof row.notes === "string" ? row.notes : "",
+          };
+
+          setForm((prev) => ({ ...prev, ...nextForm }));
+          setStep(inferIntakeStepFromDbRow(row));
+          setIntakeId(typeof row.id === "string" ? row.id : null);
+          setGeneratedTitle(null);
+          setGeneratedSummary(null);
+          setIsHydrated(true);
+          setHasStoredIntake(keepBanner);
+          return;
+        }
+
+        // No draft anywhere, mark as hydrated and hide banner.
+        setIsHydrated(true);
+        setHasStoredIntake(false);
+        // eslint-disable-next-line no-console
+        console.log("HYDRATE: no draft found");
+        return;
+      }
+      const parsed = JSON.parse(raw) as {
+        form: Record<string, string | string[] | number | null>;
+        step?: number;
+        generatedTitle?: string | null;
+        generatedSummary?: string | null;
+      };
+      // eslint-disable-next-line no-console
+      console.log("HYDRATE: restored draft", parsed);
+      setForm((prev) => ({ ...prev, ...(parsed.form || {}) }));
+      if (typeof parsed.step === "number") {
+        setStep(parsed.step);
+      }
+      if (parsed.generatedTitle !== undefined) {
+        setGeneratedTitle(parsed.generatedTitle ?? null);
+      }
+      if (parsed.generatedSummary !== undefined) {
+        setGeneratedSummary(parsed.generatedSummary ?? null);
+      }
+      setIsHydrated(true);
+      // eslint-disable-next-line no-console
+      console.log("HYDRATE: finished");
+      setHasStoredIntake(keepBanner);
+    } catch {
+      // ignore parse errors
+    }
+  };
+
+  // Restore stored intake form from storage or Supabase draft.
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && dbDraftLoaded && !isHydrated && !loading) {
+      hydrateFromDraft(true);
+    }
+  }, [authLoading, isAuthenticated, dbDraftLoaded, isHydrated, loading]);
+
+  // Persist draft on every relevant change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isHydrated) {
+      // eslint-disable-next-line no-console
+      console.log("AUTOSAVE: skipped before hydration");
+      return;
+    }
+    try {
+      const payload = {
+        form,
+        step,
+        generatedTitle,
+        generatedSummary,
+      };
+      window.localStorage.setItem(ZORGVRAGEN_DRAFT_KEY, JSON.stringify(payload));
+      // Temporary debug log
+      // eslint-disable-next-line no-console
+      console.log("AUTOSAVE: saved draft", payload);
+    } catch {
+      // ignore storage errors
+    }
+  }, [form, step, generatedTitle, generatedSummary, isHydrated]);
 
   const update = (key: string, value: string | string[] | number | null) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const isClientLike = role === "client" || role === "organization";
+
   const saveDraft = async () => {
     const token = await getZorentaAccessToken();
-    if (!token) return;
+    if (!token || !isClientLike) return;
     setSaving(true);
     const body: Record<string, unknown> = { ...form, status: "draft" };
     if (intakeId) body.id = intakeId;
@@ -101,7 +542,7 @@ export default function IntakePage() {
 
   const submit = async () => {
     const token = await getZorentaAccessToken();
-    if (!token) return;
+    if (!token || !isClientLike) return;
     setSaving(true);
     const body: Record<string, unknown> = { ...form, status: "completed" };
     if (intakeId) body.id = intakeId;
@@ -114,7 +555,7 @@ export default function IntakePage() {
     setSaving(false);
     if (data.id) {
       trackZorentaEvent("intake_completed", { intake_id: data.id });
-      router.push(`/zorenta/intake/results?intake_id=${data.id}`);
+      setIntakeId(data.id);
     }
   };
 
@@ -129,35 +570,154 @@ export default function IntakePage() {
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
+  const selectedTags = (form.skills_required as string[]) ?? [];
+
+  const toggleTag = (tag: string) => {
+    const current = (form.skills_required as string[]) ?? [];
+    const exists = current.includes(tag);
+    const next = exists ? current.filter((t) => t !== tag) : [...current, tag];
+    update("skills_required", next);
+    if (!form.care_type && next.length > 0) {
+      update("care_type", next[0]);
+    }
+  };
+
+  const previewTitle =
+    generatedTitle ??
+    generateCareRequestTitle(form, generationSeed);
+  const previewSummary =
+    generatedSummary ??
+    generateCareRequestSummary(form, generationSeed);
+
   return (
     <PageContainer maxWidth="narrow" className="space-y-6 sm:space-y-8">
       <ZorentaPageHeader
         title="Zorgvraag intake"
-        description="Beschrijf je zorgvraag. Wij matchen je met geschikte zorgverleners."
+        description={`Stap ${step + 1}: ${currentStep.title}`}
       />
 
-      {/* Progress bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-2 flex justify-between text-sm">
+      {!loading && role === "caregiver" && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs sm:text-sm text-amber-900">
+          <div className="mt-0.5">
+            <p className="font-medium">
+              Deze intake is bedoeld voor cliënten en organisaties.
+            </p>
+            <p className="mt-0.5 text-amber-900/80">
+              Als zorgverlener kun je opdrachten en matches bekijken via je dashboard en de
+              opdrachtenpagina. De intake kan niet door zorgverleners worden verstuurd.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasStoredIntake && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3 text-xs sm:text-sm">
+          <div>
+            <p className="font-medium text-emerald-900">
+              Je eerdere zorgvraag staat nog klaar.
+            </p>
+            <p className="text-emerald-800/80">
+              Wil je verdergaan waar je was of opnieuw beginnen?
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 bg-[#40ada8] px-3 text-xs text-white hover:bg-[#369e9a]"
+              onClick={() => hydrateFromDraft(false)}
+            >
+              Verder waar ik was
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 border-emerald-200 bg-white px-3 text-xs text-emerald-900 hover:bg-emerald-50"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  try {
+                    window.localStorage.removeItem(ZORGVRAGEN_DRAFT_KEY);
+                    // Temporary debug log
+                    // eslint-disable-next-line no-console
+                    console.log("Cleared zorgvraag draft");
+                  } catch {
+                    // ignore
+                  }
+                }
+                setForm(defaultForm);
+                setStep(0);
+                setGeneratedTitle(null);
+                setGeneratedSummary(null);
+                setIntakeId(null);
+                setHasStoredIntake(false);
+              }}
+            >
+              Opnieuw beginnen
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step indicator */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between text-sm">
           <span className="font-medium text-slate-700">{currentStep.title}</span>
-          <span className="text-slate-500">Stap {step + 1} van {STEPS.length}</span>
+          <span className="text-slate-500">
+            Stap {step + 1} van {STEPS.length}
+          </span>
         </div>
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-          <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-          />
-        </div>
+        <ol className="flex items-center justify-between gap-3">
+          {["Voor wie", "Type zorg", "Frequentie", "Budget", "Locatie", "Samenvatting"].map(
+            (label, index) => {
+              const done = index < step;
+              const active = index === step;
+              return (
+                <li key={label} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className={[
+                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                      done
+                        ? "bg-[#40ada8] text-white"
+                        : active
+                        ? "bg-[#40ada8]/10 text-[#40ada8] ring-2 ring-[#40ada8]/30"
+                        : "bg-slate-100 text-slate-500",
+                    ].join(" ")}
+                  >
+                    {index + 1}
+                  </div>
+                  <p
+                    className={[
+                      "text-[11px] text-center",
+                      active
+                        ? "font-medium text-slate-900"
+                        : done
+                        ? "text-slate-600"
+                        : "text-slate-500",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </p>
+                </li>
+              );
+            }
+          )}
+        </ol>
       </div>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5 text-emerald-600" />
-            {currentStep.title}
+      <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#40ada8]/10 text-[#40ada8]">
+              <FileText className="h-4 w-4" />
+            </span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-slate-900">{currentStep.title}</span>
+              <span className="text-xs font-normal text-slate-500">
+                Stap {step + 1} van {STEPS.length} · SamenConnect zorgvraag
+              </span>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5 pt-6">
+        <CardContent className="space-y-5 px-5 pb-6 pt-6 sm:pb-7 sm:pt-7">
           {currentStep.key === "who" && (
             <>
               <ZorentaFormField label="Voor wie is de zorg?" hint="Bijv. mijzelf, mijn moeder">
@@ -180,21 +740,147 @@ export default function IntakePage() {
                   ))}
                 </select>
               </ZorentaFormField>
+              <ZorentaFormField label="Doelgroep">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {TARGET_GROUP_OPTIONS.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
             </>
           )}
           {currentStep.key === "type" && (
-            <ZorentaFormField label="Type zorg">
-              <select
-                value={String(form.care_type ?? "")}
-                onChange={(e) => update("care_type", e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-              >
-                <option value="">Kies…</option>
-                {CARE_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </ZorentaFormField>
+            <>
+              <ZorentaFormField label="Financiering / regeling">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {FINANCING_OPTIONS.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
+
+              <ZorentaFormField label="Soort hulp / zorg">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {CARE_TYPES.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
+
+              <ZorentaFormField label="Zorgniveau">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {CARE_LEVEL_OPTIONS.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
+
+              <ZorentaFormField label="Type inzet">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ENGAGEMENT_TYPES.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
+
+              <ZorentaFormField label="Vaardigheden / ervaring">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {SKILL_OPTIONS.map((option) => {
+                    const selected = selectedTags.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => toggleTag(option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ZorentaFormField>
+            </>
           )}
           {currentStep.key === "frequency" && (
             <>
@@ -221,32 +907,57 @@ export default function IntakePage() {
             </>
           )}
           {currentStep.key === "budget" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ZorentaFormField label="Budget min (€/uur)">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="20"
-                  value={form.budget_min ?? ""}
-                  onChange={(e) =>
-                    update("budget_min", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  className="mt-1"
-                />
-              </ZorentaFormField>
-              <ZorentaFormField label="Budget max (€/uur)">
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="35"
-                  value={form.budget_max ?? ""}
-                  onChange={(e) =>
-                    update("budget_max", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  className="mt-1"
-                />
-              </ZorentaFormField>
-            </div>
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ZorentaFormField label="Budget min (€/uur)">
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="20"
+                    value={form.budget_min ?? ""}
+                    onChange={(e) =>
+                      update("budget_min", e.target.value === "" ? null : Number(e.target.value))
+                    }
+                    className="mt-1"
+                  />
+                </ZorentaFormField>
+                <ZorentaFormField label="Budget max (€/uur)">
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="35"
+                    value={form.budget_max ?? ""}
+                    onChange={(e) =>
+                      update("budget_max", e.target.value === "" ? null : Number(e.target.value))
+                    }
+                    className="mt-1"
+                  />
+                </ZorentaFormField>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Indicatie van het uurtarief. Dit hangt af van zorgtype, ervaring en urgentie. Later nog aanpasbaar.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  { label: "€20–€30", min: 20, max: 30 },
+                  { label: "€30–€40", min: 30, max: 40 },
+                  { label: "€40–€60", min: 40, max: 60 },
+                  { label: "€60+", min: 60, max: null },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      update("budget_min", preset.min);
+                      update("budget_max", preset.max);
+                    }}
+                    className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
           {currentStep.key === "location" && (
             <>
@@ -258,6 +969,9 @@ export default function IntakePage() {
                     placeholder="Bijv. Amsterdam"
                   />
                 </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Tip: gebruik de plaats waar de zorg wordt geleverd.
+                </p>
               </ZorentaFormField>
               <ZorentaFormField label="Regio / provincie">
                 <select
@@ -274,16 +988,26 @@ export default function IntakePage() {
                 </select>
               </ZorentaFormField>
               <ZorentaFormField label="Urgentie">
-                <select
-                  value={String(form.urgency ?? "")}
-                  onChange={(e) => update("urgency", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                >
-                  <option value="">Kies…</option>
-                  {URGENCY_OPTIONS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {URGENCY_OPTIONS.map((option) => {
+                    const selected = String(form.urgency ?? "") === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => update("urgency", option)}
+                        className={[
+                          "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
+                          selected
+                            ? "border-[#40ada8] bg-[#40ada8] text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
               </ZorentaFormField>
               <ZorentaFormField label="Opmerkingen (optioneel)">
                 <textarea
@@ -297,28 +1021,305 @@ export default function IntakePage() {
             </>
           )}
 
+          {currentStep.key === "summary" && (
+            <div className="space-y-4 border-t border-slate-100 pt-6">
+              <Card className="rounded-xl border-slate-200 bg-slate-50/60 p-4 shadow-sm">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Gegenereerde zorgvraag</h3>
+                <p className="text-sm font-semibold text-slate-900">{previewTitle}</p>
+                <p className="mt-2 text-sm text-slate-600">{previewSummary}</p>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Deze tekst is automatisch opgesteld en kan later nog aangepast worden.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-200 bg-white text-xs text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      const nextSeed = generationSeed + 1;
+                      setGenerationSeed(nextSeed);
+                      setGeneratedTitle(null);
+                      setGeneratedSummary(null);
+                    }}
+                  >
+                    Opnieuw genereren
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-[#40ada8] px-3 text-xs text-white hover:bg-[#369e9a]"
+                    onClick={() => {
+                      setGeneratedTitle(previewTitle);
+                      setGeneratedSummary(previewSummary);
+                      update("generated_title", previewTitle);
+                      update("generated_summary", previewSummary);
+                    }}
+                  >
+                    Overnemen
+                  </Button>
+                </div>
+              </Card>
+
+              <Card className="rounded-xl border-slate-200 bg-slate-100 p-4 shadow-sm">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Zorgopdracht · Preview voor zorgverleners
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-slate-900">{previewTitle}</h3>
+
+                <div className="mt-3 grid gap-2 text-xs sm:text-sm text-slate-700">
+                  <div className="flex flex-wrap gap-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        📍 Locatie
+                      </p>
+                      <p className="text-sm text-slate-800">
+                        {(form.preferred_city as string) || "Locatie nog niet ingevuld"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        🕒 Frequentie
+                      </p>
+                      <p className="text-sm text-slate-800">
+                        {String(form.care_frequency || "Niet ingevuld")}{" "}
+                        {form.preferred_schedule && `· ${form.preferred_schedule}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        💶 Budget
+                      </p>
+                      <p className="text-sm text-slate-800">
+                        {form.budget_min != null || form.budget_max != null
+                          ? `€${form.budget_min ?? "?"}–€${form.budget_max ?? "?"} per uur`
+                          : "Nog niet ingevuld"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        💼 Type overeenkomst
+                      </p>
+                      <p className="text-sm text-slate-800">
+                        {ENGAGEMENT_TYPES.find((t) => selectedTags.includes(t)) ||
+                          FINANCING_OPTIONS.find((t) => selectedTags.includes(t)) ||
+                          "Nog niet ingevuld"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Beschrijving
+                  </p>
+                  <p className="mt-1 text-sm text-slate-800">
+                    {previewSummary}
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="rounded-xl border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Samenvatting van je zorgvraag</h3>
+                <div className="space-y-3 text-xs sm:text-sm text-slate-700">
+                  <div>
+                    <p className="font-medium text-slate-900">Voor wie is de zorg</p>
+                    <p className="mt-1">
+                      {String(form.who_needs_care || "Niet ingevuld")}{" "}
+                      {form.age_group && `· ${form.age_group}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Doelgroep</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {TARGET_GROUP_OPTIONS.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                      {TARGET_GROUP_OPTIONS.every((t) => !selectedTags.includes(t)) && (
+                        <span className="text-slate-500">Niet ingevuld</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Financiering / regeling</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {FINANCING_OPTIONS.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Soort hulp / zorg & zorgniveau</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {CARE_TYPES.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                      {CARE_LEVEL_OPTIONS.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Type inzet & vaardigheden</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {ENGAGEMENT_TYPES.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                      {SKILL_OPTIONS.filter((t) =>
+                        selectedTags.includes(t)
+                      ).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Frequentie</p>
+                    <p className="mt-1">
+                      {String(form.care_frequency || "Niet ingevuld")}{" "}
+                      {form.preferred_schedule && `· ${form.preferred_schedule}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Budget</p>
+                    <p className="mt-1">
+                      {form.budget_min != null || form.budget_max != null
+                        ? `€${form.budget_min ?? "?"}–€${form.budget_max ?? "?"} per uur`
+                        : "Niet ingevuld"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Locatie & urgentie</p>
+                    <p className="mt-1">
+                      {(form.preferred_city as string) || "Geen stad ingevuld"}{" "}
+                      {form.preferred_region && `· ${form.preferred_region}`}{" "}
+                      {form.urgency && `· ${form.urgency}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900">Opmerkingen</p>
+                    <p className="mt-1">
+                      {String(form.notes || "Geen extra opmerkingen")}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
-            <Button variant="outline" onClick={saveDraft} disabled={saving} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={saveDraft}
+              disabled={saving || !isClientLike}
+              className="gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            >
               <Save className="h-4 w-4" />
               Concept opslaan
             </Button>
             <div className="flex gap-2">
               {step > 0 && (
-                <Button variant="outline" onClick={() => setStep(step - 1)} className="gap-1.5">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(step - 1)}
+                  className="gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                >
                   <ChevronLeft className="h-4 w-4" />
                   Vorige
                 </Button>
               )}
               {!isLast ? (
-                <Button onClick={() => setStep(step + 1)} className="gap-1.5">
+                <Button
+                  onClick={() => setStep(step + 1)}
+                  className="gap-1.5 bg-[#40ada8] text-white hover:bg-[#369e9a]"
+                >
                   Volgende
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={submit} disabled={saving} className="gap-1.5">
-                  Afronden en matches bekijken
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    onClick={async () => {
+                      if (!isClientLike) return;
+                      // Optional: keep local preview data, but DB intake is canonical
+                      if (typeof window !== "undefined") {
+                        try {
+                          window.sessionStorage.setItem(
+                            "samenconnect_intake_form",
+                            JSON.stringify(form)
+                          );
+                          window.sessionStorage.setItem(
+                            "samenconnect_generated_title",
+                            (generatedTitle ?? previewTitle) || ""
+                          );
+                          window.sessionStorage.setItem(
+                            "samenconnect_generated_summary",
+                            (generatedSummary ?? previewSummary) || ""
+                          );
+                        } catch {
+                          // Non-fatal if storage fails
+                        }
+                      }
+                      await submit();
+                      const id = intakeId;
+                      // Prefer the latest known id from state; matches page will fall back to latest completed intake if missing.
+                      if (id) {
+                        router.push(`/zorenta/matches?intake_id=${encodeURIComponent(id)}`);
+                      } else {
+                        router.push("/zorenta/matches");
+                      }
+                    }}
+                    disabled={saving || !isClientLike}
+                    className="gap-1.5 bg-[#40ada8] text-white hover:bg-[#369e9a]"
+                  >
+                    Bekijk matches
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <p className="text-xs text-slate-500">
+                    We tonen zorgverleners en opdrachten die passen bij jouw zorgvraag.
+                  </p>
+                </div>
               )}
             </div>
           </div>

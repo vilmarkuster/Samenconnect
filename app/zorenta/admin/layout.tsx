@@ -23,7 +23,7 @@ export default function ZorentaAdminLayout({
         if (cancelled) return null;
         if (!token) {
           setState("forbidden");
-          setMessage("Geen actieve Zorenta-sessie gevonden.");
+          setMessage("Geen actieve SamenConnect-sessie gevonden.");
           return null;
         }
         return fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
@@ -87,7 +87,7 @@ export default function ZorentaAdminLayout({
       <div className="flex flex-col items-start gap-2">
         <p className="text-sm font-medium text-slate-700">Admin toegang controleren...</p>
         <p className="text-xs text-slate-500">
-          We halen je Zorenta-profiel op en controleren of je admin-rechten hebt.
+          We halen je SamenConnect-profiel op en controleren of je admin-rechten hebt.
         </p>
       </div>
     );

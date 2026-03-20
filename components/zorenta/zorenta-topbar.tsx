@@ -25,7 +25,7 @@ export function ZorentaTopbar({ unreadCount, onMenuClick, isAdmin }: ZorentaTopb
           </button>
         )}
         <Link href="/zorenta/dashboard" className="hidden font-semibold text-slate-900 md:block">
-          Zorenta
+          SamenConnect
         </Link>
       </div>
       <div className="flex items-center gap-1.5">
@@ -56,7 +56,7 @@ export function ZorentaTopbar({ unreadCount, onMenuClick, isAdmin }: ZorentaTopb
         <Link href="/dashboard">
           <Button variant="ghost" size="sm" className="gap-1.5 text-slate-600">
             <ExternalLink className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Back to App</span>
+            <span className="hidden sm:inline">Terug naar SamenConnect</span>
           </Button>
         </Link>
       </div>
