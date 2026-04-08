@@ -35,6 +35,7 @@ type Match = {
     hourly_rate?: number | null;
     experience_years?: number | null;
     display_name?: string | null;
+    avatar_url?: string | null;
   };
   score: number;
   reasons: string[];
@@ -169,11 +170,11 @@ function IntakeResultsContent() {
         </CardContent>
       </Card>
 
-      {/* Primary CTA: Vacature aanmaken */}
+      {/* Primary CTA: Opdracht aanmaken */}
       <Card className="overflow-hidden border-emerald-200 bg-emerald-50/80">
         <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-slate-800">
-            Zet deze zorgvraag om in een vacature. Zorgverleners kunnen dan solliciteren.
+            Zet deze zorgvraag om in een opdracht. Zorgverleners kunnen dan reageren.
           </p>
           <Button
             onClick={createJobFromIntake}
@@ -181,7 +182,7 @@ function IntakeResultsContent() {
             className="w-full shrink-0 gap-2 bg-emerald-600 hover:bg-emerald-700 sm:w-auto"
           >
             <Briefcase className="h-4 w-4" />
-            {creatingJob ? "Bezig…" : "Maak vacature van intake"}
+            {creatingJob ? "Bezig…" : "Maak opdracht van intake"}
           </Button>
         </CardContent>
       </Card>
@@ -196,14 +197,14 @@ function IntakeResultsContent() {
           <ZorentaEmptyState
             icon={User}
             title="Nog geen matches"
-            description="Pas je intake aan of plaats een vacature om meer zichtbaarheid te krijgen."
+            description="Pas je intake aan of plaats een opdracht om meer zichtbaarheid te krijgen."
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Link href="/zorenta/intake">
                   <Button variant="outline">Intake aanpassen</Button>
                 </Link>
                 <Button onClick={createJobFromIntake} disabled={creatingJob}>
-                  Vacature aanmaken
+                  Opdracht aanmaken
                 </Button>
               </div>
             }
@@ -217,6 +218,7 @@ function IntakeResultsContent() {
                 key={m.caregiver.profile_id}
                 profileId={m.caregiver.profile_id}
                 name={m.caregiver.display_name ?? "Zorgverlener"}
+                avatarUrl={m.caregiver.avatar_url ?? null}
                 headline={m.caregiver.headline}
                 experienceYears={m.caregiver.experience_years}
                 skills={m.reasons ?? []}
@@ -236,7 +238,7 @@ function IntakeResultsContent() {
         <Link href="/zorenta/jobs/new">
           <Button variant="outline" className="gap-2">
             <Briefcase className="h-4 w-4" />
-            Handmatig vacature plaatsen
+            Plaats opdracht
           </Button>
         </Link>
         <Link href="/zorenta/search?type=caregivers">

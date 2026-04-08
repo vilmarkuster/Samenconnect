@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getPlatformSupabaseServerClient, getPlatformUserOrNull } from "@/lib/platform-supabase-server";
 import {
   buildSqlFromSpec,
   buildFullAppScaffoldFiles,
@@ -17,6 +17,9 @@ type AppPlanRow = {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+
     const body = await req.json().catch(() => ({}));
     const appPlanId = body?.appPlanId;
     const specFromBody = body?.spec;
@@ -28,12 +31,17 @@ export async function POST(req: NextRequest) {
     if (specFromBody && typeof specFromBody === "object" && appNameFromBody) {
       spec = specFromBody;
       appName = String(appNameFromBody);
-    } else if (appPlanId && typeof appPlanId === "string") {
-      const supabase = getSupabaseClient();
+    } else if (
+      appPlanId !== undefined &&
+      appPlanId !== null &&
+      (typeof appPlanId === "string" || typeof appPlanId === "number")
+    ) {
+      const idStr = String(appPlanId);
+      const supabase = getPlatformSupabaseServerClient(req);
       const { data, error } = await supabase
         .from("app_plans")
         .select("*")
-        .eq("id", appPlanId)
+        .eq("id", idStr)
         .single();
 
       if (error || !data) {
@@ -91,7 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const supabase = getSupabaseClient();
+      const supabase = getPlatformSupabaseServerClient(req);
       await supabase.from("generated_apps").upsert(
         { name: appName, slug: appSlug, description: specObj.description ?? null },
         { onConflict: "slug" }

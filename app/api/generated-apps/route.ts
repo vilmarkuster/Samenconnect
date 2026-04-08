@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { NextRequest } from "next/server";
+import { getPlatformSupabaseServerClient, getPlatformUserOrNull } from "@/lib/platform-supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return NextResponse.json({ apps: [], error: "Unauthorized." }, { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from("generated_apps")
       .select("id, name, slug, description, created_at")

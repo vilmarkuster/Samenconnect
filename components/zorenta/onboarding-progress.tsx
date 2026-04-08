@@ -39,14 +39,14 @@ export function OnboardingProgress({
       ? [
           { done: hasRoleProfile, label: "Profiel compleet" },
           { done: jobMatchesCount > 0, label: "Beste matches bekeken" },
-          { done: applicationsCount > 0, label: "Gesolliciteerd op vacature" },
+          { done: applicationsCount > 0, label: "Gereageerd op opdracht" },
           { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
         ]
       : role === "client" || role === "organization"
         ? [
             { done: hasRoleProfile, label: "Profiel compleet" },
             { done: intakesCount > 0, label: "Intake gestart" },
-            { done: myJobsCount > 0, label: "Eerste vacature geplaatst" },
+            { done: myJobsCount > 0, label: "Eerste opdracht geplaatst" },
             { done: recentApplicationsCount > 0, label: "Eerste match" },
             { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
           ]
@@ -57,7 +57,7 @@ export function OnboardingProgress({
       ? !hasRoleProfile
         ? { label: "Vul je profiel in", href: profileEditHref }
         : jobMatchesCount === 0
-          ? { label: "Bekijk vacatures", href: "/zorenta/jobs" }
+          ? { label: "Bekijk opdrachten", href: "/zorenta/jobs" }
           : applicationsCount === 0
             ? { label: "Solliciteer nu", href: "/zorenta/jobs" }
             : conversationsCount === 0
@@ -69,9 +69,9 @@ export function OnboardingProgress({
           : intakesCount === 0 && myJobsCount === 0
             ? { label: "Start intake", href: "/zorenta/intake" }
             : myJobsCount === 0
-              ? { label: "Plaats je eerste vacature", href: "/zorenta/jobs/new" }
+              ? { label: "Plaats je eerste opdracht", href: "/zorenta/jobs/new" }
               : conversationsCount === 0
-                ? { label: "Bekijk sollicitaties", href: "/zorenta/applications" }
+                ? { label: "Bekijk matches", href: "/zorenta/applications" }
                 : null
         : null;
 

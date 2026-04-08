@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getPlatformSupabaseServerClient, getPlatformUserOrNull } from "@/lib/platform-supabase-server";
 
 type TaskRow = {
   id: number;
@@ -10,9 +10,11 @@ type TaskRow = {
   created_at: string;
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
@@ -48,6 +50,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const body = await req.json();
     const name: string | undefined = body?.name;
     const workflowId: number | undefined =
@@ -62,7 +67,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("tasks")
       .insert({

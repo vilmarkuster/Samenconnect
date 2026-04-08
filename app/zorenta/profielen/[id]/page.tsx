@@ -10,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Euro, ArrowLeft, MessageCircle, Bookmark } from "lucide-react";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
+import {
+  isMarketplaceCardCaregiverPayload,
+  isNormalizedCaregiverProfilePayload,
+} from "@/lib/zorenta/normalize-caregiver-profile-display";
 
 type PageProps = {
   params: { id: string };
@@ -41,6 +45,7 @@ type ResolvedCaregiver = {
 type ResolvedCaregiverResponse = {
   mode: "linked-caregiver" | "linked-organization" | "marketplace";
   caregiver: ResolvedCaregiver;
+  profile?: { id?: string | null; display_name?: string | null; avatar_url?: string | null } | null;
   /** Present for linked-organization (from public.organization_profiles when readable). */
   organization?: Record<string, unknown> | null;
   reviews?: Review[];
@@ -76,9 +81,51 @@ export default function CaregiverProfilePage({ params }: PageProps) {
         }
         return res.json();
       })
-      .then((d: ResolvedCaregiverResponse) => {
+      .then((d: Record<string, unknown>) => {
         if (cancelled) return;
-        setResolved(d);
+        const profile = d.profile as {
+          id?: string | null;
+          display_name?: string | null;
+          avatar_url?: string | null;
+        } | null;
+        let caregiverUi: ResolvedCaregiver;
+
+        const mc = d.marketplaceCard;
+        if (mc && typeof mc === "object" && "tags" in mc && Array.isArray((mc as { tags: unknown }).tags)) {
+          caregiverUi = mc as ResolvedCaregiver;
+        } else if (isMarketplaceCardCaregiverPayload(d.caregiver)) {
+          caregiverUi = d.caregiver as ResolvedCaregiver;
+        } else if (d.pageCaregiver && isNormalizedCaregiverProfilePayload(d.pageCaregiver)) {
+          const pc = d.pageCaregiver;
+          caregiverUi = {
+            id: String(params.id),
+            linkedProfileId: profile?.id ?? null,
+            name: profile?.display_name?.trim() || "Zorgverlener",
+            role: "ZZP zorgverlener",
+            city: pc.city ?? "",
+            rate: pc.hourly_rate,
+            isVolunteer: false,
+            tags: [...pc.care_types, ...pc.skills],
+            skills: pc.skills,
+            certifications: pc.certifications,
+            arrangement: "ZZP",
+            bio: pc.bio ?? "",
+          };
+        } else {
+          setError("Profiel niet gevonden.");
+          setLoading(false);
+          return;
+        }
+
+        setResolved({
+          mode: d.mode as ResolvedCaregiverResponse["mode"],
+          caregiver: caregiverUi,
+          profile,
+          organization: (d.organization ?? null) as ResolvedCaregiverResponse["organization"],
+          reviews: d.reviews as Review[] | undefined,
+          averageRating: d.averageRating as number | null | undefined,
+          reviewCount: d.reviewCount as number | undefined,
+        });
         setLoading(false);
       })
       .catch((e) => {
@@ -143,8 +190,13 @@ export default function CaregiverProfilePage({ params }: PageProps) {
         <Card className="overflow-hidden rounded-2xl border-slate-200 bg-white shadow-md">
           <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:gap-6">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-xl font-semibold text-emerald-700 sm:h-20 sm:w-20 sm:text-2xl">
-                {initials(caregiver.name)}
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-xl font-semibold text-emerald-700 sm:h-20 sm:w-20 sm:text-2xl">
+                {resolved.profile?.avatar_url?.trim() ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={resolved.profile.avatar_url} alt={caregiver.name} className="h-full w-full object-cover" />
+                ) : (
+                  initials(caregiver.name)
+                )}
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">

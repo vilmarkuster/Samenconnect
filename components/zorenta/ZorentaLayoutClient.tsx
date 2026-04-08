@@ -32,6 +32,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   const { isAuthenticated, isLoading, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<ZorentaLayoutMode>(mode);
@@ -64,12 +65,32 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
           .then(([notifData, meData]) => {
             setUnreadCount(Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0);
             setUserDisplayName(meData?.profile?.display_name ?? null);
+            setUserAvatarUrl(typeof meData?.profile?.avatar_url === "string" ? meData.profile.avatar_url : null);
             setIsAdmin(meData?.profile?.role === "admin");
           })
           .catch(() => {});
       });
     }
   }, [isPublic, isAuthenticated]);
+
+  // Allow child pages (e.g. notifications) to adjust the unread bell count optimistically.
+  useEffect(() => {
+    function handleUnreadDelta(event: Event) {
+      const detail = (event as CustomEvent<{ delta?: number; value?: number }>).detail ?? {};
+      if (typeof detail.value === "number" && Number.isFinite(detail.value)) {
+        setUnreadCount(Math.max(0, detail.value));
+        return;
+      }
+      if (typeof detail.delta === "number" && Number.isFinite(detail.delta) && detail.delta !== 0) {
+        setUnreadCount((prev) => Math.max(0, prev + detail.delta!));
+      }
+    }
+
+    window.addEventListener("zorenta:notifications:unreadDelta", handleUnreadDelta as EventListener);
+    return () => {
+      window.removeEventListener("zorenta:notifications:unreadDelta", handleUnreadDelta as EventListener);
+    };
+  }, []);
 
   if (isPublic) {
     return (
@@ -128,6 +149,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       sidebarOpen={sidebarOpen}
       setSidebarOpen={setSidebarOpen}
       userDisplayName={userDisplayName}
+      userAvatarUrl={userAvatarUrl}
       unreadNotifications={unreadCount}
       onLogout={handleLogout}
       isAdmin={isAdmin}

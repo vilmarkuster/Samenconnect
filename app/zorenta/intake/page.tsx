@@ -15,6 +15,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { FileText, ChevronRight, ChevronLeft, Save } from "lucide-react";
+import {
+  FINANCIERING_REGELING_OPTIONS,
+  SOORT_HULP_ZORG_OPTIONS,
+  ZORGNIVEAU_OPTIONS,
+  TYPE_INZET_OPTIONS,
+  VAARDIGHEDEN_ERVARING_OPTIONS,
+  TARGET_GROUP_OPTIONS,
+  labelsForValues,
+  labelForValue,
+  mergeIntakeSubmission,
+  intakeTaxonomyFromRow,
+} from "@/lib/zorenta/intake-taxonomy";
 
 const STEPS = [
   { key: "who", title: "Voor wie is de zorg" },
@@ -25,72 +37,8 @@ const STEPS = [
   { key: "summary", title: "Samenvatting" },
 ];
 
-const FINANCING_OPTIONS = ["PGB", "Wlz", "Wmo", "Zvw", "Particulier"] as const;
-const CARE_TYPES = [
-  // General care
-  "Thuiszorg",
-  "Verpleging",
-  "Begeleiding",
-  "Persoonlijke verzorging",
-  "Huishoudelijke hulp",
-  "Dagbesteding",
-  "Nachtzorg",
-  "24-uurs zorg",
-  // Ouderenzorg
-  "Dementiezorg",
-  "Ouderenzorg",
-  // GGZ & mentale zorg
-  "GGZ begeleiding",
-  "Verslavingszorg",
-  "Autisme begeleiding",
-  "Trauma / PTSS begeleiding",
-  "Forensische zorg",
-  // Specialistische zorg
-  "Gehandicaptenzorg",
-  "NAH begeleiding",
-  "Palliatieve zorg",
-  // Jeugd & gezin
-  "Jeugdzorg",
-  "Gezinsbegeleiding",
-  "Opvoedondersteuning",
-  "Logeeropvang",
-  // Overig
-  "Kraamzorg",
-] as const;
-const ENGAGEMENT_TYPES = [
-  "Mantelzorg",
-  "Vrijwilligerswerk",
-  "ZZP-opdracht",
-  "Tijdelijke vervanging",
-  "Structurele ondersteuning",
-  "Spoedhulp",
-] as const;
-const TARGET_GROUP_OPTIONS = [
-  "Oudere",
-  "Kind",
-  "Jongere",
-  "Volwassene",
-  "Gezin",
-  "Meerdere cliënten",
-] as const;
-const CARE_LEVEL_OPTIONS = [
-  "Basis ondersteuning",
-  "Persoonlijke verzorging",
-  "Verpleging",
-  "Specialistische zorg",
-  "Intensieve zorg",
-  "24-uurs begeleiding",
-] as const;
-const SKILL_OPTIONS = [
-  "Medicatie toedienen",
-  "Tillift",
-  "ADL ondersteuning",
-  "Gedragsproblematiek",
-  "Autisme begeleiding",
-  "Dementie ervaring",
-  "Palliatieve zorg ervaring",
-  "Revalidatie ondersteuning",
-] as const;
+const TARGET_GROUP_LABELS = TARGET_GROUP_OPTIONS.map((o) => o.label);
+
 const AGE_GROUPS = [
   "0–12 jaar",
   "13–17 jaar",
@@ -110,23 +58,22 @@ const URGENCY_OPTIONS = [
   "Flexibel",
 ] as const;
 
-function generateCareRequestTitle(form: Record<string, any>, seed = 0): string {
-  const skills: string[] = Array.isArray(form.skills_required)
-    ? (form.skills_required as string[])
-    : [];
+function strArr(form: Record<string, unknown>, key: string): string[] {
+  const v = form[key];
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
 
-  const selectedCareTypes = CARE_TYPES.filter((t) => skills.includes(t));
-  const selectedLevels = CARE_LEVEL_OPTIONS.filter((t) => skills.includes(t));
-  const zorgTypes = [...selectedCareTypes, ...selectedLevels];
+function generateCareRequestTitle(form: Record<string, any>, seed = 0): string {
+  const merged = mergeIntakeSubmission(form as Record<string, unknown>);
+  const soortLabels = labelsForValues(SOORT_HULP_ZORG_OPTIONS, merged.soort_hulp_zorg);
+  const niveauLabels = labelsForValues(ZORGNIVEAU_OPTIONS, merged.zorgniveau);
+  const zorgTypes = [...soortLabels, ...niveauLabels];
 
   const rawCare =
     (form.care_type as string) ||
     zorgTypes.slice(0, 2).join(" en ") ||
     "zorg";
-  // Never let doelgroep labels become the care type; if that happens, fall back to concrete care types
-  const mainCare = TARGET_GROUP_OPTIONS.includes(
-    rawCare as (typeof TARGET_GROUP_OPTIONS)[number]
-  )
+  const mainCare = TARGET_GROUP_LABELS.includes(rawCare)
     ? zorgTypes.slice(0, 2).join(" en ") || "zorg"
     : rawCare;
 
@@ -148,12 +95,7 @@ function generateCareRequestTitle(form: Record<string, any>, seed = 0): string {
   else if (lowerWho.includes("vrouw")) relation = "vrouw";
   else if (lowerWho.includes("man")) relation = "man";
   // No generic doelgroep labels like "volwassene", "jongere", etc. as subject
-  if (
-    relation.toLowerCase().includes("volwassen") ||
-    TARGET_GROUP_OPTIONS.includes(
-      relation as (typeof TARGET_GROUP_OPTIONS)[number]
-    )
-  ) {
+  if (relation.toLowerCase().includes("volwassen") || TARGET_GROUP_LABELS.includes(relation)) {
     relation = "cliënt";
   }
 
@@ -166,8 +108,8 @@ function generateCareRequestTitle(form: Record<string, any>, seed = 0): string {
     ? `€${form.budget_max}`
     : "";
 
-  const financingShort =
-    FINANCING_OPTIONS.find((t) => skills.includes(t)) || "PGB-zorgvraag";
+  const fin0 = merged.financiering_regeling[0];
+  const financingShort = fin0 ? labelForValue(FINANCIERING_REGELING_OPTIONS, fin0) ?? "PGB" : "PGB-zorgvraag";
 
   const variant = seed % 4;
 
@@ -207,24 +149,21 @@ function generateCareRequestSummary(form: Record<string, any>, seed = 0): string
     (form.preferred_city as string) ||
     "Nederland";
 
-  const skills: string[] = Array.isArray(form.skills_required)
-    ? (form.skills_required as string[])
-    : [];
-
-  const selectedCareTypes = CARE_TYPES.filter((t) => skills.includes(t));
-  const selectedLevels = CARE_LEVEL_OPTIONS.filter((t) => skills.includes(t));
+  const merged = mergeIntakeSubmission(form as Record<string, unknown>);
+  const soortLabels = labelsForValues(SOORT_HULP_ZORG_OPTIONS, merged.soort_hulp_zorg);
+  const niveauLabels = labelsForValues(ZORGNIVEAU_OPTIONS, merged.zorgniveau);
   const zorgOmschrijving =
-    [...selectedCareTypes, ...selectedLevels].slice(0, 2).join(" en ") || "zorg";
+    [...soortLabels, ...niveauLabels].slice(0, 2).join(" en ") || "zorg";
 
   const engagement =
-    ENGAGEMENT_TYPES.find((t) => skills.includes(t)) ||
+    labelsForValues(TYPE_INZET_OPTIONS, merged.type_inzet)[0] ||
     "een zorgprofessional (ZZP)";
 
   const schedule =
     (form.preferred_schedule as string) ||
     "";
 
-  const importantSkills = SKILL_OPTIONS.filter((t) => skills.includes(t)).slice(0, 2);
+  const importantSkills = labelsForValues(VAARDIGHEDEN_ERVARING_OPTIONS, merged.vaardigheden_ervaring).slice(0, 2);
 
   const age = form.age_group ? ` (${form.age_group})` : "";
   const rawWho = (form.who_needs_care as string) || "";
@@ -238,7 +177,7 @@ function generateCareRequestSummary(form: Record<string, any>, seed = 0): string
   if (!relation) relation = "mijn cliënt";
 
   const financing =
-    FINANCING_OPTIONS.find((t) => skills.includes(t)) || null;
+    labelsForValues(FINANCIERING_REGELING_OPTIONS, merged.financiering_regeling)[0] || null;
 
   const line1 = `Voor ${relation}${age} in ${city} zoek ik ondersteuning bij ${zorgOmschrijving}.`;
   const line2 = schedule
@@ -314,6 +253,12 @@ const defaultForm: Record<string, string | string[] | number | null> = {
   preferred_region: "",
   preferred_country: "Nederland",
   urgency: "",
+  financiering_regeling: [],
+  soort_hulp_zorg: [],
+  zorgniveau: [],
+  type_inzet: [],
+  vaardigheden_ervaring: [],
+  target_group: [],
   skills_required: [],
   language_preference: "Nederlands",
   budget_min: null,
@@ -329,6 +274,7 @@ const ZORGVRAGEN_DRAFT_KEY = "samenconnect_zorgvraag_draft";
 function inferIntakeStepFromDbRow(row: {
   who_needs_care?: unknown;
   care_type?: unknown;
+  soort_hulp_zorg?: unknown;
   care_frequency?: unknown;
   preferred_schedule?: unknown;
   budget_min?: unknown;
@@ -336,6 +282,7 @@ function inferIntakeStepFromDbRow(row: {
   preferred_city?: unknown;
 }): number {
   const who = typeof row.who_needs_care === "string" ? row.who_needs_care.trim() : "";
+  const hasSoort = Array.isArray(row.soort_hulp_zorg) && row.soort_hulp_zorg.length > 0;
   const careType = typeof row.care_type === "string" ? row.care_type.trim() : "";
   const careFreq = typeof row.care_frequency === "string" ? row.care_frequency.trim() : "";
   const preferredSchedule = typeof row.preferred_schedule === "string" ? row.preferred_schedule.trim() : "";
@@ -344,7 +291,7 @@ function inferIntakeStepFromDbRow(row: {
   const hasBudgetMax = typeof row.budget_max === "number";
 
   if (!who) return 0; // who
-  if (!careType) return 1; // type
+  if (!hasSoort && !careType) return 1; // type
   if (!careFreq && !preferredSchedule) return 2; // frequency
   if (!hasBudgetMin && !hasBudgetMax) return 3; // budget
   if (!city) return 4; // location
@@ -420,7 +367,8 @@ export default function IntakePage() {
         if (!dbDraftLoaded) return;
 
         if (dbLatestDraft) {
-          const row = dbLatestDraft as any;
+          const row = dbLatestDraft as Record<string, unknown>;
+          const tax = intakeTaxonomyFromRow(row);
           const nextForm: Record<string, string | string[] | number | null> = {
             ...defaultForm,
             who_needs_care: typeof row.who_needs_care === "string" ? row.who_needs_care : "",
@@ -437,6 +385,12 @@ export default function IntakePage() {
             urgency: typeof row.urgency === "string" ? row.urgency : "",
             language_preference:
               typeof row.language_preference === "string" ? row.language_preference : "Nederlands",
+            financiering_regeling: tax.financiering_regeling,
+            soort_hulp_zorg: tax.soort_hulp_zorg,
+            zorgniveau: tax.zorgniveau,
+            type_inzet: tax.type_inzet,
+            vaardigheden_ervaring: tax.vaardigheden_ervaring,
+            target_group: tax.target_group,
             skills_required: Array.isArray(row.skills_required) ? row.skills_required : [],
             budget_min: typeof row.budget_min === "number" ? row.budget_min : null,
             budget_max: typeof row.budget_max === "number" ? row.budget_max : null,
@@ -468,7 +422,8 @@ export default function IntakePage() {
       };
       // eslint-disable-next-line no-console
       console.log("HYDRATE: restored draft", parsed);
-      setForm((prev) => ({ ...prev, ...(parsed.form || {}) }));
+      const mergedTax = mergeIntakeSubmission((parsed.form || {}) as Record<string, unknown>);
+      setForm((prev) => ({ ...prev, ...(parsed.form || {}), ...mergedTax }));
       if (typeof parsed.step === "number") {
         setStep(parsed.step);
       }
@@ -570,15 +525,13 @@ export default function IntakePage() {
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
-  const selectedTags = (form.skills_required as string[]) ?? [];
-
-  const toggleTag = (tag: string) => {
-    const current = (form.skills_required as string[]) ?? [];
-    const exists = current.includes(tag);
-    const next = exists ? current.filter((t) => t !== tag) : [...current, tag];
-    update("skills_required", next);
-    if (!form.care_type && next.length > 0) {
-      update("care_type", next[0]);
+  const toggleArr = (key: string, value: string) => {
+    const current = strArr(form, key);
+    const exists = current.includes(value);
+    const next = exists ? current.filter((t) => t !== value) : [...current, value];
+    update(key, next);
+    if (key === "soort_hulp_zorg" && next.length > 0 && !form.care_type) {
+      update("care_type", labelForValue(SOORT_HULP_ZORG_OPTIONS, next[0]) ?? next[0]);
     }
   };
 
@@ -743,12 +696,12 @@ export default function IntakePage() {
               <ZorentaFormField label="Doelgroep">
                 <div className="mt-2 flex flex-wrap gap-2">
                   {TARGET_GROUP_OPTIONS.map((option) => {
-                    const selected = selectedTags.includes(option);
+                    const selected = strArr(form, "target_group").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("target_group", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -756,7 +709,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -768,13 +721,13 @@ export default function IntakePage() {
             <>
               <ZorentaFormField label="Financiering / regeling">
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {FINANCING_OPTIONS.map((option) => {
-                    const selected = selectedTags.includes(option);
+                  {FINANCIERING_REGELING_OPTIONS.map((option) => {
+                    const selected = strArr(form, "financiering_regeling").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("financiering_regeling", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -782,7 +735,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -791,13 +744,13 @@ export default function IntakePage() {
 
               <ZorentaFormField label="Soort hulp / zorg">
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {CARE_TYPES.map((option) => {
-                    const selected = selectedTags.includes(option);
+                  {SOORT_HULP_ZORG_OPTIONS.map((option) => {
+                    const selected = strArr(form, "soort_hulp_zorg").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("soort_hulp_zorg", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -805,7 +758,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -814,13 +767,13 @@ export default function IntakePage() {
 
               <ZorentaFormField label="Zorgniveau">
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {CARE_LEVEL_OPTIONS.map((option) => {
-                    const selected = selectedTags.includes(option);
+                  {ZORGNIVEAU_OPTIONS.map((option) => {
+                    const selected = strArr(form, "zorgniveau").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("zorgniveau", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -828,7 +781,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -837,13 +790,13 @@ export default function IntakePage() {
 
               <ZorentaFormField label="Type inzet">
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {ENGAGEMENT_TYPES.map((option) => {
-                    const selected = selectedTags.includes(option);
+                  {TYPE_INZET_OPTIONS.map((option) => {
+                    const selected = strArr(form, "type_inzet").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("type_inzet", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -851,7 +804,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -860,13 +813,13 @@ export default function IntakePage() {
 
               <ZorentaFormField label="Vaardigheden / ervaring">
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {SKILL_OPTIONS.map((option) => {
-                    const selected = selectedTags.includes(option);
+                  {VAARDIGHEDEN_ERVARING_OPTIONS.map((option) => {
+                    const selected = strArr(form, "vaardigheden_ervaring").includes(option.value);
                     return (
                       <button
-                        key={option}
+                        key={option.value}
                         type="button"
-                        onClick={() => toggleTag(option)}
+                        onClick={() => toggleArr("vaardigheden_ervaring", option.value)}
                         className={[
                           "rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-medium transition",
                           selected
@@ -874,7 +827,7 @@ export default function IntakePage() {
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         ].join(" ")}
                       >
-                        {option}
+                        {option.label}
                       </button>
                     );
                   })}
@@ -1103,8 +1056,8 @@ export default function IntakePage() {
                         💼 Type overeenkomst
                       </p>
                       <p className="text-sm text-slate-800">
-                        {ENGAGEMENT_TYPES.find((t) => selectedTags.includes(t)) ||
-                          FINANCING_OPTIONS.find((t) => selectedTags.includes(t)) ||
+                        {labelsForValues(TYPE_INZET_OPTIONS, strArr(form, "type_inzet"))[0] ||
+                          labelsForValues(FINANCIERING_REGELING_OPTIONS, strArr(form, "financiering_regeling"))[0] ||
                           "Nog niet ingevuld"}
                       </p>
                     </div>
@@ -1134,9 +1087,7 @@ export default function IntakePage() {
                   <div>
                     <p className="font-medium text-slate-900">Doelgroep</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {TARGET_GROUP_OPTIONS.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(TARGET_GROUP_OPTIONS, strArr(form, "target_group")).map((t) => (
                         <span
                           key={t}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
@@ -1144,7 +1095,7 @@ export default function IntakePage() {
                           {t}
                         </span>
                       ))}
-                      {TARGET_GROUP_OPTIONS.every((t) => !selectedTags.includes(t)) && (
+                      {strArr(form, "target_group").length === 0 && (
                         <span className="text-slate-500">Niet ingevuld</span>
                       )}
                     </div>
@@ -1152,9 +1103,7 @@ export default function IntakePage() {
                   <div>
                     <p className="font-medium text-slate-900">Financiering / regeling</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {FINANCING_OPTIONS.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(FINANCIERING_REGELING_OPTIONS, strArr(form, "financiering_regeling")).map((t) => (
                         <span
                           key={t}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
@@ -1167,21 +1116,17 @@ export default function IntakePage() {
                   <div>
                     <p className="font-medium text-slate-900">Soort hulp / zorg & zorgniveau</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {CARE_TYPES.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(SOORT_HULP_ZORG_OPTIONS, strArr(form, "soort_hulp_zorg")).map((t) => (
                         <span
-                          key={t}
+                          key={`s-${t}`}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
                         >
                           {t}
                         </span>
                       ))}
-                      {CARE_LEVEL_OPTIONS.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(ZORGNIVEAU_OPTIONS, strArr(form, "zorgniveau")).map((t) => (
                         <span
-                          key={t}
+                          key={`z-${t}`}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
                         >
                           {t}
@@ -1192,21 +1137,17 @@ export default function IntakePage() {
                   <div>
                     <p className="font-medium text-slate-900">Type inzet & vaardigheden</p>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {ENGAGEMENT_TYPES.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(TYPE_INZET_OPTIONS, strArr(form, "type_inzet")).map((t) => (
                         <span
-                          key={t}
+                          key={`ti-${t}`}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
                         >
                           {t}
                         </span>
                       ))}
-                      {SKILL_OPTIONS.filter((t) =>
-                        selectedTags.includes(t)
-                      ).map((t) => (
+                      {labelsForValues(VAARDIGHEDEN_ERVARING_OPTIONS, strArr(form, "vaardigheden_ervaring")).map((t) => (
                         <span
-                          key={t}
+                          key={`v-${t}`}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
                         >
                           {t}

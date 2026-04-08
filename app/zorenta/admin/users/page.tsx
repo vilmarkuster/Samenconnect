@@ -120,7 +120,7 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Naam</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Plan</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Vacatures</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Opdrachten</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Sollicitaties</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Acties</th>
                   </tr>

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
+import { ensureConversationForJobApplication } from "@/lib/zorenta/application-conversation";
 
 export async function GET(
   req: NextRequest,
@@ -62,25 +63,15 @@ export async function PUT(
 
     let conversationId: string | null = null;
     if (newStatus === "accepted" && job) {
-      const posterId = job.poster_id;
-      const applicantId = app.applicant_id;
-      const p1 = posterId < applicantId ? posterId : applicantId;
-      const p2 = posterId < applicantId ? applicantId : posterId;
-      const { data: existing } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("participant_1", p1)
-        .eq("participant_2", p2)
-        .maybeSingle();
-      if (existing) {
-        conversationId = existing.id;
-      } else {
-        const { data: created, error: convErr } = await supabase
-          .from("conversations")
-          .insert({ participant_1: p1, participant_2: p2, job_id: app.job_id })
-          .select("id")
-          .single();
-        if (!convErr && created) conversationId = created.id;
+      try {
+        conversationId = await ensureConversationForJobApplication(supabase, {
+          applicationId: id,
+          jobId: app.job_id,
+          applicantId: app.applicant_id,
+          posterId: job.poster_id,
+        });
+      } catch {
+        conversationId = null;
       }
     }
     return jsonResponse({ ...data, conversation_id: conversationId ?? undefined });

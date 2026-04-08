@@ -1,6 +1,15 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonResponse } from "@/lib/zorenta/auth";
+import {
+  devLogCaregiverProfileRawSource,
+  selectCaregiverProfileRowByProfileId,
+} from "@/lib/zorenta/caregiver-profile-repository";
+import { getSupabaseForPublicCaregiverApi } from "@/lib/zorenta/supabase-for-public-caregiver-api";
+import {
+  normalizeCaregiverProfileRow,
+  type NormalizedCaregiverProfileForDisplay,
+} from "@/lib/zorenta/normalize-caregiver-profile-display";
 
 type LinkedReview = {
   id: string;
@@ -31,7 +40,7 @@ function mapProviderType(providerTypeRaw: unknown) {
 }
 
 async function fetchReviewsForProfile(
-  supabase: ReturnType<typeof getSupabaseClient>,
+  supabase: SupabaseClient,
   profileId: string
 ): Promise<
   | { error: string; status: number }
@@ -57,29 +66,29 @@ async function fetchReviewsForProfile(
   };
 }
 
-/** Linked caregiver: profiles.role = caregiver + caregiver_profiles row */
-async function fetchLinkedCaregiverData(supabase: ReturnType<typeof getSupabaseClient>, profileId: string) {
-  const { data: profile, error: pError } = await supabase
-    .from("profiles")
-    .select("id, display_name, role")
-    .eq("id", profileId)
-    .single();
-  if (pError || !profile) return { error: "Profile not found." as const, status: 404 };
-  if (profile.role !== "caregiver") return { error: "Caregiver profile not found." as const, status: 404 };
-
-  const { data: caregiver, error: cError } = await supabase
-    .from("caregiver_profiles")
-    .select("*")
-    .eq("profile_id", profileId)
-    .single();
+/** Linked caregiver: `caregiver_profiles` row for `profile_id` (GET resolves this before `profiles.role` checks). */
+async function fetchLinkedCaregiverData(supabase: SupabaseClient, profileId: string) {
+  const { data: caregiver, error: cError } = await selectCaregiverProfileRowByProfileId(supabase, profileId);
   if (cError || !caregiver) return { error: "Caregiver profile not found." as const, status: 404 };
+  devLogCaregiverProfileRawSource("fetchLinkedCaregiverData", profileId, caregiver);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, display_name, role, avatar_url")
+    .eq("id", profileId)
+    .maybeSingle();
 
   const rev = await fetchReviewsForProfile(supabase, profileId);
   if ("error" in rev) return { error: rev.error, status: rev.status };
 
   return {
     profileId,
-    profile,
+    profile: {
+      id: profileId,
+      display_name: profile?.display_name ?? null,
+      role: profile?.role ?? null,
+      avatar_url: profile?.avatar_url ?? null,
+    },
     caregiver,
     reviews: rev.reviews,
     averageRating: rev.averageRating,
@@ -88,10 +97,10 @@ async function fetchLinkedCaregiverData(supabase: ReturnType<typeof getSupabaseC
 }
 
 /** Linked organization: profiles.role = organization; organization_profiles may be hidden by RLS — then fallback to profile + marketplace only */
-async function fetchLinkedOrganizationData(supabase: ReturnType<typeof getSupabaseClient>, profileId: string) {
+async function fetchLinkedOrganizationData(supabase: SupabaseClient, profileId: string) {
   const { data: profile, error: pError } = await supabase
     .from("profiles")
-    .select("id, display_name, role")
+    .select("id, display_name, role, avatar_url")
     .eq("id", profileId)
     .single();
   if (pError || !profile) return { error: "Profile not found." as const, status: 404 };
@@ -118,63 +127,129 @@ async function fetchLinkedOrganizationData(supabase: ReturnType<typeof getSupaba
 
 type MarketplaceRow = Record<string, unknown>;
 
-function buildDisplayFromMarketplaceAndLinkedCaregiver(
-  marketplaceRow: MarketplaceRow,
+function pageCaregiverFromOrganizationLinked(
   linked: {
     profileId: string;
-    profile: { id: string; display_name: string | null; role: string | null };
-    caregiver: Record<string, unknown>;
+    profile: { id: string; display_name: string | null; role: string | null; avatar_url?: string | null };
+    organization: Record<string, unknown> | null;
     reviews: LinkedReview[];
     averageRating: number | null;
     reviewCount: number;
-  }
+  },
+  marketplaceRow: MarketplaceRow | null
 ) {
-  const providerType = marketplaceRow.provider_type ?? "zzp";
-  const { role, arrangement, isVolunteer } = mapProviderType(providerType);
-
-  const tags =
-    [...toStringArray(marketplaceRow.zorgtype), ...toStringArray(marketplaceRow.specialisaties), ...toStringArray(marketplaceRow.vaardigheden)].filter(
-      Boolean
-    );
-  const certifications = [...toStringArray(marketplaceRow.certificaten), ...toStringArray(marketplaceRow.registraties)].filter(Boolean);
-
-  const skills = toStringArray(linked.caregiver.skills);
-  const bio = String(linked.caregiver.bio ?? "");
+  const org = linked.organization;
+  const orgName = org ? String(org.name ?? "") : "";
+  const orgDescription = org && org.description != null ? String(org.description) : "";
+  const orgCity = org && org.city != null ? String(org.city) : "";
+  const city = (orgCity || (marketplaceRow ? String(marketplaceRow.location ?? "") : "")).trim();
+  const bioText =
+    orgDescription.trim() ||
+    (org
+      ? ""
+      : "Dit aanbod komt van een geregistreerde organisatie op SamenConnect. Aanvullende organisatiegegevens kunnen beperkt zichtbaar zijn.");
 
   const rate =
-    typeof marketplaceRow.prijs === "number"
-      ? (marketplaceRow.prijs as number)
+    marketplaceRow &&
+    (typeof marketplaceRow.prijs === "number"
+      ? marketplaceRow.prijs
       : marketplaceRow.prijs == null
         ? null
-        : Number(marketplaceRow.prijs);
+        : Number(marketplaceRow.prijs));
 
   return {
-    mode: "linked-caregiver" as const,
-    caregiver: {
-      id: String(marketplaceRow.id),
-      linkedProfileId: linked.profileId,
-      name: String(linked.profile.display_name ?? marketplaceRow.name ?? ""),
-      role,
-      city: String(linked.caregiver.city ?? marketplaceRow.location ?? ""),
-      rate: Number.isFinite(rate as number) ? rate : null,
-      isVolunteer,
-      tags: tags.length ? tags : skills,
-      skills,
-      certifications,
-      arrangement,
-      bio,
-    },
+    headline: null,
+    bio: bioText || null,
+    skills: [] as string[],
+    city: city || null,
+    region: null,
+    country: null,
+    experience_years: null,
+    availability: null,
+    certifications: null,
+    hourly_rate: rate != null && Number.isFinite(rate as number) ? (rate as number) : null,
+  };
+}
+
+/** Response shape for `/zorenta/caregivers/[id]` page (expects `profile` + structured `caregiver`). */
+function buildZorentaCaregiverPageResponse(linked: {
+  profileId: string;
+  profile: { id: string; display_name: string | null; role: string | null; avatar_url?: string | null };
+  caregiver: Record<string, unknown>;
+  reviews: LinkedReview[];
+  averageRating: number | null;
+  reviewCount: number;
+}) {
+  const normalized = normalizeCaregiverProfileRow(linked.caregiver as Record<string, unknown>, {
+    includePrivateContact: false,
+  })!;
+
+  return {
+    profile: { id: linked.profile.id, display_name: linked.profile.display_name, avatar_url: linked.profile.avatar_url ?? null },
+    caregiver: normalized,
     reviews: linked.reviews,
     averageRating: linked.averageRating,
     reviewCount: linked.reviewCount,
   };
 }
 
+type LinkedPageBase = ReturnType<typeof buildZorentaCaregiverPageResponse>;
+
+/** Zelfde normalized caregiver als /api/zorenta/me; géén marketplace-kaart op `caregiver`. */
+function jsonResponseLinkedCaregiverProfile(
+  base: LinkedPageBase,
+  opts: {
+    routeId: string;
+    source: "linked-caregiver-profile";
+    mode?: string;
+  }
+) {
+  const body: Record<string, unknown> = {
+    source: opts.source,
+    mode: opts.mode ?? "linked-caregiver",
+    profile: base.profile,
+    caregiver: base.caregiver,
+    pageCaregiver: base.caregiver,
+    reviews: base.reviews,
+    averageRating: base.averageRating,
+    reviewCount: base.reviewCount,
+  };
+  return jsonResponse(body);
+}
+
+function devLogCaregiverGet(
+  routeId: string,
+  branch: string,
+  body: Record<string, unknown> | null,
+  linkedFound: boolean
+) {
+  if (process.env.NODE_ENV !== "development") return;
+  const cg = body?.caregiver as Record<string, unknown> | undefined;
+  const pc = body?.pageCaregiver as Record<string, unknown> | undefined;
+  const prof = body?.profile as { id?: string | null } | undefined;
+  // eslint-disable-next-line no-console -- dev-only routing audit
+  console.log("[GET /api/zorenta/caregivers/[id]]", {
+    routeId,
+    branch,
+    source: body?.source,
+    mode: body?.mode,
+    linkedCaregiverFound: linkedFound,
+    profileId: prof?.id ?? null,
+    caregiverHourlyRate: cg?.hourly_rate,
+    caregiverSkills: cg?.skills,
+    caregiverCertifications: cg?.certifications,
+    pageCaregiverHourlyRate: pc?.hourly_rate,
+    pageCaregiverSkills: pc?.skills,
+    pageCaregiverCertifications: pc?.certifications,
+    hasMarketplaceCard: body != null && "marketplaceCard" in body,
+  });
+}
+
 function buildDisplayFromMarketplaceAndLinkedOrganization(
   marketplaceRow: MarketplaceRow,
   linked: {
     profileId: string;
-    profile: { id: string; display_name: string | null; role: string | null };
+    profile: { id: string; display_name: string | null; role: string | null; avatar_url?: string | null };
     organization: Record<string, unknown> | null;
     reviews: LinkedReview[];
     averageRating: number | null;
@@ -241,161 +316,131 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: routeId } = await params;
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseForPublicCaregiverApi(req);
 
-  // 1) If `id` matches a marketplace caregiver row, resolve as linked or marketplace-only.
-  const { data: marketplaceRow } = await supabase
-    .from("caregivers")
-    .select("*")
+  const returnLinked = (
+    branch: string,
+    linked: Awaited<ReturnType<typeof fetchLinkedCaregiverData>> & object
+  ) => {
+    if ("error" in linked) return null;
+    const base = buildZorentaCaregiverPageResponse(linked);
+    const body: Record<string, unknown> = {
+      source: "linked-caregiver-profile",
+      mode: "linked-caregiver",
+      profile: base.profile,
+      caregiver: base.caregiver,
+      pageCaregiver: base.caregiver,
+      reviews: base.reviews,
+      averageRating: base.averageRating,
+      reviewCount: base.reviewCount,
+    };
+    devLogCaregiverGet(routeId, branch, body, true);
+    return jsonResponseLinkedCaregiverProfile(base, {
+      routeId,
+      source: "linked-caregiver-profile",
+      mode: "linked-caregiver",
+    });
+  };
+
+  // —— 1) routeId = profiles.id met caregiver_profiles (geen role-check; lost stale profiles.role op) ——
+  const linkedByProfileId = await fetchLinkedCaregiverData(supabase, routeId);
+  const r1 = returnLinked("1_caregiver_profiles_by_profile_id", linkedByProfileId);
+  if (r1) return r1;
+
+  // —— 2) routeId = caregiver_profiles.id (PK) ——
+  const { data: cgRowByPk } = await supabase
+    .from("caregiver_profiles")
+    .select("profile_id")
     .eq("id", routeId)
     .maybeSingle();
-
-  if (marketplaceRow) {
-    const providerType = marketplaceRow.provider_type ?? "zzp";
-    const { role, arrangement, isVolunteer } = mapProviderType(providerType);
-
-    if (marketplaceRow.profile_id) {
-      const pid = String(marketplaceRow.profile_id);
-      const { data: linkedProfile, error: lpErr } = await supabase
-        .from("profiles")
-        .select("id, display_name, role")
-        .eq("id", pid)
-        .single();
-
-      if (lpErr || !linkedProfile) {
-        return jsonResponse({ error: "Profile not found." }, 404);
-      }
-
-      if (linkedProfile.role === "caregiver") {
-        const linked = await fetchLinkedCaregiverData(supabase, pid);
-        if ("error" in linked) return jsonResponse({ error: linked.error }, linked.status);
-        return jsonResponse(buildDisplayFromMarketplaceAndLinkedCaregiver(marketplaceRow, linked));
-      }
-
-      if (linkedProfile.role === "organization") {
-        const linked = await fetchLinkedOrganizationData(supabase, pid);
-        if ("error" in linked) return jsonResponse({ error: linked.error }, linked.status);
-        return jsonResponse(buildDisplayFromMarketplaceAndLinkedOrganization(marketplaceRow, linked));
-      }
-
-      return jsonResponse({ error: "Linked profile is not a caregiver or organization account." }, 404);
-    }
-
-    // Marketplace-only
-    const tags = [
-      ...toStringArray(marketplaceRow.zorgtype),
-      ...toStringArray(marketplaceRow.specialisaties),
-      ...toStringArray(marketplaceRow.vaardigheden),
-    ].filter(Boolean);
-    const skills = toStringArray(marketplaceRow.vaardigheden);
-    const certifications = [...toStringArray(marketplaceRow.certificaten), ...toStringArray(marketplaceRow.registraties)].filter(Boolean);
-
-    const rate =
-      typeof marketplaceRow.prijs === "number"
-        ? (marketplaceRow.prijs as number)
-        : marketplaceRow.prijs == null
-          ? null
-          : Number(marketplaceRow.prijs);
-
-    return jsonResponse({
-      mode: "marketplace",
-      caregiver: {
-        id: String(marketplaceRow.id),
-        linkedProfileId: null,
-        name: String(marketplaceRow.name ?? ""),
-        role,
-        city: String(marketplaceRow.location ?? ""),
-        rate: Number.isFinite(rate as number) ? rate : null,
-        isVolunteer,
-        tags,
-        skills,
-        certifications,
-        arrangement,
-        bio:
-          "Dit is een marketplace-profiel. Het is nog niet gekoppeld aan een SamenConnect-account, waardoor volledige SamenConnect-profielinformatie (zoals beoordelingen) nog niet beschikbaar is.",
-      },
-      reviews: [],
-      averageRating: null,
-      reviewCount: 0,
-    });
+  if (cgRowByPk?.profile_id) {
+    const linked = await fetchLinkedCaregiverData(supabase, String(cgRowByPk.profile_id));
+    const r2 = returnLinked("2_caregiver_profiles_by_row_pk", linked);
+    if (r2) return r2;
   }
 
-  // 2) Legacy / fallback: treat `id` as a real `public.profiles.id`.
+  // —— 3) routeId = public.caregivers.id: alleen linked account; geen marketplace-only body ——
+  const { data: marketplaceRow } = await supabase.from("caregivers").select("*").eq("id", routeId).maybeSingle();
+
+  if (marketplaceRow) {
+    if (!marketplaceRow.profile_id) {
+      devLogCaregiverGet(routeId, "3_marketplace_row_no_profile_id", null, false);
+      return jsonResponse({ error: "Profile not found." }, 404);
+    }
+
+    const pid = String(marketplaceRow.profile_id);
+    const { data: linkedProfile, error: lpErr } = await supabase
+      .from("profiles")
+      .select("id, display_name, role, avatar_url")
+      .eq("id", pid)
+      .single();
+
+    if (lpErr || !linkedProfile) {
+      devLogCaregiverGet(routeId, "3_marketplace_linked_profile_missing", null, false);
+      return jsonResponse({ error: "Profile not found." }, 404);
+    }
+
+    const linkedTry = await fetchLinkedCaregiverData(supabase, pid);
+    if (!("error" in linkedTry)) {
+      const r3 = returnLinked("3_marketplace_row_with_caregiver_profiles", linkedTry);
+      if (r3) return r3;
+    }
+
+    if (linkedProfile.role === "organization") {
+      const linked = await fetchLinkedOrganizationData(supabase, pid);
+      if ("error" in linked) {
+        devLogCaregiverGet(routeId, "3_org_fetch_error", null, false);
+        return jsonResponse({ error: linked.error }, linked.status);
+      }
+      const orgBody: Record<string, unknown> = {
+        ...buildDisplayFromMarketplaceAndLinkedOrganization(marketplaceRow, linked),
+        profile: { id: linked.profileId, display_name: linked.profile.display_name, avatar_url: linked.profile.avatar_url ?? null },
+        pageCaregiver: pageCaregiverFromOrganizationLinked(linked, marketplaceRow),
+      };
+      devLogCaregiverGet(routeId, "3_marketplace_organization", orgBody, false);
+      return jsonResponse(orgBody);
+    }
+
+    devLogCaregiverGet(routeId, "3_marketplace_no_caregiver_profile", null, false);
+    return jsonResponse({ error: "Profile not found." }, 404);
+  }
+
+  // —— 4) Organization: profile UUID als route (zonder marketplace-rij hierboven) ——
+  const profileIdResolved = routeId;
   const { data: legacyProfile, error: legPErr } = await supabase
     .from("profiles")
-    .select("id, display_name, role")
-    .eq("id", routeId)
+    .select("id, display_name, role, avatar_url")
+    .eq("id", profileIdResolved)
     .single();
 
   if (legPErr || !legacyProfile) {
+    devLogCaregiverGet(routeId, "4_no_profile", null, false);
     return jsonResponse({ error: "Profile not found." }, 404);
   }
 
   const { data: linkedMarketplaceRow } = await supabase
     .from("caregivers")
     .select("*")
-    .eq("profile_id", routeId)
+    .eq("profile_id", profileIdResolved)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (legacyProfile.role === "caregiver") {
-    const linked = await fetchLinkedCaregiverData(supabase, routeId);
-    if ("error" in linked) return jsonResponse({ error: linked.error }, linked.status);
-
-    const providerType = linkedMarketplaceRow?.provider_type ?? "zzp";
-    const { role, arrangement, isVolunteer } = mapProviderType(providerType);
-
-    const tags = linkedMarketplaceRow
-      ? [
-          ...toStringArray(linkedMarketplaceRow.zorgtype),
-          ...toStringArray(linkedMarketplaceRow.specialisaties),
-          ...toStringArray(linkedMarketplaceRow.vaardigheden),
-        ].filter(Boolean)
-      : toStringArray(linked.caregiver.skills);
-
-    const certifications = linkedMarketplaceRow
-      ? [...toStringArray(linkedMarketplaceRow.certificaten), ...toStringArray(linkedMarketplaceRow.registraties)].filter(Boolean)
-      : [];
-
-    const rate =
-      linkedMarketplaceRow?.prijs == null
-        ? null
-        : typeof linkedMarketplaceRow.prijs === "number"
-          ? (linkedMarketplaceRow.prijs as number)
-          : Number(linkedMarketplaceRow.prijs);
-
-    const skills = toStringArray(linked.caregiver.skills);
-    const bio = String(linked.caregiver.bio ?? "");
-
-    return jsonResponse({
-      mode: "linked-caregiver",
-      caregiver: {
-        id: linkedMarketplaceRow ? String(linkedMarketplaceRow.id) : routeId,
-        linkedProfileId: linked.profileId,
-        name: String(linked.profile.display_name ?? ""),
-        role,
-        city: String(linked.caregiver.city ?? linkedMarketplaceRow?.location ?? ""),
-        rate: rate != null && Number.isFinite(rate) ? rate : null,
-        isVolunteer,
-        tags,
-        skills,
-        certifications,
-        arrangement,
-        bio,
-      },
-      reviews: linked.reviews,
-      averageRating: linked.averageRating,
-      reviewCount: linked.reviewCount,
-    });
-  }
-
   if (legacyProfile.role === "organization") {
-    const linked = await fetchLinkedOrganizationData(supabase, routeId);
-    if ("error" in linked) return jsonResponse({ error: linked.error }, linked.status);
+    const linked = await fetchLinkedOrganizationData(supabase, profileIdResolved);
+    if ("error" in linked) {
+      devLogCaregiverGet(routeId, "4_org_error", null, false);
+      return jsonResponse({ error: linked.error }, linked.status);
+    }
 
     if (linkedMarketplaceRow) {
-      return jsonResponse(buildDisplayFromMarketplaceAndLinkedOrganization(linkedMarketplaceRow, linked));
+      const orgBody: Record<string, unknown> = {
+        ...buildDisplayFromMarketplaceAndLinkedOrganization(linkedMarketplaceRow, linked),
+        profile: { id: linked.profileId, display_name: linked.profile.display_name, avatar_url: linked.profile.avatar_url ?? null },
+        pageCaregiver: pageCaregiverFromOrganizationLinked(linked, linkedMarketplaceRow),
+      };
+      devLogCaregiverGet(routeId, "4_organization_with_marketplace", orgBody, false);
+      return jsonResponse(orgBody);
     }
 
     const org = linked.organization;
@@ -411,10 +456,10 @@ export async function GET(
         ? ""
         : "Dit aanbod komt van een geregistreerde organisatie op SamenConnect. Aanvullende organisatiegegevens kunnen beperkt zichtbaar zijn.");
 
-    return jsonResponse({
+    const orgBody: Record<string, unknown> = {
       mode: "linked-organization",
       caregiver: {
-        id: routeId,
+        id: profileIdResolved,
         linkedProfileId: linked.profileId,
         name,
         role: "Organisatie",
@@ -431,8 +476,13 @@ export async function GET(
       reviews: linked.reviews,
       averageRating: linked.averageRating,
       reviewCount: linked.reviewCount,
-    });
+      profile: { id: linked.profileId, display_name: linked.profile.display_name, avatar_url: linked.profile.avatar_url ?? null },
+      pageCaregiver: pageCaregiverFromOrganizationLinked(linked, null),
+    };
+    devLogCaregiverGet(routeId, "4_organization_no_marketplace_row", orgBody, false);
+    return jsonResponse(orgBody);
   }
 
+  devLogCaregiverGet(routeId, "fallback_not_found", null, false);
   return jsonResponse({ error: "Profile not found." }, 404);
 }

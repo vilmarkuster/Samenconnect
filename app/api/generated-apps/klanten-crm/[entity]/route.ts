@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getPlatformSupabaseServerClient } from "@/lib/platform-supabase-server";
 
 const ENTITIES = ["companies", "contacts", "deals", "tasks", "activities"] as const;
 
@@ -8,7 +8,7 @@ function isEntity(s: string): s is (typeof ENTITIES)[number] {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ entity: string }> }
 ) {
   try {
@@ -16,7 +16,7 @@ export async function GET(
     if (!isEntity(entity)) {
       return new Response(JSON.stringify({ error: "Invalid entity." }), { status: 400 });
     }
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from(entity)
       .select("*")
@@ -50,7 +50,7 @@ export async function POST(
       return new Response(JSON.stringify({ error: "Invalid entity." }), { status: 400 });
     }
     const body = await req.json().catch(() => ({}));
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
 
     const insertPayload: Record<string, unknown> = { ...body };
     delete insertPayload.id;

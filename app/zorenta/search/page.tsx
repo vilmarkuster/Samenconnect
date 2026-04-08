@@ -14,10 +14,13 @@ import { CaregiverCard } from "@/components/caregiver/CaregiverCard";
 import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { Search, Briefcase, User, Filter, SlidersHorizontal } from "lucide-react";
+import { JobListingCover } from "@/components/zorenta/job-listing-cover";
 
 type Caregiver = {
   id: string;
   profile_id: string;
+  /** `public.caregivers.id` when this profile is linked to a marketplace listing. */
+  marketplace_caregiver_id?: string | null;
   headline: string | null;
   city: string | null;
   region?: string | null;
@@ -25,7 +28,7 @@ type Caregiver = {
   experience_years?: number | null;
   hourly_rate?: number | null;
   availability?: string | null;
-  profile?: { display_name: string | null };
+  profile?: { display_name: string | null; avatar_url?: string | null };
   average_rating?: number | null;
 };
 
@@ -35,6 +38,7 @@ type Job = {
   city: string | null;
   care_type: string | null;
   status: string;
+  image_urls?: string[] | null;
 };
 
 const CARE_TYPES = ["", "Thuiszorg", "Verpleeghuis", "Gehandicaptenzorg", "Dementiezorg", "Palliatieve zorg", "Kraamzorg", "Overig"];
@@ -150,7 +154,7 @@ export default function SearchPage() {
             Zorgverleners
           </TabsTrigger>
           <TabsTrigger value="jobs" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            Vacatures
+            Opdrachten
           </TabsTrigger>
         </TabsList>
 
@@ -353,7 +357,7 @@ export default function SearchPage() {
             <Link href="/zorenta/jobs">
               <Button variant="outline" size="sm">
                 <Briefcase className="mr-1.5 h-3.5 w-3.5" />
-                Vacatures bekijken
+                Opdrachten bekijken
               </Button>
             </Link>
           )}
@@ -376,7 +380,9 @@ export default function SearchPage() {
                 <CaregiverCard
                   key={c.id}
                   profileId={c.profile_id}
+                  caregiverRouteId={c.marketplace_caregiver_id ?? null}
                   name={c.profile?.display_name || "Zorgverlener"}
+                  avatarUrl={c.profile?.avatar_url ?? null}
                   headline={c.headline}
                   experienceYears={c.experience_years}
                   skills={Array.isArray(c.skills) ? c.skills : []}
@@ -394,23 +400,28 @@ export default function SearchPage() {
           {emptyJobs ? (
             <ZorentaEmptyState
               icon={Briefcase}
-              title="Geen vacatures gevonden"
-              description="Probeer een andere plaats of bekijk alle vacatures."
+              title="Geen opdrachten gevonden"
+              description="Probeer een andere plaats of bekijk alle opdrachten."
               action={
                 <Link href="/zorenta/jobs">
-                  <Button variant="outline">Alle vacatures</Button>
+                  <Button variant="outline">Alle opdrachten</Button>
                 </Link>
               }
             />
           ) : !hasSearchedJobs && !loading ? (
             <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-8 text-center text-sm text-slate-500">
-              Voer een zoekopdracht in of bekijk vacatures.
+              Voer een zoekopdracht in of bekijk opdrachten.
             </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {jobs.map((job) => (
                 <Link key={job.id} href={`/zorenta/jobs/${job.id}`}>
-                  <Card className="transition-shadow hover:shadow-md">
+                  <Card className="overflow-hidden transition-shadow hover:shadow-md">
+                    <JobListingCover
+                      imageUrls={job.image_urls}
+                      alt=""
+                      className="aspect-[16/9] rounded-t-xl border-b border-slate-100"
+                    />
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">{job.title}</CardTitle>
                     </CardHeader>

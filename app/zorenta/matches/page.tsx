@@ -35,6 +35,7 @@ const SELECTED_CONVERSATION_KEY = "samenconnect_selected_conversation";
 
 type Intake = {
   id: string;
+  job_id?: string | null;
   care_type?: string | null;
   care_frequency?: string | null;
   preferred_schedule?: string | null;
@@ -332,6 +333,9 @@ function MatchesContent() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const cameFromCareRequest =
+    searchParams?.get("from") === "zorgvraag" || searchParams?.get("saved") === "1";
+  const linkedJobIdFromQuery = searchParams?.get("job_id") ?? null;
 
   type SortOption = "best" | "closest" | "lowPrice" | "highPrice" | "rating" | "new";
   const [sortOption, setSortOption] = useState<SortOption>("best");
@@ -400,6 +404,7 @@ function MatchesContent() {
             const row = chosen as any;
             const mapped: Intake = {
               id: String(row.id),
+              job_id: row.job_id ? String(row.job_id) : null,
               care_type: row.care_type ?? null,
               care_frequency: row.care_frequency ?? null,
               preferred_schedule: row.preferred_schedule ?? null,
@@ -476,6 +481,11 @@ function MatchesContent() {
         }
 
         const rows = data ?? [];
+        const linkedProfileIds = [...new Set(rows.map((r: any) => String(r.profile_id ?? "")).filter(Boolean))];
+        const { data: profileRows } = linkedProfileIds.length
+          ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", linkedProfileIds)
+          : { data: [] };
+        const profileById = Object.fromEntries((profileRows ?? []).map((p: any) => [String(p.id), p]));
         const metaById: Record<string, CaregiverMeta> = {};
         const newIndex: Record<string, number> = {};
         const allowedCerts = new Set<string>(
@@ -529,9 +539,17 @@ function MatchesContent() {
 
           return {
             id,
-            name: String(row.name ?? "Onbekende zorgverlener"),
+            name: String(
+              profileById[String(row.profile_id)]?.display_name ??
+              row.name ??
+              "Onbekende zorgverlener"
+            ),
             role,
             linkedProfileId: row.profile_id ? String(row.profile_id) : null,
+            avatarUrl:
+              typeof profileById[String(row.profile_id)]?.avatar_url === "string"
+                ? String(profileById[String(row.profile_id)]?.avatar_url)
+                : null,
             provider_type: providerType,
             city: String(row.location ?? ""),
             rate:
@@ -984,6 +1002,7 @@ function MatchesContent() {
   const organisationsNearby = filteredMatches.filter(
     (m) => m.caregiver.role === "Organisatie"
   );
+  const topMatch = bestMatches[0] ?? null;
 
   const zorgverlenersCount = filteredMatches.filter(
     (m) => m.caregiver.role !== "Organisatie"
@@ -1092,9 +1111,75 @@ function MatchesContent() {
       <ZorentaPageHeader
         title="Beste matches voor jouw zorgvraag"
         description="Op basis van jouw zorgvraag hebben we de best passende zorgverleners en opdrachten geselecteerd."
-        backHref="/zorenta/intake"
+        backHref="/zorenta/zorgvraag-nieuw"
         backLabel="Zorgvraag aanpassen"
       />
+
+      {cameFromCareRequest && (
+        <Card className="border-emerald-200 bg-emerald-50/70">
+          <CardContent className="py-3">
+            <p className="text-sm font-semibold text-emerald-800">
+              Je zorgvraag is opgeslagen.
+            </p>
+            <p className="mt-1 text-xs text-emerald-700">
+              Hieronder zie je matches die op basis van jouw ingevulde gegevens zijn geselecteerd.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-[#40ADA8]/25 bg-gradient-to-r from-[#40ADA8]/10 to-white">
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              We vonden {zorgverlenersCount} passende matches
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Stuur direct een bericht om sneller reactie te krijgen.
+            </p>
+          </div>
+          {topMatch ? (
+            <div className="flex flex-wrap gap-2">
+              {(intake?.job_id || linkedJobIdFromQuery) ? (
+                <Link href={`/zorenta/jobs/${encodeURIComponent(intake?.job_id ?? linkedJobIdFromQuery ?? "")}`}>
+                  <Button variant="outline" size="sm" className="h-8 border-slate-200 text-xs">
+                    Bekijk jouw opdracht
+                  </Button>
+                </Link>
+              ) : null}
+              {topMatch.caregiver.linkedProfileId ? (
+                <StartMessageButton
+                  otherUserId={topMatch.caregiver.linkedProfileId}
+                  size="sm"
+                  variant="primary"
+                  label="Bericht beste match"
+                  prefill={`Hoi ${topMatch.caregiver.name.split(" ")[0]}, ik zag dat je goed past bij mijn zorgvraag. Heb je ruimte om dit kort af te stemmen?`}
+                />
+              ) : null}
+              <Link href={`/zorenta/profielen/${topMatch.caregiver.id}`}>
+                <Button variant="outline" size="sm" className="h-8 border-slate-200 text-xs">
+                  Bekijk beste match
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(intake?.job_id || linkedJobIdFromQuery) ? (
+                <Link href={`/zorenta/jobs/${encodeURIComponent(intake?.job_id ?? linkedJobIdFromQuery ?? "")}`}>
+                  <Button variant="outline" size="sm" className="h-8 border-slate-200 text-xs">
+                    Open opdracht
+                  </Button>
+                </Link>
+              ) : null}
+              <Link href="/zorenta/zorgvraag-nieuw">
+                <Button variant="outline" size="sm" className="h-8 border-slate-200 text-xs">
+                  Zorgvraag verbeteren
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Compact intake summary strip */}
       {intake && (
@@ -1807,7 +1892,7 @@ function MatchesContent() {
               <Button
                 variant="outline"
                 className="border-slate-200 text-xs"
-                onClick={() => router.push("/zorenta/intake")}
+                onClick={() => router.push("/zorenta/zorgvraag-nieuw")}
               >
                 Terug naar intake
               </Button>
@@ -1992,7 +2077,7 @@ function MatchesContent() {
                 <Button
                   variant="outline"
                   className="w-full justify-center border-slate-200 text-xs"
-                  onClick={() => router.push("/zorenta/intake")}
+                  onClick={() => router.push("/zorenta/zorgvraag-nieuw")}
                 >
                   Zorgvraag aanpassen
                 </Button>
@@ -2046,8 +2131,13 @@ function MatchCard({
     <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <CardContent className={`p-4 ${compact ? "space-y-3" : "space-y-4"}`}>
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-sm font-semibold text-emerald-700">
-            {initials(caregiver.name)}
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-sm font-semibold text-emerald-700">
+            {caregiver.avatarUrl?.trim() ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={caregiver.avatarUrl} alt={caregiver.name} className="h-full w-full object-cover" />
+            ) : (
+              initials(caregiver.name)
+            )}
           </div>
           <div className="flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">

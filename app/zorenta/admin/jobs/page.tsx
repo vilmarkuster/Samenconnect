@@ -62,7 +62,7 @@ export default function AdminJobsPage() {
 
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Vacatures</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Opdrachten</h1>
 
       <Card className="border-slate-200">
         <CardHeader className="pb-3">
@@ -152,7 +152,7 @@ export default function AdminJobsPage() {
           )}
           {!loading && total > 0 && (
             <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-              {total} vacature(s)
+              {total} opdracht(en)
             </p>
           )}
         </CardContent>

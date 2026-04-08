@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getPlatformSupabaseServerClient } from "@/lib/platform-supabase-server";
 
 const ENTITIES = ["companies", "contacts", "deals", "tasks", "activities"] as const;
 
@@ -8,7 +8,7 @@ function isEntity(s: string): s is (typeof ENTITIES)[number] {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ entity: string; id: string }> }
 ) {
   try {
@@ -16,7 +16,7 @@ export async function GET(
     if (!isEntity(entity) || !id) {
       return new Response(JSON.stringify({ error: "Invalid entity or id." }), { status: 400 });
     }
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase.from(entity).select("*").eq("id", id).single();
 
     if (error || !data) {
@@ -51,7 +51,7 @@ export async function PUT(
     delete updatePayload.id;
     delete updatePayload.created_at;
 
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from(entity)
       .update(updatePayload)
@@ -78,7 +78,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ entity: string; id: string }> }
 ) {
   try {
@@ -86,7 +86,7 @@ export async function DELETE(
     if (!isEntity(entity) || !id) {
       return new Response(JSON.stringify({ error: "Invalid entity or id." }), { status: 400 });
     }
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
     const { error } = await supabase.from(entity).delete().eq("id", id);
 
     if (error) {

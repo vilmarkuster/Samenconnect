@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS } from "@/lib/zorenta/caregiver-public-profile-route-id";
 
 type Agent = {
   id: number | string;
@@ -21,11 +23,47 @@ type AgentRun = {
   output: string;
 };
 
+function isMatchAgentName(name: string) {
+  return name.trim().toLowerCase() === "match agent";
+}
+
+type MatchAgentResult = {
+  matches: Array<{
+    caregiverId?: string;
+    caregiverName?: string;
+    fitScore?: number;
+    reason?: string;
+    concerns?: string[];
+    recommendation?: string;
+  }>;
+};
+
+function tryParseMatchAgentResult(raw: string): MatchAgentResult | null {
+  if (!raw || typeof raw !== "string") return null;
+
+  const trimmed = raw.trim();
+  const fencedBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const cleaned = (fencedBlockMatch ? fencedBlockMatch[1] : trimmed).trim();
+
+  try {
+    const parsed = JSON.parse(cleaned) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const matches = (parsed as any).matches;
+    if (!Array.isArray(matches)) return null;
+    return parsed as MatchAgentResult;
+  } catch {
+    return null;
+  }
+}
+
 export default function AgentsPage() {
+  const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeRunAgentId, setActiveRunAgentId] = useState<number | string | null>(null);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [latestRunByAgentId, setLatestRunByAgentId] = useState<Record<string, string>>({});
+  const [runErrorByAgentId, setRunErrorByAgentId] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -137,16 +175,22 @@ export default function AgentsPage() {
 
   async function handleRunTest(agent: Agent) {
     setError(null);
+    setRunErrorByAgentId((prev) => {
+      const next = { ...prev };
+      delete next[String(agent.id)];
+      return next;
+    });
     setActiveRunAgentId(agent.id);
 
     try {
       const res = await fetch("/api/agents/run", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           agentId: agent.id,
-          agentName: agent.name,
-          description: agent.description
+          jobId: "17d4bc01-b3ad-4d43-86c2-d383c80a5b43"
         })
       });
 
@@ -157,6 +201,7 @@ export default function AgentsPage() {
           data?.detail ||
           `Agent run failed with status ${res.status}`;
         setError(message);
+        setRunErrorByAgentId((prev) => ({ ...prev, [String(agent.id)]: message }));
         return;
       }
 
@@ -165,6 +210,8 @@ export default function AgentsPage() {
         typeof data?.output === "string"
           ? data.output
           : "No output returned from agent run.";
+
+      setLatestRunByAgentId((prev) => ({ ...prev, [String(agent.id)]: output }));
 
       const newRun: AgentRun = {
         id: runs.length > 0 ? `${runs.length + 1}` : "1",
@@ -179,6 +226,7 @@ export default function AgentsPage() {
       const message =
         err?.message || (typeof err === "string" ? err : "Agent run failed");
       setError(message);
+      setRunErrorByAgentId((prev) => ({ ...prev, [String(agent.id)]: message }));
     } finally {
       setActiveRunAgentId(null);
     }
@@ -245,27 +293,164 @@ export default function AgentsPage() {
                       : "—"}
                   </p>
                 </CardHeader>
-                <CardContent className="mt-auto flex gap-2 pt-0">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleRunTest(agent)}
-                    disabled={activeRunAgentId === agent.id}
-                  >
-                    {activeRunAgentId === agent.id ? "Running…" : "Run test"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1 text-red-600 hover:text-red-700"
-                    onClick={() => handleDeleteAgent(agent.id)}
-                  >
-                    Delete
-                  </Button>
+                <CardContent className="mt-auto space-y-2 pt-0">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => router.push(`/agents/${agent.id}`)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleRunTest(agent)}
+                      disabled={activeRunAgentId === agent.id}
+                    >
+                      {activeRunAgentId === agent.id ? "Running…" : "Run test"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteAgent(agent.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+
+                  {activeRunAgentId === agent.id && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      <div className="font-medium text-slate-900">Running test…</div>
+                      <div className="mt-0.5 text-slate-500">
+                        Calling <span className="font-mono">/api/agents/run</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {runErrorByAgentId[String(agent.id)] && activeRunAgentId !== agent.id && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {runErrorByAgentId[String(agent.id)]}
+                    </div>
+                  )}
+
+                  {latestRunByAgentId[String(agent.id)] && activeRunAgentId !== agent.id && (
+                    isMatchAgentName(agent.name) ? (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-medium text-emerald-900">
+                            Latest match result
+                          </div>
+                          <div className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                            Match Agent
+                          </div>
+                        </div>
+                        {(() => {
+                          const parsed = tryParseMatchAgentResult(latestRunByAgentId[String(agent.id)]);
+                          if (!parsed) {
+                            return (
+                              <div className="mt-1 whitespace-pre-wrap text-xs text-emerald-950">
+                                {latestRunByAgentId[String(agent.id)]}
+                              </div>
+                            );
+                          }
+
+                          const topMatches = parsed.matches.slice(0, 3);
+                          return (
+                            <div className="mt-2 space-y-2">
+                              {topMatches.map((m, idx) => {
+                                const name = typeof m.caregiverName === "string" ? m.caregiverName : `Match ${idx + 1}`;
+                                const caregiverId = typeof m.caregiverId === "string" ? m.caregiverId : "";
+                                const fitScore =
+                                  typeof m.fitScore === "number" && Number.isFinite(m.fitScore)
+                                    ? Math.max(0, Math.min(100, Math.round(m.fitScore)))
+                                    : null;
+                                const reason = typeof m.reason === "string" ? m.reason : "";
+                                const concerns = Array.isArray(m.concerns)
+                                  ? m.concerns.filter((c) => typeof c === "string" && c.trim().length > 0)
+                                  : [];
+                                const recommendation =
+                                  typeof m.recommendation === "string" ? m.recommendation : "";
+
+                                return (
+                                  <div
+                                    key={`${caregiverId || idx}`}
+                                    className={
+                                      caregiverId
+                                        ? "cursor-pointer rounded-lg border border-emerald-200 bg-white/70 px-3 py-2 transition hover:bg-white hover:shadow-soft"
+                                        : "rounded-lg border border-emerald-200 bg-white/70 px-3 py-2"
+                                    }
+                                    onClick={() => {
+                                      if (
+                                        caregiverId &&
+                                        !DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS.has(caregiverId)
+                                      ) {
+                                        router.push(`/zorenta/caregivers/${caregiverId}`);
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-semibold text-emerald-950">
+                                          {name}
+                                        </div>
+                                        {caregiverId && (
+                                          <div className="mt-0.5 text-[11px] text-emerald-900/70">
+                                            {caregiverId}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {fitScore !== null && (
+                                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
+                                          {fitScore}%
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {reason && (
+                                      <div className="mt-2 text-xs text-emerald-950">
+                                        <span className="font-semibold">Reason:</span>{" "}
+                                        {reason}
+                                      </div>
+                                    )}
+
+                                    {concerns.length > 0 && (
+                                      <div className="mt-2 text-xs text-emerald-950">
+                                        <div className="font-semibold">Concerns:</div>
+                                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-emerald-950">
+                                          {concerns.map((c, i) => (
+                                            <li key={i}>{c}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+
+                                    {recommendation && (
+                                      <div className="mt-2 text-xs text-emerald-950">
+                                        <span className="font-semibold">Recommendation:</span>{" "}
+                                        {recommendation}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <div className="text-[11px] font-medium text-slate-900">Latest output</div>
+                        <div className="mt-1 whitespace-pre-wrap text-xs text-slate-700">
+                          {latestRunByAgentId[String(agent.id)]}
+                        </div>
+                      </div>
+                    )
+                  )}
                 </CardContent>
               </Card>
             ))}

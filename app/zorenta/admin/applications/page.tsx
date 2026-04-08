@@ -84,7 +84,7 @@ export default function AdminApplicationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80">
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Vacature</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Opdracht</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Sollicitant</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Datum</th>

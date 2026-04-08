@@ -11,8 +11,7 @@ type MatchScoreBadgeProps = {
 
 export function MatchScoreBadge({ score, summary, narrativeSummary, className }: MatchScoreBadgeProps) {
   const safeScore = Number.isFinite(score) ? Math.round(Math.min(100, Math.max(0, score))) : 0;
-  const variant =
-    safeScore >= 70 ? "strong" : safeScore >= 40 ? "medium" : "low";
+  const variant = safeScore >= 80 ? "strong" : safeScore >= 55 ? "medium" : "low";
   return (
     <div className={cn("inline-flex flex-col gap-1", className)}>
       <span

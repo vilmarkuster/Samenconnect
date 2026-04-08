@@ -147,6 +147,19 @@ export default function ZorentaDashboardPage() {
     [conversationsCount, jobMatches.length, totalJobs]
   );
 
+  const getStatHref = (label: string): string | null => {
+    switch (label) {
+      case "Nieuwe opdrachten":
+        return "/zorenta/jobs";
+      case "Berichten":
+        return "/zorenta/berichten";
+      case "Matches":
+        return "/zorenta/matches";
+      default:
+        return null;
+    }
+  };
+
   if (loading || !me?.profile) {
     return (
       <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 md:px-8 lg:py-10">
@@ -202,9 +215,9 @@ export default function ZorentaDashboardPage() {
       ? !hasRoleProfile
         ? { label: "Vul je profiel in", href: profileEditHref }
         : jobMatches.length === 0
-          ? { label: "Bekijk vacatures", href: "/zorenta/jobs" }
+          ? { label: "Bekijk opdrachten", href: "/zorenta/jobs" }
           : applicationsCount === 0
-            ? { label: "Solliciteer op een vacature", href: "/zorenta/jobs" }
+            ? { label: "Reageer op een opdracht", href: "/zorenta/jobs" }
             : conversationsCount === 0
               ? { label: "Stuur je eerste bericht", href: "/zorenta/applications" }
               : null
@@ -213,7 +226,7 @@ export default function ZorentaDashboardPage() {
         : intakesCount === 0 && totalJobs === 0
           ? { label: "Start zorgvraag intake", href: "/zorenta/intake" }
           : totalJobs === 0
-            ? { label: "Plaats je eerste vacature", href: "/zorenta/jobs/new" }
+            ? { label: "Plaats je eerste opdracht", href: "/zorenta/jobs/new" }
             : (dashboard?.recentApplications?.length ?? 0) === 0
               ? { label: "Bekijk matches", href: "/zorenta/jobs" }
               : conversationsCount === 0
@@ -314,7 +327,7 @@ export default function ZorentaDashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Link href="/zorenta/zorgvraag-nieuw">
+              <Link href="/zorenta/jobs/new">
                 <Button className="bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
                   <PlusCircle className="h-4 w-4" />
                   Plaats opdracht
@@ -339,10 +352,12 @@ export default function ZorentaDashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             {stats.map((item) => {
               const Icon = item.icon;
-              return (
+              const href = getStatHref(item.label);
+              const card = (
                 <div
-                  key={item.label}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className={`flex items-center justify-between rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                    href ? "cursor-pointer" : ""
+                  }`}
                 >
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -355,6 +370,14 @@ export default function ZorentaDashboardPage() {
                   </div>
                 </div>
               );
+              if (href) {
+                return (
+                  <Link key={item.label} href={href} className="block">
+                    {card}
+                  </Link>
+                );
+              }
+              return <div key={item.label}>{card}</div>;
             })}
           </div>
         </div>
@@ -568,9 +591,9 @@ export default function ZorentaDashboardPage() {
                   <FileText className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">Recente sollicitaties</p>
+                  <p className="font-medium text-slate-900">Recente matches</p>
                   <p className="truncate text-xs text-slate-500">
-                    Volg de status van je verstuurde sollicitaties.
+                    Volg de status van je nieuwste matches.
                   </p>
                 </div>
               </Link>
@@ -613,10 +636,11 @@ export default function ZorentaDashboardPage() {
                 AI Opdracht Finder
               </p>
               <h3 className="text-lg font-semibold text-slate-900">
-                Laat AI automatisch opdrachten voor je vinden
+                Laat AI automatisch passende opdrachten vinden
               </h3>
               <p className="text-sm text-slate-600">
-                Onze AI scant de marketplace en stelt een persoonlijke lijst met passende opdrachten voor je samen.
+                Onze AI zoekt op dit moment binnen SamenConnect en stelt een persoonlijke lijst met passende opdrachten
+                voor je samen. In een volgende stap worden ook externe bronnen toegevoegd.
               </p>
               <Button className="mt-2 bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
                 Start AI zoeken

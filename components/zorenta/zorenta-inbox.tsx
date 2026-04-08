@@ -31,6 +31,7 @@ function idsEqual(a: string | null, b: string | null | undefined): boolean {
 
 /** Profile snippet from GET /conversations — extra fields optional for forward-compat */
 type OtherParticipantProfile = {
+  id?: string;
   display_name?: string | null;
   /** If API starts returning these, they take priority in name picking */
   full_name?: string | null;
@@ -38,6 +39,13 @@ type OtherParticipantProfile = {
   role?: string | null;
   /** When API includes avatar URLs, ConversationThreadAvatar shows them */
   avatar_url?: string | null;
+  /**
+   * Canonical id for `/zorenta/caregivers/[id]`: `profiles.id` when `caregiver_profiles` exists; else marketplace id.
+   */
+  caregiver_route_id?: string | null;
+  caregiver_route_source?: "marketplace" | "caregiver_profile" | null;
+  /** When false, do not link (e.g. incomplete test user). When undefined, treat as true if `caregiver_route_id` is set (older API). */
+  has_renderable_caregiver_profile?: boolean;
 };
 
 type ApiConversation = {
@@ -45,12 +53,22 @@ type ApiConversation = {
   /** From API — used to pick the other participant when enriching display names */
   participant_1?: string;
   participant_2?: string;
+  application_id?: string | null;
+  application?: { id: string; status: string; job_id: string } | null;
   other?: OtherParticipantProfile | null;
   job?: { id: string; title: string } | null;
   unread_count?: number;
   last_message?: { body: string; created_at: string } | null;
   updated_at?: string;
 };
+
+/** Non-empty canonical caregiver profile path id for `/zorenta/caregivers/[id]`, or null (no link). */
+function caregiverProfileRouteId(other: OtherParticipantProfile | null | undefined): string | null {
+  const raw = other?.caregiver_route_id?.trim();
+  if (!raw) return null;
+  if (other?.has_renderable_caregiver_profile === false) return null;
+  return raw;
+}
 
 type ApiMessage = {
   id: string;
@@ -62,6 +80,63 @@ type ApiMessage = {
   /** Set when the recipient has read the message (own/outgoing bubbles). */
   read_at?: string | null;
 };
+
+/** API caps limit at 200; default GET without offset returns the oldest page only — long threads need the tail. */
+const THREAD_MESSAGES_LIMIT = 200;
+
+function sortMessagesByCreatedAtAsc(messages: ApiMessage[]): ApiMessage[] {
+  return [...messages].sort(
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)
+  );
+}
+
+/**
+ * Loads the most recent messages for the thread view (last page when total > limit).
+ * Ensures newest batch/composer messages are visible for existing long conversations.
+ */
+async function fetchMessagesForThreadView(
+  token: string,
+  conversationId: string
+): Promise<
+  | { ok: true; messages: ApiMessage[] }
+  | { ok: false; error: string; status?: number }
+> {
+  const base = `/api/zorenta/messages?conversation_id=${encodeURIComponent(conversationId)}`;
+  const first = await fetch(`${base}&limit=${THREAD_MESSAGES_LIMIT}&offset=0`, {
+    headers: zorentaHeaders(token),
+  });
+  const data = await first.json().catch(() => ({}));
+  if (!first.ok) {
+    return {
+      ok: false,
+      error:
+        first.status === 403 || first.status === 404
+          ? "Dit gesprek bestaat niet of je hebt geen toegang."
+          : typeof data?.error === "string"
+            ? data.error
+            : "Berichten laden mislukt.",
+      status: first.status,
+    };
+  }
+  const total = typeof data.total === "number" ? data.total : 0;
+  let rows: ApiMessage[] = Array.isArray(data.messages) ? data.messages : [];
+  if (total > THREAD_MESSAGES_LIMIT) {
+    const offset = Math.max(0, total - THREAD_MESSAGES_LIMIT);
+    const second = await fetch(`${base}&limit=${THREAD_MESSAGES_LIMIT}&offset=${offset}`, {
+      headers: zorentaHeaders(token),
+    });
+    const d2 = await second.json().catch(() => ({}));
+    if (!second.ok) {
+      return {
+        ok: false,
+        error: typeof d2?.error === "string" ? d2.error : "Berichten laden mislukt.",
+        status: second.status,
+      };
+    }
+    rows = Array.isArray(d2.messages) ? d2.messages : [];
+  }
+  return { ok: true, messages: sortMessagesByCreatedAtAsc(rows) };
+}
 
 function activityTs(c: ApiConversation): number {
   const iso = c.last_message?.created_at ?? c.updated_at ?? "";
@@ -120,6 +195,21 @@ function formatDateSeparatorLabel(iso: string): string {
     d.getFullYear() === yesterday.getFullYear();
   if (isYesterday) return "Gisteren";
   return d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function applicationStatusLabelNl(status: string | undefined): string {
+  switch (status) {
+    case "pending":
+      return "In afwachting";
+    case "shortlisted":
+      return "Shortlist";
+    case "accepted":
+      return "Geaccepteerd";
+    case "rejected":
+      return "Afgewezen";
+    default:
+      return status?.trim() ? status : "";
+  }
 }
 
 function formatListTime(iso: string | null | undefined) {
@@ -562,7 +652,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     }
   }, [urlConversationId]);
 
-  // Load messages for selected conversation
+  // Load messages for selected conversation — tail page so long threads show the newest messages.
   useEffect(() => {
     if (!token || !selectedId) {
       setMessages([]);
@@ -570,39 +660,39 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       return;
     }
     let cancelled = false;
+    setMessages([]);
     setLoadingMessages(true);
     setMessagesError(null);
     const conversationIdForThisFetch = selectedId;
-    fetch(
-      `/api/zorenta/messages?conversation_id=${encodeURIComponent(conversationIdForThisFetch)}`,
-      {
-        headers: zorentaHeaders(token),
+
+    void (async () => {
+      const result = await fetchMessagesForThreadView(token, conversationIdForThisFetch);
+      if (cancelled) return;
+      if (!idsEqual(selectedIdRef.current, conversationIdForThisFetch)) return;
+      if (!result.ok) {
+        setMessages([]);
+        setMessagesError(result.error);
+        setLoadingMessages(false);
+        return;
       }
-    )
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
+      setMessages(result.messages);
+      setMessagesError(null);
+      void loadConversations(token, { silent: true });
+      setLoadingMessages(false);
+
+      // Second pass after the current turn: catches the newest row if the first GET raced a just-sent batch message.
+      queueMicrotask(async () => {
         if (cancelled) return;
-        // Do not apply messages for a conversation that is no longer selected (prevents A → B bleed).
         if (!idsEqual(selectedIdRef.current, conversationIdForThisFetch)) return;
-        if (!res.ok) {
-          setMessages([]);
-          setMessagesError(
-            res.status === 403 || res.status === 404
-              ? "Dit gesprek bestaat niet of je hebt geen toegang."
-              : typeof data?.error === "string"
-                ? data.error
-                : "Berichten laden mislukt."
-          );
-          return;
-        }
-        setMessages(data.messages ?? []);
-        setMessagesError(null);
-        // GET /messages marks read_at server-side; silent refresh pulls authoritative unread_count.
+        const again = await fetchMessagesForThreadView(token, conversationIdForThisFetch);
+        if (cancelled) return;
+        if (!idsEqual(selectedIdRef.current, conversationIdForThisFetch)) return;
+        if (!again.ok) return;
+        setMessages(again.messages);
         void loadConversations(token, { silent: true });
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingMessages(false);
       });
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -756,7 +846,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
             return prev;
           }
           appendedToThread = true;
-          return [...prev, msg];
+          return sortMessagesByCreatedAtAsc([...prev, msg]);
         });
 
         // eslint-disable-next-line no-console -- temporary Realtime debug
@@ -771,15 +861,11 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
           console.log("[zorenta-realtime] INSERT GET /messages refetch triggered", {
             conversation_id: convId,
           });
-          void fetch(
-            `/api/zorenta/messages?conversation_id=${encodeURIComponent(convId)}`,
-            { headers: zorentaHeaders(t) }
-          )
-            .then(async (res) => {
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok) {
+          void fetchMessagesForThreadView(t, convId)
+            .then((threadResult) => {
+              if (!threadResult.ok) {
                 // eslint-disable-next-line no-console -- temporary Realtime debug
-                console.log("[zorenta-realtime] INSERT GET /messages failed", res.status, data);
+                console.log("[zorenta-realtime] INSERT GET /messages failed", threadResult.error);
                 return;
               }
               if (!idsEqual(selectedIdRef.current, convId)) {
@@ -792,9 +878,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
               }
               // eslint-disable-next-line no-console -- temporary Realtime debug
               console.log("[zorenta-realtime] INSERT GET OK → replace with canonical messages", {
-                count: Array.isArray(data.messages) ? data.messages.length : 0,
+                count: threadResult.messages.length,
               });
-              setMessages(data.messages ?? []);
+              setMessages(threadResult.messages);
               setMessagesError(null);
               const t2 = tokenRef.current;
               const load2 = loadConversationsRef.current;
@@ -1086,10 +1172,16 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         const res = await fetch(`/api/zorenta/caregivers/${encodeURIComponent(id)}`);
         if (!res.ok) return [id, ""] as const;
         const d = await res.json().catch(() => null);
-        const nm =
-          d?.caregiver?.name != null && String(d.caregiver.name).trim()
-            ? String(d.caregiver.name).trim()
-            : "";
+        const p = d?.profile as { display_name?: string | null } | undefined;
+        const mc = d && typeof d === "object" ? (d as { marketplaceCard?: { name?: string } }).marketplaceCard : undefined;
+        const cg = d?.caregiver as Record<string, unknown> | undefined;
+        const cardName =
+          mc?.name != null && String(mc.name).trim()
+            ? String(mc.name).trim()
+            : cg && !Array.isArray(cg.care_types) && typeof cg.name === "string" && cg.name.trim()
+              ? cg.name.trim()
+              : "";
+        const nm = (p?.display_name && String(p.display_name).trim()) || cardName;
         return [id, nm] as const;
       })
     ).then((rows) => {
@@ -1226,7 +1318,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         return sortConversationsByLatest(next);
       });
 
-      setMessages((prev) => [...prev, data]);
+      setMessages((prev) =>
+        sortMessagesByCreatedAtAsc([...prev, data as ApiMessage])
+      );
       setComposerBody("");
       setFakeTypingAfterSend(true);
       loadConversations(token);
@@ -1246,7 +1340,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const displayName =
     getPresentableOtherName(selectedConvo, meId, resolvedOtherNames)?.trim() || "Contact";
   threadOtherDisplayNameRef.current = displayName;
+  const headerCaregiverRoute = caregiverProfileRouteId(selectedConvo?.other);
+  const headerProfileHref = headerCaregiverRoute ? `/zorenta/caregivers/${headerCaregiverRoute}` : null;
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
+  const selectedApplicationStatus = applicationStatusLabelNl(selectedConvo?.application?.status);
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
   const convActivityIso = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at ?? "";
 
@@ -1348,8 +1445,11 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       : conv.last_message.body
                     : "Nog geen berichten";
                   const jobTitle = conv.job?.title?.trim();
-                  const secondaryLine = jobTitle
-                    ? `Sollicitatie · ${jobTitle}`
+                  const hasApplicationContext = Boolean(conv.application_id && conv.application);
+                  const secondaryLine = hasApplicationContext
+                    ? jobTitle
+                      ? `Sollicitatie · ${jobTitle}`
+                      : "Reactie · opdracht"
                     : preview;
                   const timeLabel = formatListTime(conv.last_message?.created_at ?? conv.updated_at);
                   const hasUnread = unread > 0;
@@ -1359,14 +1459,23 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     : hasUnread
                       ? "unread"
                       : "default";
+                  const profileRouteId = caregiverProfileRouteId(conv.other);
+                  const profileHref = profileRouteId ? `/zorenta/caregivers/${profileRouteId}` : null;
                   return (
-                    <button
+                    <div
                       key={conv.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       aria-selected={isActive}
                       onClick={() => handleSelectConversation(conv.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSelectConversation(conv.id);
+                        }
+                      }}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-[border-color,box-shadow,background-color] duration-200",
+                        "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-[border-color,box-shadow,background-color] duration-200",
                         isActive
                           ? "relative z-[1] ring-2 ring-[#40ada8] ring-offset-2 ring-offset-white border-2 border-[#40ada8] bg-gradient-to-br from-[#40ada8]/18 via-[#40ada8]/10 to-white shadow-md"
                           : isFlashing
@@ -1376,28 +1485,62 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                               : "border border-slate-200 bg-white hover:bg-slate-50"
                       )}
                     >
-                      <ConversationThreadAvatar
-                        label={name}
-                        photoUrl={conv.other?.avatar_url}
-                        emphasized={false}
-                        listTone={avatarTone}
-                        size="sm"
-                      />
+                      {profileHref ? (
+                        <Link
+                          href={profileHref}
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0 rounded-full outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#40ada8]/50"
+                          aria-label={`Profiel van ${name}`}
+                        >
+                          <ConversationThreadAvatar
+                            label={name}
+                            photoUrl={conv.other?.avatar_url}
+                            emphasized={false}
+                            listTone={avatarTone}
+                            size="sm"
+                          />
+                        </Link>
+                      ) : (
+                        <ConversationThreadAvatar
+                          label={name}
+                          photoUrl={conv.other?.avatar_url}
+                          emphasized={false}
+                          listTone={avatarTone}
+                          size="sm"
+                        />
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <p
-                              className={cn(
-                                "min-w-0 truncate text-sm",
-                                isActive
-                                  ? "font-semibold text-slate-900"
-                                  : hasUnread
+                            {profileHref ? (
+                              <Link
+                                href={profileHref}
+                                onClick={(e) => e.stopPropagation()}
+                                className={cn(
+                                  "min-w-0 truncate text-sm underline-offset-2 transition-colors hover:text-[#2d7f7b] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#40ada8]/40 rounded-sm",
+                                  isActive
                                     ? "font-semibold text-slate-900"
-                                    : "font-medium text-slate-600"
-                              )}
-                            >
-                              {name}
-                            </p>
+                                    : hasUnread
+                                      ? "font-semibold text-slate-900"
+                                      : "font-medium text-slate-600"
+                                )}
+                              >
+                                {name}
+                              </Link>
+                            ) : (
+                              <p
+                                className={cn(
+                                  "min-w-0 truncate text-sm",
+                                  isActive
+                                    ? "font-semibold text-slate-900"
+                                    : hasUnread
+                                      ? "font-semibold text-slate-900"
+                                      : "font-medium text-slate-600"
+                                )}
+                              >
+                                {name}
+                              </p>
+                            )}
                             {isActive ? (
                               <span className="shrink-0 rounded-full bg-[#40ada8] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                                 Actief
@@ -1439,7 +1582,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                           {unread > 99 ? "99+" : unread}
                         </span>
                       ) : null}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1485,14 +1628,38 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       >
                         <ArrowLeft className="h-3.5 w-3.5" />
                       </button>
-                      <ConversationThreadAvatar
-                        label={displayName}
-                        photoUrl={selectedConvo?.other?.avatar_url}
-                        emphasized={Number(selectedConvo?.unread_count ?? 0) > 0}
-                        size="md"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+                      {headerProfileHref ? (
+                        <Link
+                          href={headerProfileHref}
+                          className="shrink-0 rounded-full outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#40ada8]/50"
+                          aria-label={`Profiel van ${displayName}`}
+                        >
+                          <ConversationThreadAvatar
+                            label={displayName}
+                            photoUrl={selectedConvo?.other?.avatar_url}
+                            emphasized={Number(selectedConvo?.unread_count ?? 0) > 0}
+                            size="md"
+                          />
+                        </Link>
+                      ) : (
+                        <ConversationThreadAvatar
+                          label={displayName}
+                          photoUrl={selectedConvo?.other?.avatar_url}
+                          emphasized={Number(selectedConvo?.unread_count ?? 0) > 0}
+                          size="md"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        {headerProfileHref ? (
+                          <Link
+                            href={headerProfileHref}
+                            className="block w-fit rounded-sm text-sm font-semibold text-slate-900 underline-offset-2 transition-colors hover:text-[#2d7f7b] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#40ada8]/40"
+                          >
+                            {displayName}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+                        )}
                         <p className="mt-0.5 text-xs text-slate-500">
                           {presenceStatusLine.type === "online" ? (
                             <span className="font-medium text-emerald-700">Online</span>
@@ -1509,14 +1676,32 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                             <span className="text-slate-400">Niet online</span>
                           )}
                         </p>
-                        {selectedJobTitle ? (
+                        {selectedConvo?.application?.id ? (
                           <div className="mt-1.5 space-y-0.5">
                             <p className="text-[11px] leading-tight text-slate-500">
-                              Gesprek over jouw sollicitatie
+                              {selectedApplicationStatus
+                                ? `Sollicitatie · ${selectedApplicationStatus}`
+                                : "Sollicitatie"}
                             </p>
-                            <p className="text-sm font-semibold leading-snug text-slate-800">
-                              {selectedJobTitle}
-                            </p>
+                            {selectedJobTitle ? (
+                              selectedConvo.job?.id || selectedConvo.application?.job_id ? (
+                                <Link
+                                  href={`/zorenta/jobs/${selectedConvo.job?.id ?? selectedConvo.application?.job_id}`}
+                                  className="block text-sm font-semibold leading-snug text-[#2d7f7b] hover:underline"
+                                >
+                                  {selectedJobTitle}
+                                </Link>
+                              ) : (
+                                <p className="text-sm font-semibold leading-snug text-slate-800">{selectedJobTitle}</p>
+                              )
+                            ) : (
+                              <p className="text-sm font-semibold leading-snug text-slate-800">Opdracht</p>
+                            )}
+                          </div>
+                        ) : selectedJobTitle ? (
+                          <div className="mt-1.5 space-y-0.5">
+                            <p className="text-[11px] leading-tight text-slate-500">Gesprek over opdracht</p>
+                            <p className="text-sm font-semibold leading-snug text-slate-800">{selectedJobTitle}</p>
                           </div>
                         ) : (
                           <p className="mt-1 text-xs text-slate-500">Gesprek</p>

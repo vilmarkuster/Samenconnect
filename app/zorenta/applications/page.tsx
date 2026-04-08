@@ -12,15 +12,17 @@ import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaEmptyState } from "@/components/zorenta/empty-state";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { FileText } from "lucide-react";
+import { CaregiverApplicationThreadButton } from "@/components/zorenta/caregiver-application-thread-button";
 
 type App = {
   id: string;
   job_id: string;
   applicant_id?: string;
+  conversation_id?: string | null;
   status: string;
   message: string | null;
   created_at: string;
-  care_jobs?: { id: string; title: string; status: string };
+  care_jobs?: { id: string; title: string; status: string; poster_id?: string };
   profiles?: { display_name: string | null };
 };
 
@@ -66,18 +68,18 @@ export default function ApplicationsPage() {
   return (
     <ZorentaPageContainer maxWidth="default" className="space-y-6">
       <ZorentaPageHeader
-        title="Sollicitaties"
-        description="Bekijk en beheer sollicitaties op vacatures."
+        title="Matches"
+        description="Bekijk en beheer matches op opdrachten."
       />
       {applications.length === 0 ? (
         <ZorentaEmptyState
           icon={FileText}
-          title="Nog geen sollicitaties"
-          description={myRole === "caregiver" ? "Bekijk geschikte vacatures en solliciteer om hier te verschijnen." : "Nodig zorgverleners uit of wacht op sollicitaties."}
+          title="Nog geen matches"
+          description={myRole === "caregiver" ? "Bekijk geschikte opdrachten en reageer om hier te verschijnen." : "Nodig zorgverleners uit of wacht op matches."}
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Link href="/zorenta/jobs">
-                <Button>Bekijk vacatures</Button>
+                <Button>Bekijk opdrachten</Button>
               </Link>
               {myRole !== "caregiver" && (
                 <Link href="/zorenta/search">
@@ -102,7 +104,7 @@ export default function ApplicationsPage() {
                         {app.care_jobs.title}
                       </Link>
                     ) : (
-                      `Vacature ${app.job_id}`
+                      `Opdracht ${app.job_id}`
                     )}
                   </CardTitle>
                   <StatusBadge status={app.status} />
@@ -120,10 +122,28 @@ export default function ApplicationsPage() {
                 <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                   <Link href={`/zorenta/jobs/${app.job_id}`}>
                     <Button variant="outline" size="sm">
-                      Vacature
+                      Opdracht
                     </Button>
                   </Link>
-                  {app.applicant_id && (
+                  {myRole === "caregiver" && app.conversation_id ? (
+                    <Link href={`/zorenta/berichten?conversation=${encodeURIComponent(app.conversation_id)}`}>
+                      <Button
+                        size="sm"
+                        className="bg-[#40ADA8] text-white hover:bg-[#369e9a]"
+                      >
+                        Open gesprek
+                      </Button>
+                    </Link>
+                  ) : null}
+                  {myRole === "caregiver" && !app.conversation_id && app.care_jobs?.poster_id ? (
+                    <CaregiverApplicationThreadButton
+                      posterId={app.care_jobs.poster_id}
+                      applicationId={app.id}
+                      jobId={app.job_id}
+                      introBody={app.message}
+                    />
+                  ) : null}
+                  {myRole !== "caregiver" && app.applicant_id ? (
                     <>
                       <Link href={`/zorenta/caregivers/${app.applicant_id}`}>
                         <Button variant="outline" size="sm">
@@ -134,10 +154,11 @@ export default function ApplicationsPage() {
                         applicantId={app.applicant_id}
                         applicationId={app.id}
                         jobId={app.job_id}
+                        conversationId={app.conversation_id ?? null}
                         isAccepted={app.status === "accepted"}
                       />
                     </>
-                  )}
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -167,25 +188,33 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const SUGGESTED_APPLICATION_MESSAGE =
-  "Hoi! Ik heb net gesolliciteerd op deze vacature. Ik kom graag in contact.";
+  "Hoi! Ik heb net gereageerd op deze opdracht. Ik kom graag in contact.";
 
 function StartConversationButton({
   applicantId,
   applicationId,
   jobId,
   isAccepted,
+  conversationId,
 }: {
   applicantId: string;
   applicationId: string;
   jobId: string;
   isAccepted?: boolean;
+  conversationId?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasThread = Boolean(conversationId);
   async function start() {
     setLoading(true);
     setError(null);
+    if (conversationId) {
+      router.push(`/zorenta/berichten?conversation=${encodeURIComponent(conversationId)}`);
+      setLoading(false);
+      return;
+    }
     const token = await getZorentaAccessToken();
     if (!token) {
       setLoading(false);
@@ -224,7 +253,7 @@ function StartConversationButton({
         disabled={loading}
         className={isAccepted ? "bg-emerald-600 hover:bg-emerald-700" : ""}
       >
-        {loading ? "…" : isAccepted ? "Open gesprek" : "Bericht sturen"}
+        {loading ? "…" : hasThread || isAccepted ? "Open gesprek" : "Bericht sturen"}
       </Button>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>

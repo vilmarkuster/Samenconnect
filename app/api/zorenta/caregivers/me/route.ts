@@ -1,5 +1,31 @@
 import { NextRequest } from "next/server";
 import { getZorentaSupabaseClient, getAccessTokenFromRequest } from "@/lib/zorenta/supabase-server";
+import {
+  deriveLegacyAvailabilityFromSchedule,
+  normalizeAvailabilitySchedule,
+  scheduleFromLegacyArrays,
+  type AvailabilitySchedule,
+} from "@/lib/zorenta/caregiver-availability-schedule";
+
+function hasKey(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
+}
+
+function toStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x ?? "").trim()).filter(Boolean);
+}
+
+function trimText(v: unknown): string | null {
+  return typeof v === "string" ? v.trim() || null : null;
+}
+
+function resolveAvailabilitySchedule(body: Record<string, unknown>): AvailabilitySchedule {
+  if (hasKey(body, "availability_schedule") && body.availability_schedule != null) {
+    return normalizeAvailabilitySchedule(body.availability_schedule);
+  }
+  return scheduleFromLegacyArrays(toStringArray(body.availability_days), toStringArray(body.availability_times));
+}
 
 async function getProfileId(supabase: ReturnType<typeof getZorentaSupabaseClient>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -48,19 +74,30 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Profile not found." }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const schedule = resolveAvailabilitySchedule(body);
+    const { availability_days, availability_times } = deriveLegacyAvailabilityFromSchedule(schedule);
     const payload = {
       profile_id: profileId,
-      headline: typeof body.headline === "string" ? body.headline.trim() || null : null,
-      bio: typeof body.bio === "string" ? body.bio.trim() || null : null,
-      skills: Array.isArray(body.skills) ? body.skills.filter((s: unknown): s is string => typeof s === "string") : [],
+      headline: trimText(body.headline),
+      bio: trimText(body.bio),
+      phone: trimText(body.phone),
+      skills: toStringArray(body.skills),
       experience_years: typeof body.experience_years === "number" ? body.experience_years : null,
-      availability: typeof body.availability === "string" ? body.availability.trim() || null : null,
-      city: typeof body.city === "string" ? body.city.trim() || null : null,
-      region: typeof body.region === "string" ? body.region.trim() || null : null,
-      country: typeof body.country === "string" ? body.country.trim() || null : null,
-      certifications: typeof body.certifications === "string" ? body.certifications.trim() || null : null,
+      availability: trimText(body.availability),
+      city: trimText(body.city),
+      region: trimText(body.region),
+      country: trimText(body.country),
+      certifications: toStringArray(body.certifications),
       hourly_rate: typeof body.hourly_rate === "number" ? body.hourly_rate : null,
+      care_types: toStringArray(body.care_types),
+      availability_schedule: schedule,
+      availability_days: availability_days.length ? availability_days : null,
+      availability_times: availability_times.length ? availability_times : null,
+      travel_distance_km: typeof body.travel_distance_km === "number" ? body.travel_distance_km : null,
+      has_driver_license: typeof body.has_driver_license === "boolean" ? body.has_driver_license : false,
+      languages: toStringArray(body.languages),
+      min_rate: typeof body.min_rate === "number" ? body.min_rate : null,
     };
 
     const { data, error } = await supabase.from("caregiver_profiles").insert(payload).select().single();
@@ -85,20 +122,33 @@ export async function PUT(req: NextRequest) {
       return new Response(JSON.stringify({ error: "Profile not found." }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const payload: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
-    if (typeof body.headline === "string") payload.headline = body.headline.trim() || null;
-    if (typeof body.bio === "string") payload.bio = body.bio.trim() || null;
-    if (Array.isArray(body.skills)) payload.skills = body.skills.filter((s: unknown): s is string => typeof s === "string");
-    if (typeof body.experience_years === "number") payload.experience_years = body.experience_years;
-    if (typeof body.availability === "string") payload.availability = body.availability.trim() || null;
-    if (typeof body.city === "string") payload.city = body.city.trim() || null;
-    if (typeof body.region === "string") payload.region = body.region.trim() || null;
-    if (typeof body.country === "string") payload.country = body.country.trim() || null;
-    if (typeof body.certifications === "string") payload.certifications = body.certifications.trim() || null;
-    if (typeof body.hourly_rate === "number") payload.hourly_rate = body.hourly_rate;
+    if (hasKey(body, "headline")) payload.headline = trimText(body.headline);
+    if (hasKey(body, "bio")) payload.bio = trimText(body.bio);
+    if (hasKey(body, "phone")) payload.phone = trimText(body.phone);
+    if (hasKey(body, "skills")) payload.skills = toStringArray(body.skills);
+    if (hasKey(body, "experience_years")) payload.experience_years = typeof body.experience_years === "number" ? body.experience_years : null;
+    if (hasKey(body, "availability")) payload.availability = trimText(body.availability);
+    if (hasKey(body, "city")) payload.city = trimText(body.city);
+    if (hasKey(body, "region")) payload.region = trimText(body.region);
+    if (hasKey(body, "country")) payload.country = trimText(body.country);
+    if (hasKey(body, "certifications")) payload.certifications = toStringArray(body.certifications);
+    if (hasKey(body, "hourly_rate")) payload.hourly_rate = typeof body.hourly_rate === "number" ? body.hourly_rate : null;
+    if (hasKey(body, "care_types")) payload.care_types = toStringArray(body.care_types);
+    if (hasKey(body, "availability_schedule") || hasKey(body, "availability_days") || hasKey(body, "availability_times")) {
+      const schedule = resolveAvailabilitySchedule(body);
+      payload.availability_schedule = schedule;
+      const { availability_days, availability_times } = deriveLegacyAvailabilityFromSchedule(schedule);
+      payload.availability_days = availability_days.length ? availability_days : null;
+      payload.availability_times = availability_times.length ? availability_times : null;
+    }
+    if (hasKey(body, "travel_distance_km")) payload.travel_distance_km = typeof body.travel_distance_km === "number" ? body.travel_distance_km : null;
+    if (hasKey(body, "has_driver_license")) payload.has_driver_license = typeof body.has_driver_license === "boolean" ? body.has_driver_license : null;
+    if (hasKey(body, "languages")) payload.languages = toStringArray(body.languages);
+    if (hasKey(body, "min_rate")) payload.min_rate = typeof body.min_rate === "number" ? body.min_rate : null;
 
     const { data, error } = await supabase
       .from("caregiver_profiles")

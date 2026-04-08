@@ -13,6 +13,9 @@ import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { Briefcase, Search, PlusCircle, MapPin, Clock3, BadgeCheck } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase-client";
+import { JobListingCover } from "@/components/zorenta/job-listing-cover";
+import { formatJobPrice } from "@/lib/zorenta/job-price";
+import { cn } from "@/lib/utils";
 
 const CARE_TYPES = [
   "",
@@ -38,9 +41,15 @@ type Job = {
   hourly_rate?: number | null;
   budget_min?: number | null;
   budget_max?: number | null;
+  image_urls?: string[] | null;
 };
 
 type Me = { profile: { role: string } | null };
+
+function readableLocation(city: string | null | undefined): string {
+  const val = (city ?? "").trim();
+  return val || "Locatie in overleg";
+}
 
 function ZorentaJobsContent() {
   const searchParams = useSearchParams();
@@ -61,6 +70,7 @@ function ZorentaJobsContent() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [intakeLinkedJobIds, setIntakeLinkedJobIds] = useState<Set<string>>(() => new Set());
   // Small timeout to reset the bump animation.
   const heartBumpTimeoutRef = useRef<number | null>(null);
   const showCreatedSuccess = searchParams.get("created") === "1";
@@ -90,6 +100,7 @@ function ZorentaJobsContent() {
       const jobsData = await jobsRes.json().catch(() => ({}));
       let role: string | null = null;
       let matchMap: Record<string, { score: number; summary: string; narrativeSummary?: string }> = {};
+      let linkedFromIntake = new Set<string>();
       if (token) {
         const meRes = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
         const meData = await meRes.json().catch(() => ({}));
@@ -119,6 +130,19 @@ function ZorentaJobsContent() {
             );
           }
         }
+
+        if (role === "client" || role === "organization") {
+          const intakeRes = await fetch("/api/zorenta/intake", { headers: zorentaHeaders(token) });
+          const intakeData = await intakeRes.json().catch(() => ({}));
+          const rows: Array<{ job_id?: string | null }> = Array.isArray(intakeData?.intakes)
+            ? intakeData.intakes
+            : [];
+          linkedFromIntake = new Set(
+            rows
+              .map((r) => (typeof r?.job_id === "string" ? r.job_id.trim() : ""))
+              .filter((id) => id.length > 0)
+          );
+        }
       }
 
       // Load favorites (for heart state)
@@ -136,6 +160,7 @@ function ZorentaJobsContent() {
         setJobMatchMap(matchMap);
         setMyUserId(userId);
         setFavoriteJobIds(favSet);
+        setIntakeLinkedJobIds(linkedFromIntake);
         setLoading(false);
       }
     }
@@ -149,7 +174,7 @@ function ZorentaJobsContent() {
     if (!myUserId) {
       setFavoriteFeedback({
         type: "error",
-        text: "Log in om vacatures op te slaan in je favorieten.",
+        text: "Log in om opdrachten op te slaan in je favorieten.",
       });
       return;
     }
@@ -238,29 +263,29 @@ function ZorentaJobsContent() {
           className="rounded-2xl border border-[#40ADA8]/20 bg-[#40ADA8]/10 px-4 py-3 text-sm font-medium text-[#2f7f7a]"
           role="status"
         >
-          Vacature is geplaatst.
+          Opdracht is geplaatst.
         </div>
       )}
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-3">
+        <div className="space-y-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#40ADA8]/10 px-3 py-1 text-xs font-semibold text-[#40ADA8]">
               <BadgeCheck className="h-3.5 w-3.5" />
               Opdrachtenmarkt
             </div>
             <ZorentaPageHeader
               title="Opdrachten"
-              description="Ontdek zorgopdrachten met duidelijke tarieven, locatie en tags."
+              description="Vind zorgopdrachten, filter op plaats en type, en plaats eenvoudig een nieuwe opdracht."
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="w-full sm:w-48">
+          <div className="grid gap-2 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.2fr)_auto_auto_auto_auto]">
+            <div className="min-w-0">
               <CityAutocomplete value={city} onChange={setCity} placeholder="Plaats (stad)" />
             </div>
             <select
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm focus:border-[#40ADA8] focus:outline-none focus:ring-4 focus:ring-[#40ADA8]/15"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm focus:border-[#40ADA8] focus:outline-none focus:ring-4 focus:ring-[#40ADA8]/15"
             >
               <option value="5">5 km</option>
               <option value="10">10 km</option>
@@ -271,7 +296,7 @@ function ZorentaJobsContent() {
             <select
               value={filterCareType}
               onChange={(e) => setFilterCareType(e.target.value)}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm shadow-sm focus:border-[#40ADA8] focus:outline-none focus:ring-4 focus:ring-[#40ADA8]/15"
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm focus:border-[#40ADA8] focus:outline-none focus:ring-4 focus:ring-[#40ADA8]/15"
             >
               {CARE_TYPES.map((t) => (
                 <option key={t || "all"} value={t}>
@@ -283,16 +308,16 @@ function ZorentaJobsContent() {
               variant="outline"
               size="sm"
               onClick={() => setFilterCity(city)}
-              className="h-11 w-full rounded-2xl border-slate-200 bg-white px-4 text-slate-700 shadow-sm sm:w-auto"
+              className="h-11 w-full rounded-xl border-slate-200 bg-white px-4 text-slate-700 shadow-sm"
             >
               <Search className="h-4 w-4" />
               Zoeken
             </Button>
             {canCreateJobs && (
               <Link href="/zorenta/jobs/new">
-                <Button size="sm" className="h-11 w-full rounded-2xl bg-[#40ADA8] px-4 text-white hover:bg-[#369e9a] sm:w-auto">
+                <Button size="sm" className="h-11 w-full rounded-xl bg-[#40ADA8] px-4 text-white hover:bg-[#369e9a]">
                   <PlusCircle className="h-4 w-4" />
-                  Nieuwe vacature
+                  Plaats opdracht
                 </Button>
               </Link>
             )}
@@ -303,14 +328,14 @@ function ZorentaJobsContent() {
       {jobs.length === 0 ? (
         <ZorentaEmptyState
           icon={Briefcase}
-          title={canCreateJobs ? "Plaats je eerste vacature" : "Geen vacatures gevonden"}
-          description={canCreateJobs ? "Zet je zorgvraag om in een vacature. Zorgverleners kunnen dan solliciteren." : "Pas je filters aan of bekijk later opnieuw."}
+          title={canCreateJobs ? "Plaats je eerste opdracht" : "Geen opdrachten gevonden"}
+          description={canCreateJobs ? "Zet je zorgvraag om in een opdracht. Zorgverleners kunnen dan reageren." : "Pas je filters aan of bekijk later opnieuw."}
           action={
             canCreateJobs ? (
               <Link href="/zorenta/jobs/new">
                 <Button className="gap-2">
                   <PlusCircle className="h-4 w-4" />
-                  Plaats je eerste vacature
+                  Plaats je eerste opdracht
                 </Button>
               </Link>
             ) : (
@@ -324,25 +349,48 @@ function ZorentaJobsContent() {
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {jobs.map((job) => {
             const match = jobMatchMap[job.id];
+            const priceLabel = formatJobPrice({
+              hourly_rate: job.hourly_rate,
+              budget_min: job.budget_min,
+              budget_max: job.budget_max,
+            });
             return (
               <article
                 key={job.id}
-                className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
-                <div className="relative h-48 bg-gradient-to-br from-slate-200 via-slate-100 to-slate-50">
-                  <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                <div className="relative">
+                  <JobListingCover
+                    imageUrls={job.image_urls}
+                    careType={job.care_type}
+                    alt=""
+                    className="aspect-[16/9] rounded-t-3xl"
+                  />
+                  <div className="absolute left-4 top-4 max-w-[80%] truncate rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
                     {job.care_type || "Zorg"}
                   </div>
                 </div>
-                  <div className="space-y-4 p-5 sm:p-6">
-                  <div className="space-y-2">
+                <div className="flex flex-1 flex-col space-y-2.5 p-5 sm:p-6">
+                  <div className="space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
-                        <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                      <div className="min-w-0">
+                        <h3 className="line-clamp-2 min-h-[3.15rem] text-lg font-semibold leading-6 text-slate-900">
+                          {job.title}
+                        </h3>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500">
                           <MapPin className="h-4 w-4" />
-                          {job.city || "Locatie onbekend"}
+                          <span className="truncate">{readableLocation(job.city)}</span>
                         </div>
+                        {intakeLinkedJobIds.has(job.id) ? (
+                          <div className="mt-1.5">
+                            <Badge
+                              variant="outline"
+                              className="rounded-full border-[#40ADA8]/35 bg-[#40ADA8]/10 text-[11px] text-[#2f7f7a]"
+                            >
+                              Aangemaakt vanuit zorgvraag
+                            </Badge>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {match && (
@@ -372,12 +420,12 @@ function ZorentaJobsContent() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                    <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700 whitespace-nowrap">
                       <Clock3 className="h-4 w-4 text-[#40ADA8]" />
-                      €{job.hourly_rate ? `${Math.round(job.hourly_rate)}–${Math.round(job.hourly_rate + 3)}` : "15–18"} / uur
+                      {priceLabel ?? "Tarief in overleg"}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex min-h-[2.1rem] flex-wrap gap-1.5">
                     <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-700">
                       PGB
                     </Badge>
@@ -388,18 +436,18 @@ function ZorentaJobsContent() {
                       Flexibel
                     </Badge>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="mt-auto flex gap-2 pt-2">
                     <Button
                       type="button"
                       variant="outline"
-                      className="flex-1 rounded-2xl border-slate-200 bg-white"
+                      className="flex-1 rounded-2xl border-slate-200 bg-white whitespace-nowrap"
                       onClick={() => router.push(`/zorenta/jobs/${job.id}`)}
                     >
-                      Bekijk vacature
+                      Bekijk opdracht
                     </Button>
                     <Button
                       type="button"
-                      className="flex-1 rounded-2xl bg-[#40ADA8] text-white hover:bg-[#369e9a]"
+                      className="flex-1 rounded-2xl bg-[#40ADA8] text-white hover:bg-[#369e9a] whitespace-nowrap"
                       onClick={() => router.push(`/zorenta/jobs/${job.id}`)}
                     >
                       {myRole === "caregiver" ? "Solliciteer" : "Bekijk details"}
@@ -418,9 +466,6 @@ function ZorentaJobsContent() {
 export default function ZorentaJobsPage() {
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-md bg-black px-3 py-1 text-sm font-bold uppercase tracking-wide text-white">
-        JOBS PAGE
-      </div>
       <Suspense fallback={<ZorentaPageSkeleton />}>
         <ZorentaJobsContent />
       </Suspense>

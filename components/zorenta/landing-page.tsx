@@ -121,7 +121,7 @@ export function ZorentaLandingPage() {
           <div className="mt-12 grid gap-8 md:grid-cols-3">
             {[
               { step: 1, title: "Registreer", text: "Kies je rol: cliënt, zorgverlener of organisatie. Vul je profiel in." },
-              { step: 2, title: "Match of vraag", text: "Zoek vacatures of doorloop de intake. Wij tonen de beste matches." },
+              { step: 2, title: "Match of vraag", text: "Zoek opdrachten of doorloop de intake. Wij tonen de beste matches." },
               { step: 3, title: "Contact", text: "Solliciteer of nodig uit. Communiceer veilig via het platform." },
             ].map(({ step, title, text }) => (
               <div key={step} className="relative flex flex-col items-center text-center">
@@ -149,10 +149,10 @@ export function ZorentaLandingPage() {
                 Voor cliënten en organisaties
               </h2>
               <p className="mt-4 text-slate-600">
-                Beschrijf je zorgvraag via de intake of plaats een vacature. Bekijk aanbevolen zorgverleners en neem contact op.
+                Beschrijf je zorgvraag via de intake of plaats een opdracht. Bekijk aanbevolen zorgverleners en neem contact op.
               </p>
               <ul className="mt-6 space-y-3">
-                {["Geleide intake of direct vacature plaatsen", "Top matches op basis van je vraag", "Veilig berichten en afspraken"].map((item) => (
+                {["Geleide intake of direct opdracht plaatsen", "Top matches op basis van je vraag", "Veilig berichten en afspraken"].map((item) => (
                   <li key={item} className="flex items-center gap-2 text-slate-700">
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
                     {item}
@@ -179,10 +179,10 @@ export function ZorentaLandingPage() {
                 Voor zorgverleners
               </h2>
               <p className="mt-4 text-slate-600">
-                Maak een profiel, voeg je vaardigheden en beschikbaarheid toe. Ontvang vacatures die bij je passen en reageer direct.
+                Maak een profiel, voeg je vaardigheden en beschikbaarheid toe. Ontvang opdrachten die bij je passen en reageer direct.
               </p>
               <ul className="mt-6 space-y-3">
-                {["Profiel met skills en ervaring", "Matched vacatures op je dashboard", "Eén plek voor sollicitaties en berichten"].map((item) => (
+                {["Profiel met skills en ervaring", "Matched opdrachten op je dashboard", "Eén plek voor reacties en berichten"].map((item) => (
                   <li key={item} className="flex items-center gap-2 text-slate-700">
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
                     {item}

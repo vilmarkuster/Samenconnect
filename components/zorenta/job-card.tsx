@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MatchScoreBadge } from "@/components/zorenta/match-score-badge";
+import { JobListingCover } from "@/components/zorenta/job-listing-cover";
 import { MapPin, Building2, Euro, Clock } from "lucide-react";
 
 export type ZorentaJobCardJob = {
@@ -18,6 +19,8 @@ export type ZorentaJobCardJob = {
   hourly_rate?: number | null;
   availability?: string | null;
   schedule?: string | null;
+  /** Publieke Storage-URLs; optioneel voor backward compatibility */
+  image_urls?: string[] | null;
 };
 
 type ZorentaJobCardProps = {
@@ -40,7 +43,12 @@ export function ZorentaJobCard({
 
   return (
     <Link href={`/zorenta/jobs/${job.id}`}>
-      <Card className="h-full transition-shadow hover:shadow-md">
+      <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
+        <JobListingCover
+          imageUrls={job.image_urls}
+          alt=""
+          className="aspect-[16/9] rounded-t-xl border-b border-slate-100"
+        />
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-3">
             <CardTitle className="text-base font-semibold leading-tight text-slate-900 line-clamp-2">

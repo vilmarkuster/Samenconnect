@@ -67,7 +67,7 @@ export default function AdminConversationsPage() {
                   <tr className="border-b border-slate-200 bg-slate-50/80">
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Deelnemer 1</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Deelnemer 2</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Vacature</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Opdracht</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Berichten</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Gestart</th>
                   </tr>

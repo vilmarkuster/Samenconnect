@@ -53,9 +53,9 @@ export default function AdminJobDetailPage() {
     return (
       <ZorentaPageContainer maxWidth="default" className="space-y-6">
         <Link href="/zorenta/admin/jobs" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
-          <ChevronLeft className="h-4 w-4" /> Vacatures
+          <ChevronLeft className="h-4 w-4" /> Opdrachten
         </Link>
-        <p className="text-slate-600">Vacature niet gevonden.</p>
+        <p className="text-slate-600">Opdracht niet gevonden.</p>
       </ZorentaPageContainer>
     );
   }
@@ -69,7 +69,7 @@ export default function AdminJobDetailPage() {
         className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
       >
         <ChevronLeft className="h-4 w-4" />
-        Vacatures
+        Opdrachten
       </Link>
 
       <Card className="border-slate-200">

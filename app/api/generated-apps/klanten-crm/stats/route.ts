@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { NextRequest, NextResponse } from "next/server";
+import { getPlatformSupabaseServerClient } from "@/lib/platform-supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getPlatformSupabaseServerClient(req);
 
     const [companiesRes, dealsRes, tasksRes] = await Promise.all([
       supabase.from("companies").select("id", { count: "exact", head: true }),

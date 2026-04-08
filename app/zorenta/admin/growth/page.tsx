@@ -28,7 +28,7 @@ export default function ZorentaGrowthPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-slate-700">
-              Hoog‑niveau zicht op inschrijvingen, profielen, vacatures en sollicitaties.
+              Hoog‑niveau zicht op inschrijvingen, profielen, opdrachten en sollicitaties.
             </p>
             <Badge variant="outline" className="text-xs">
               Eerste versie
@@ -45,7 +45,7 @@ export default function ZorentaGrowthPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-slate-700">
-              Snelle indruk van actieve vacatures, aanbod van zorgverleners en gaten in de
+              Snelle indruk van actieve opdrachten, aanbod van zorgverleners en gaten in de
               marktplaats.
             </p>
             <Badge variant="outline" className="text-xs">
@@ -63,7 +63,7 @@ export default function ZorentaGrowthPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-slate-700">
-              Interne suggesties om profielen te activeren, vacatures te vullen en reviews te
+              Interne suggesties om profielen te activeren, opdrachten te vullen en reviews te
               verzamelen.
             </p>
             <Badge variant="outline" className="text-xs">

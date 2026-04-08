@@ -23,11 +23,11 @@ import {
 
 const baseNavItems = [
   { href: "/zorenta/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/zorenta/jobs", label: "Vacatures", icon: Briefcase },
+  { href: "/zorenta/jobs", label: "Opdrachten", icon: Briefcase },
   { href: "/zorenta/favorites", label: "Favorieten", icon: Heart },
   { href: "/zorenta/opgeslagen", label: "Opgeslagen", icon: Bookmark },
   { href: "/zorenta/intake", label: "Zorgvraag intake", icon: ClipboardList },
-  { href: "/zorenta/applications", label: "Sollicitaties", icon: FileText },
+  { href: "/zorenta/applications", label: "Matches", icon: FileText },
   { href: "/zorenta/berichten", label: "Berichten", icon: MessageSquare },
   { href: "/zorenta/reviews", label: "Reviews", icon: Star },
   { href: "/zorenta/notifications", label: "Notificaties", icon: Bell },

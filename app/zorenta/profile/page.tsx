@@ -1,219 +1,136 @@
-"use client";
+ "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZorentaPageContainer } from "@/components/zorenta/page-container";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
-import {
-  Award,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Heart,
-  MapPin,
-  MessageSquare,
-  Star,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { Briefcase, Clock3, MapPin, Phone, Star, User } from "lucide-react";
+import { CaregiverProfileSections } from "@/components/zorenta/caregiver-profile-sections";
+import { buildCaregiverViewModel } from "@/lib/zorenta/caregiver-profile-view-model";
+import type { AvailabilitySchedule } from "@/lib/zorenta/caregiver-availability-schedule";
+import { formatDisplayName, formatLabelValue, formatLocationLine } from "@/lib/zorenta/profile-display";
+
+type MeResponse = {
+  profile?: { id?: string; display_name?: string | null; role?: string | null; avatar_url?: string | null };
+  caregiver?: {
+    headline?: string | null;
+    bio?: string | null;
+    skills?: string[] | null;
+    care_types?: string[] | null;
+    experience_years?: number | null;
+    availability?: string | null;
+    availability_days?: string[] | null;
+    availability_times?: string[] | null;
+    availability_schedule?: AvailabilitySchedule | unknown | null;
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+    certifications?: string[] | string | null;
+    languages?: string[] | null;
+    hourly_rate?: number | null;
+    min_rate?: number | null;
+    travel_distance_km?: number | null;
+    has_driver_license?: boolean | null;
+    phone?: string | null;
+  } | null;
+  client?: {
+    headline?: string | null;
+    care_needs?: string | null;
+    care_types?: string[] | null;
+    phone?: string | null;
+    postcode?: string | null;
+    preferred_location?: string | null;
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+    frequency?: string | null;
+    hours_per_week?: number | null;
+    preferred_days?: string[] | null;
+    preferred_times?: string[] | null;
+    start_date?: string | null;
+    urgency?: string | null;
+    extra_notes?: string | null;
+  } | null;
+  organization?: {
+    name?: string | null;
+    org_type?: string | null;
+    description?: string | null;
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+  } | null;
+};
+
+function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold text-slate-900">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0 text-sm text-slate-700">{children}</CardContent>
+    </Card>
+  );
+}
+
+function initials(name: string): string {
+  const p = formatDisplayName(name).split(" ").filter(Boolean);
+  if (p.length === 0) return "SC";
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return `${p[0][0] ?? ""}${p[p.length - 1][0] ?? ""}`.toUpperCase();
+}
+
+function editRouteForRole(role: string | null | undefined): { href: string | null; label: string } {
+  if (role === "caregiver") return { href: "/zorenta/caregivers/me/edit", label: "Profiel bewerken" };
+  if (role === "client") return { href: "/zorenta/clients/me/edit", label: "Profiel bewerken" };
+  if (role === "organization") return { href: "/zorenta/organizations/me/edit", label: "Profiel bewerken" };
+  return { href: null, label: "Profiel bewerken" };
+}
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<{
-    name: string;
-    email: string;
-    role: string | null;
-    location?: string | null;
-    rating?: number | null;
-    completeness?: number | null;
-    bio?: string | null;
-    experience?: string | null;
-    specialties?: string[];
-    skills?: string[];
-    availability?: string | null;
-    daysAvailable?: string[];
-    certificates?: string[];
-    reviews?: { id: string; author: string; rating: number; text: string }[];
-    recentActivity?: { id: string; type: string; title: string; detail: string }[];
-  } | null>(null);
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<MeResponse | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    getZorentaAccessToken().then((token) => {
+    (async () => {
+      const token = await getZorentaAccessToken();
       if (!token) {
         if (!cancelled) {
-          setProfile(null);
+          setError("Je moet ingelogd zijn om je profiel te bekijken.");
           setLoading(false);
         }
         return;
       }
-      fetch("/api/zorenta/me", { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then(async (d) => {
-          if (cancelled) return;
+      const res = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
+      const d = (await res.json().catch(() => null)) as MeResponse | null;
+      if (cancelled) return;
+      if (!res.ok || !d?.profile) {
+        setError("Profielgegevens konden niet worden geladen.");
+        setLoading(false);
+        return;
+      }
+      setData(d);
+      setLoading(false);
 
-          const role: string | null = d.profile?.role ?? null;
-          const profileId: string | null = typeof d.profile?.id === "string" ? d.profile.id : null;
-
-          const splitCommaList = (val: unknown): string[] => {
-            if (typeof val !== "string") return [];
-            return val
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-          };
-
-          const formatRelativeTime = (iso: string | null | undefined): string => {
-            if (!iso) return "";
-            const ts = new Date(iso).getTime();
-            if (!Number.isFinite(ts)) return "";
-            const diffMs = Date.now() - ts;
-            const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-            if (diffSec < 60) return `${diffSec} sec geleden`;
-            const diffMin = Math.floor(diffSec / 60);
-            if (diffMin < 60) return `${diffMin} min geleden`;
-            const diffHours = Math.floor(diffMin / 60);
-            if (diffHours < 24) return `${diffHours} uur geleden`;
-            const diffDays = Math.floor(diffHours / 24);
-            return diffDays === 1 ? "Gisteren" : `${diffDays} dagen geleden`;
-          };
-
-          const caregiver = d.caregiver ?? null;
-          const client = d.client ?? null;
-          const organization = d.organization ?? null;
-
-          const location =
-            caregiver?.city ?? client?.city ?? organization?.city ?? "Nederland";
-
-          const availabilityText =
-            caregiver?.availability ?? client?.preferred_location ?? organization?.city ?? null;
-
-          const daysAvailable = splitCommaList(availabilityText);
-
-          const certifications =
-            role === "caregiver" ? splitCommaList(caregiver?.certifications) : [];
-
-          const skills =
-            role === "caregiver" ? (Array.isArray(caregiver?.skills) ? caregiver.skills : []) : [];
-
-          const bio =
-            role === "caregiver"
-              ? caregiver?.bio ?? null
-              : role === "client"
-                ? client?.care_needs ?? null
-                : role === "organization"
-                  ? organization?.description ?? null
-                  : null;
-
-          const experience =
-            role === "caregiver" && typeof caregiver?.experience_years === "number"
-              ? `${caregiver.experience_years}+ jaar ervaring`
-              : null;
-
-          const baseCompletenessParts: Array<boolean> = [];
-          if (typeof bio === "string" && bio.trim()) baseCompletenessParts.push(true);
-          if (skills.length > 0) baseCompletenessParts.push(true);
-          if (role === "caregiver" && availabilityText && typeof availabilityText === "string") baseCompletenessParts.push(true);
-          if (location && typeof location === "string" && location.trim()) baseCompletenessParts.push(true);
-          if (role === "caregiver" && certifications.length > 0) baseCompletenessParts.push(true);
-
-          const completeness =
-            baseCompletenessParts.length === 0
-              ? null
-              : Math.round((baseCompletenessParts.length / 5) * 100);
-
-          // Start with real core data; reviews/activity are loaded below.
-            setProfile({
-            name: d.profile?.display_name || "Je profiel",
-            email: "—",
-            role,
-            location,
-            rating: null,
-            completeness: completeness ?? 75,
-            bio: bio ?? "Nog niet ingevuld",
-            experience: experience ?? "—",
-            specialties: skills,
-            skills,
-            availability: availabilityText ?? "—",
-            daysAvailable,
-            certificates: certifications,
-            reviews: [],
-            recentActivity: [],
-          });
-
-          // Reviews (only meaningful for caregivers)
-          let computedRating: number | null = null;
-          let mappedReviews: { id: string; author: string; rating: number; text: string }[] = [];
-          if (role === "caregiver" && profileId) {
-            try {
-              const reviewsRes = await fetch(
-                `/api/zorenta/reviews?reviewee_id=${encodeURIComponent(profileId)}`,
-                { headers: zorentaHeaders(token) }
-              );
-              const reviewsData = await reviewsRes.json().catch(() => ({}));
-              computedRating =
-                typeof reviewsData?.average === "number" ? reviewsData.average : null;
-              mappedReviews = (Array.isArray(reviewsData?.reviews) ? reviewsData.reviews : []).map(
-                (r: any) => ({
-                  id: String(r.id),
-                  author: String(r.reviewer_id ?? "Onbekend"),
-                  rating: Number(r.rating ?? 0),
-                  text: typeof r.comment === "string" ? r.comment : "",
-                })
-              );
-            } catch {
-              // non-fatal
-            }
-          }
-
-          // Recent activity from notifications (real data)
-          let recentActivity: { id: string; type: string; title: string; detail: string }[] = [];
-          try {
-            const notifRes = await fetch("/api/zorenta/notifications?unread=false", {
-              headers: zorentaHeaders(token),
-            });
-            const notifData = await notifRes.json().catch(() => ({}));
-            const notifications = Array.isArray(notifData?.notifications) ? notifData.notifications : [];
-            recentActivity = notifications.slice(0, 6).map((n: any) => {
-              const nType = String(n.type ?? "");
-              const type =
-                nType === "new_message"
-                  ? "message"
-                  : nType === "new_application" || nType.startsWith("application_")
-                    ? "application"
-                    : nType === "new_review"
-                      ? "match"
-                      : "application";
-              return {
-                id: String(n.id),
-                type,
-                title: typeof n.title === "string" ? n.title : "Melding",
-                detail: formatRelativeTime(n.created_at),
-              };
-            });
-          } catch {
-            // non-fatal
-          }
-
-          if (!cancelled) {
-            setProfile((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                rating: computedRating ?? prev.rating,
-                reviews: mappedReviews,
-                recentActivity,
-              };
-            });
-            setLoading(false);
-          }
+      if (d.profile.role === "caregiver" && d.profile.id) {
+        const reviewsRes = await fetch(`/api/zorenta/reviews?reviewee_id=${encodeURIComponent(d.profile.id)}`, {
+          headers: zorentaHeaders(token),
         });
-    });
+        const reviewsData = await reviewsRes.json().catch(() => ({}));
+        if (!cancelled && typeof reviewsData?.average === "number") {
+          setRating(reviewsData.average);
+        }
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -230,12 +147,17 @@ export default function ProfilePage() {
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
       <ZorentaPageHeader title="Mijn profiel" description="Beheer je SamenConnect-profiel, beschikbaarheid en prestaties." />
+      {searchParams.get("saved") === "1" ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Profiel opgeslagen.
+        </div>
+      ) : null}
 
-      {!profile ? (
+      {!data || !data.profile ? (
         <Card className="rounded-xl border-slate-200 shadow-sm">
           <CardContent className="p-6">
             <p className="text-sm text-slate-600">
-              We konden nog geen profielgegevens vinden. Stel je profiel in om verder te gaan.
+              {error || "We konden nog geen profielgegevens vinden. Stel je profiel in om verder te gaan."}
             </p>
             <div className="mt-4">
               <Link href="/zorenta/register">
@@ -245,264 +167,259 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          <Card className="overflow-hidden rounded-xl border-slate-200 shadow-lg transition hover:shadow-xl">
-            <CardContent className="p-0">
-              <div className="bg-gradient-to-r from-[#40ada8]/18 via-[#40ada8]/8 to-slate-50 p-8 sm:p-10">
-                <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 flex-1 flex-col gap-5 sm:flex-row sm:items-center">
-                    <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-[#40ada8] text-3xl font-semibold text-white shadow-lg shadow-[#40ada8]/25 ring-8 ring-white/70">
-                      {profile.name
-                        .split(" ")
-                        .map((part) => part[0])
-                        .slice(0, 2)
-                        .join("")
-                        .toUpperCase()}
-                    </div>
-                    <div className="min-w-0 space-y-3">
-                      <div>
-                        <h1 className="truncate text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                          {profile.name}
-                        </h1>
-                        <p className="mt-1 text-sm font-semibold uppercase tracking-[0.18em] text-[#40ada8]">
-                          {profile.role === "caregiver"
-                            ? "Zorgverlener"
-                            : profile.role === "client"
-                              ? "ZZP"
-                              : profile.role === "organization"
-                                ? "Organisatie"
-                                : "Vrijwilliger"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 shadow-sm ring-1 ring-slate-200/70">
-                          <MapPin className="h-4 w-4 text-[#40ada8]" />
-                          {profile.location}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 shadow-sm ring-1 ring-slate-200/70">
-                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                          {typeof profile.rating === "number" ? profile.rating.toFixed(1) : "—"} beoordeling
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 shadow-sm ring-1 ring-slate-200/70">
-                          <Clock3 className="h-4 w-4 text-[#40ada8]" />
-                          {profile.availability}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        (() => {
+          const rawName = data.profile?.display_name?.trim() ?? "";
+          const name = rawName || "Je profiel";
+          const displayTitle = rawName ? formatDisplayName(rawName) : "Je profiel";
+          const role = data.profile?.role ?? null;
+          const caregiver = data.caregiver ?? null;
+          const client = data.client ?? null;
+          const organization = data.organization ?? null;
+          const caregiverVm = role === "caregiver" ? buildCaregiverViewModel(caregiver ?? undefined) : null;
+          const location =
+            role === "caregiver"
+              ? formatLocationLine(caregiver?.city, caregiver?.region, caregiver?.country)
+              : role === "client"
+                ? formatLocationLine(client?.city, client?.region, client?.country)
+                : formatLocationLine(organization?.city, organization?.region, organization?.country);
+          const hasLocation = Boolean(location);
+          const completenessFields =
+            role === "caregiver"
+              ? [
+                  Boolean(data.profile?.avatar_url?.trim()),
+                  Boolean(caregiver?.headline?.trim()),
+                  Boolean(caregiver?.bio?.trim()),
+                  caregiverVm?.hasVaardigheden ?? false,
+                  typeof caregiver?.experience_years === "number" && caregiver.experience_years > 0,
+                  caregiverVm?.hasCertificaten ?? false,
+                  caregiverVm?.hasBeschikbaarheid ?? false,
+                  hasLocation,
+                  typeof caregiver?.hourly_rate === "number" && caregiver.hourly_rate > 0,
+                ]
+              : role === "client"
+                ? [
+                    Boolean(data.profile?.avatar_url?.trim()),
+                    Boolean(client?.headline?.trim()),
+                    Boolean(client?.care_needs?.trim()),
+                    Boolean(client?.preferred_location?.trim()),
+                    hasLocation,
+                  ]
+                : role === "organization"
+                  ? [
+                      Boolean(data.profile?.avatar_url?.trim()),
+                      Boolean(organization?.name?.trim()),
+                      Boolean(organization?.description?.trim()),
+                      hasLocation,
+                    ]
+                  : [Boolean(data.profile?.avatar_url?.trim())];
+          const completeness = Math.round((completenessFields.filter(Boolean).length / completenessFields.length) * 100);
+          const roleLabel = role === "caregiver" ? "Zorgverlener" : role === "organization" ? "Organisatie" : role === "client" ? "Cliënt" : "Gebruiker";
+          const editRoute = editRouteForRole(role);
 
-                  <div className="flex flex-col gap-3 xl:min-w-[360px] xl:max-w-[420px]">
-                    <div className="w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-md">
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-700">Profiel compleetheid</span>
-                        <span className="font-semibold text-slate-900">{profile.completeness ?? 75}%</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full bg-[#40ada8]"
-                          style={{ width: `${profile.completeness ?? 75}%` }}
-                        />
-                      </div>
-                      <p className="mt-3 text-xs text-slate-500">
-                        Werk je profiel verder bij voor betere zichtbaarheid en meer matches.
-                      </p>
-                    </div>
-                    <Link
-                      href={
-                        profile.role === "caregiver"
-                          ? "/zorenta/caregivers/me/edit"
-                          : profile.role === "client"
-                            ? "/zorenta/clients/me/edit"
-                            : "/zorenta/organizations/me/edit"
-                      }
-                    >
-                      <Button className="w-full bg-[#40ada8] text-white hover:bg-[#369e9a] sm:w-auto">
-                        Profiel bewerken
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+          return (
             <div className="space-y-6">
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Users className="h-4 w-4 text-[#40ada8]" />
-                    Bio
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm leading-6 text-slate-600">{profile.bio}</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Ervaring</p>
-                      <p className="mt-1 text-sm font-medium text-slate-900">{profile.experience}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Specialties</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {profile.specialties?.map((item) => (
-                          <span
-                            key={item}
-                            className="inline-flex items-center rounded-full border border-[#40ada8]/15 bg-[#40ada8]/8 px-3.5 py-1.5 text-xs font-medium text-[#2f8f88] shadow-sm transition hover:-translate-y-0.5 hover:border-[#40ada8]/30 hover:bg-[#40ada8]/12 hover:text-[#1f7e78]"
-                          >
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Heart className="h-4 w-4 text-[#40ada8]" />
-                    Vaardigheden
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {profile.skills?.map((skill) => (
-                      <span
-                        key={skill}
-                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[#40ada8]/30 hover:bg-[#40ada8]/8 hover:text-[#1f7e78]"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CalendarDays className="h-4 w-4 text-[#40ada8]" />
-                    Beschikbaarheid
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <span className="text-sm font-medium text-slate-700">Beschikbaar voor werk</span>
-                    <span className="inline-flex h-6 w-11 items-center rounded-full bg-[#40ada8] p-1">
-                      <span className="h-4 w-4 rounded-full bg-white" />
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {profile.daysAvailable?.map((day) => (
-                      <span
-                        key={day}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                      >
-                        {day}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Award className="h-4 w-4 text-[#40ada8]" />
-                    Certificaten
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.certificates?.map((certificate) => (
-                    <div key={certificate} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-slate-900">{certificate}</p>
-                      <p className="mt-1 text-xs text-slate-500">Geverifieerd certificaat</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    Reviews
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.reviews?.map((review) => (
-                    <div
-                      key={review.id}
-                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                            {review.author
-                              .split(" ")
-                              .map((p) => p[0])
-                              .slice(0, 2)
-                              .join("")
-                              .toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">{review.author}</p>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`h-3.5 w-3.5 ${
-                                    i < review.rating
-                                      ? "fill-amber-400 text-amber-400"
-                                      : "text-slate-200"
-                                  }`}
-                                />
-                              ))}
-                              <span className="ml-1 text-xs font-medium text-slate-600">{review.rating}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{review.text}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-xl border-slate-200 shadow-sm transition hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <TrendingUp className="h-4 w-4 text-[#40ada8]" />
-                    Recente activiteit
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.recentActivity?.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mt-0.5 rounded-full bg-[#40ada8]/10 p-2 text-[#40ada8]">
-                        {item.type === "message" ? (
-                          <MessageSquare className="h-4 w-4" />
-                        ) : item.type === "match" ? (
-                          <CheckCircle2 className="h-4 w-4" />
+              <Card className="overflow-hidden border-slate-200 shadow-sm">
+                <CardContent className="bg-gradient-to-r from-[#40ada8]/12 via-[#40ada8]/6 to-white p-6 sm:p-8">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#40ada8] text-xl font-semibold text-white">
+                        {data.profile?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={data.profile.avatar_url} alt={displayTitle} className="h-full w-full object-cover" />
                         ) : (
-                          <Heart className="h-4 w-4" />
+                          initials(rawName || name)
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                        <p className="text-sm text-slate-600">{item.detail}</p>
+                      <div className="min-w-0 space-y-1">
+                        <h2 className="truncate text-2xl font-semibold text-slate-900">{displayTitle}</h2>
+                        <p className="text-sm font-medium text-[#2d7f7b]">{roleLabel}</p>
+                        {role === "caregiver" && caregiver?.headline ? <p className="text-sm text-slate-700">{caregiver.headline}</p> : null}
+                        {role === "client" && client?.headline ? <p className="text-sm text-slate-700">{client.headline}</p> : null}
+                        {role === "organization" && organization?.name?.trim() ? (
+                          <p className="text-sm text-slate-700">{formatDisplayName(organization.name)}</p>
+                        ) : null}
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {location ? (
+                            <Badge variant="outline" className="gap-1.5">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {location}
+                            </Badge>
+                          ) : null}
+                          {typeof rating === "number" ? (
+                            <Badge variant="outline" className="gap-1.5">
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                              {rating.toFixed(1)}
+                            </Badge>
+                          ) : null}
+                          {role === "caregiver" && caregiverVm ? (
+                            caregiverVm.availabilityText ? (
+                              <Badge variant="outline" className="max-w-full gap-1.5 whitespace-normal text-left">
+                                <Clock3 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="line-clamp-3">{caregiverVm.availabilityText}</span>
+                              </Badge>
+                            ) : caregiverVm.hasScheduleSlots ? (
+                              <Badge variant="outline" className="gap-1.5">
+                                <Clock3 className="h-3.5 w-3.5" />
+                                Beschikbaarheid per dag
+                              </Badge>
+                            ) : null
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                    <div className="space-y-3 sm:w-[320px]">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-medium text-slate-700">Profiel compleetheid</span>
+                          <span className="font-semibold text-slate-900">{completeness}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-[#40ada8]" style={{ width: `${completeness}%` }} />
+                        </div>
+                      </div>
+                      {editRoute.href ? (
+                        <Link href={editRoute.href}>
+                          <Button className="w-full bg-[#40ada8] text-white hover:bg-[#369e9a]">{editRoute.label}</Button>
+                        </Link>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                          Profiel bewerken is voor dit accounttype nog niet beschikbaar.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
+
+              {role !== "caregiver" ? (
+                role === "client" ? (
+                  (() => {
+                    const prefLoc = client?.preferred_location?.trim();
+                    const prefLocDisplay = prefLoc
+                      ? prefLoc
+                          .split(",")
+                          .map((s) => formatLabelValue(s))
+                          .filter(Boolean)
+                          .join(", ")
+                      : null;
+                    const hasContact =
+                      Boolean(client?.phone?.trim()) ||
+                      Boolean(client?.postcode?.trim()) ||
+                      hasLocation;
+                    return (
+                      <div className="space-y-5">
+                        {client?.care_needs?.trim() ? (
+                          <SectionCard title="Over mij">
+                            <p className="whitespace-pre-wrap leading-relaxed">{client.care_needs}</p>
+                          </SectionCard>
+                        ) : null}
+                        {prefLocDisplay ? (
+                          <SectionCard title="Voorkeurslocatie">
+                            <p className="flex items-start gap-2 text-slate-800">
+                              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                              <span>{prefLocDisplay}</span>
+                            </p>
+                          </SectionCard>
+                        ) : null}
+                        {hasContact ? (
+                          <SectionCard title="Contact">
+                            <dl className="grid gap-3 sm:grid-cols-2">
+                              {client?.phone?.trim() ? (
+                                <div className="flex items-start gap-2">
+                                  <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                  <div>
+                                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Telefoon</dt>
+                                    <dd className="mt-0.5">{client.phone}</dd>
+                                  </div>
+                                </div>
+                              ) : null}
+                              {client?.postcode?.trim() ? (
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Postcode</dt>
+                                  <dd className="mt-0.5">{client.postcode}</dd>
+                                </div>
+                              ) : null}
+                              {location ? (
+                                <div className="flex items-start gap-2 sm:col-span-2">
+                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                  <div>
+                                    <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Stad / regio / land</dt>
+                                    <dd className="mt-0.5">{location}</dd>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </dl>
+                          </SectionCard>
+                        ) : null}
+                      </div>
+                    );
+                  })()
+                ) : role === "organization" ? (
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {organization?.description ? (
+                      <Card className="border-slate-200">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base"><User className="h-4 w-4 text-[#40ada8]" /> Over organisatie</CardTitle>
+                        </CardHeader>
+                        <CardContent><p className="whitespace-pre-wrap text-sm text-slate-700">{organization.description}</p></CardContent>
+                      </Card>
+                    ) : null}
+                    {organization?.org_type ? (
+                      <Card className="border-slate-200">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base"><Briefcase className="h-4 w-4 text-[#40ada8]" /> Organisatietype</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm text-slate-700">{organization.org_type}</CardContent>
+                      </Card>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Card className="border-slate-200">
+                    <CardContent className="p-5 text-sm text-slate-600">
+                      Geen specifieke profielweergave beschikbaar voor dit accounttype.
+                    </CardContent>
+                  </Card>
+                )
+              ) : (
+                (() => {
+                  const bioText = caregiver?.bio?.trim() ?? "";
+                  const hasContact = Boolean(caregiver?.phone?.trim()) || hasLocation;
+
+                  return (
+                    <div className="space-y-5">
+                      <CaregiverProfileSections vm={caregiverVm!} bioText={bioText} />
+
+                      {hasContact ? (
+                        <SectionCard title="Contact">
+                          <dl className="grid gap-3 sm:grid-cols-2">
+                            {caregiver?.phone?.trim() ? (
+                              <div className="flex items-start gap-2">
+                                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Telefoon</dt>
+                                  <dd className="mt-0.5">{caregiver.phone}</dd>
+                                </div>
+                              </div>
+                            ) : null}
+                            {location ? (
+                              <div className="flex items-start gap-2 sm:col-span-2">
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                <div>
+                                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Locatie</dt>
+                                  <dd className="mt-0.5">{location}</dd>
+                                </div>
+                              </div>
+                            ) : null}
+                          </dl>
+                        </SectionCard>
+                      ) : null}
+                    </div>
+                  );
+                })()
+              )}
             </div>
-          </div>
-        </div>
+          );
+        })()
       )}
     </ZorentaPageContainer>
   );

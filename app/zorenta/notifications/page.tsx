@@ -51,6 +51,10 @@ export default function NotificationsPage() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
     );
+    // Optimistically decrement unread bell count in the header.
+    window.dispatchEvent(
+      new CustomEvent("zorenta:notifications:unreadDelta", { detail: { delta: -1 } })
+    );
   }
 
   if (loading) {

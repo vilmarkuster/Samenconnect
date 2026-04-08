@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
+import { latestMarketplaceCaregiverIdByProfileId } from "@/lib/zorenta/marketplace-caregiver-id";
+import { DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS } from "@/lib/zorenta/caregiver-public-profile-route-id";
 
 export async function GET(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
@@ -46,32 +48,17 @@ export async function GET(req: NextRequest) {
     (unreadRows ?? []).forEach((m: { id: string; conversation_id: string; sender_id: string | null }) => {
       unreadCounts[m.conversation_id] = (unreadCounts[m.conversation_id] ?? 0) + 1;
     });
-
-    // Temporary: log a bounded sample of *incoming* rows (read + unread) to compare read_at vs counted.
-    const { data: incomingSample } = await supabase
-      .from("messages")
-      .select("id, conversation_id, sender_id, read_at")
-      .in("conversation_id", convIds)
-      .neq("sender_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(500);
-
-    (incomingSample ?? []).forEach((m: {
-      id: string;
-      conversation_id: string;
-      sender_id: string | null;
-      read_at: string | null;
-    }) => {
-      const counted = m.read_at == null;
-      // eslint-disable-next-line no-console -- temporary unread debug
-      console.log("[zorenta-conversations unread row]", {
-        conversation_id: m.conversation_id,
-        message_id: m.id,
-        sender_id: m.sender_id,
-        read_at: m.read_at,
-        counted_as_unread: counted,
-      });
-    });
+  }
+  const appIds = [...new Set((convos ?? []).map((c) => c.application_id).filter(Boolean))] as string[];
+  let applicationMap: Record<string, { id: string; status: string; job_id: string }> = {};
+  if (appIds.length > 0) {
+    const { data: appRows } = await supabase
+      .from("job_applications")
+      .select("id, status, job_id")
+      .in("id", appIds);
+    applicationMap = Object.fromEntries(
+      (appRows ?? []).map((a: { id: string; status: string; job_id: string }) => [a.id, a])
+    );
   }
   const jobIds = [...new Set((convos ?? []).map((c) => c.job_id).filter(Boolean))] as string[];
   const jobs = jobIds.length
@@ -80,13 +67,82 @@ export async function GET(req: NextRequest) {
   const jobMap = Object.fromEntries((jobs.data ?? []).map((j) => [j.id, j]));
   const ids = [...new Set((convos ?? []).flatMap((c) => [c.participant_1, c.participant_2]).filter((id) => id !== userId))];
   const profiles = ids.length
-    ? await supabase.from("profiles").select("id, display_name").in("id", ids)
+    ? await supabase.from("profiles").select("id, display_name, role, avatar_url").in("id", ids)
     : { data: [] };
-  const profileMap = Object.fromEntries((profiles.data ?? []).map((p) => [p.id, p]));
+  const profileRows = profiles.data ?? [];
+  const profileMap = Object.fromEntries(profileRows.map((p) => [p.id, p]));
+
+  /**
+   * Profile navigation for `/zorenta/caregivers/[id]`:
+   * - If `caregiver_profiles` exists for this participant, use `profiles.id` (not marketplace id).
+   * - Else use `public.caregivers.id` when present and not a blocked seed id.
+   */
+  const marketplaceByProfile =
+    ids.length > 0 ? await latestMarketplaceCaregiverIdByProfileId(supabase, ids) : new Map<string, string>();
+  const { data: cpRows } =
+    ids.length > 0
+      ? await supabase.from("caregiver_profiles").select("id, profile_id").in("profile_id", ids)
+      : { data: [] };
+  const caregiverProfilePkByProfileId = Object.fromEntries(
+    (cpRows ?? []).map((r: { id: string; profile_id: string }) => [r.profile_id, r.id])
+  );
+
+  type RouteSource = "marketplace" | "caregiver_profile";
+
+  function resolvePublicCaregiverPageRoute(p: {
+    id: string;
+    role: string | null;
+  }): {
+    caregiver_route_id: string | null;
+    caregiver_route_source: RouteSource | null;
+    has_renderable_caregiver_profile: boolean;
+  } {
+    const cp = caregiverProfilePkByProfileId[p.id] ?? null;
+    const mpRaw = marketplaceByProfile.get(p.id) ?? null;
+    const mp =
+      mpRaw && !DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS.has(mpRaw) ? mpRaw : null;
+
+    /** Linked `caregiver_profiles`: use `profiles.id` in the URL (GET /caregivers/[id] step B). */
+    if (cp) {
+      return {
+        caregiver_route_id: p.id,
+        caregiver_route_source: "caregiver_profile",
+        has_renderable_caregiver_profile: true,
+      };
+    }
+    if (mp) {
+      return {
+        caregiver_route_id: mp,
+        caregiver_route_source: "marketplace",
+        has_renderable_caregiver_profile: true,
+      };
+    }
+    /**
+     * No caregiver_profiles and no usable marketplace row — cannot safely link (avoid 404).
+     */
+    return {
+      caregiver_route_id: null,
+      caregiver_route_source: null,
+      has_renderable_caregiver_profile: false,
+    };
+  }
+
   const list = (convos ?? []).map((c) => ({
     ...c,
-    other: profileMap[c.participant_1 === userId ? c.participant_2 : c.participant_1],
+    other: (() => {
+      const oid = c.participant_1 === userId ? c.participant_2 : c.participant_1;
+      const p = profileMap[oid];
+      if (!p) return null;
+      const route = resolvePublicCaregiverPageRoute({ id: p.id, role: p.role });
+      return {
+        ...p,
+        caregiver_route_id: route.caregiver_route_id,
+        caregiver_route_source: route.caregiver_route_source,
+        has_renderable_caregiver_profile: route.has_renderable_caregiver_profile,
+      };
+    })(),
     job: c.job_id ? (jobMap[c.job_id] ?? null) : null,
+    application: c.application_id ? (applicationMap[c.application_id] ?? null) : null,
     unread_count: unreadCounts[c.id] ?? 0,
     last_message: lastMessages[c.id] ?? null,
   })).sort((a, b) => {

@@ -7,6 +7,7 @@ import { GlobalSearchAutocomplete } from "@/components/zorenta/global-search-aut
 
 type ZorentaTopbarProps = {
   userDisplayName?: string | null;
+  userAvatarUrl?: string | null;
   unreadNotifications?: number;
   onMenuClick?: () => void;
   onLogout?: () => void;
@@ -15,6 +16,7 @@ type ZorentaTopbarProps = {
 
 export function ZorentaTopbar({
   userDisplayName,
+  userAvatarUrl,
   unreadNotifications = 0,
   onMenuClick,
   onLogout,
@@ -105,10 +107,15 @@ export function ZorentaTopbar({
         </Link>
         <Link
           href="/zorenta/profile"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-[#40ADA8] text-sm font-semibold text-white shadow-sm"
+          className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-[#40ADA8] text-sm font-semibold text-white shadow-sm"
           aria-label="Profiel"
         >
-          {initials}
+          {userAvatarUrl?.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={userAvatarUrl} alt={userDisplayName ?? "Profiel"} className="h-full w-full object-cover" />
+          ) : (
+            initials
+          )}
         </Link>
         <Link href="/zorenta/zorgvraag-nieuw">
           <button className="ml-1 hidden h-11 rounded-2xl bg-[#40ADA8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#369590] md:inline-flex">

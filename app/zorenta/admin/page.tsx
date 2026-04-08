@@ -91,7 +91,7 @@ export default function AdminDashboardPage() {
     { title: "Zorgverleners", value: s.caregivers, icon: UserCircle, href: "/zorenta/admin/users?role=caregiver" },
     { title: "Opdrachtgevers", value: s.clients, icon: UserCircle, href: "/zorenta/admin/users?role=client" },
     { title: "Organisaties", value: s.organizations, icon: Building2, href: "/zorenta/admin/users?role=organization" },
-    { title: "Vacatures", value: s.totalJobs, icon: Briefcase, href: "/zorenta/admin/jobs", subtitle: `${s.openJobs} open` },
+    { title: "Opdrachten", value: s.totalJobs, icon: Briefcase, href: "/zorenta/admin/jobs", subtitle: `${s.openJobs} open` },
     { title: "Sollicitaties", value: s.totalApplications, icon: FileText, href: "/zorenta/admin/applications" },
     {
       title: "Gesprekken",

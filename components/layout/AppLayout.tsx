@@ -9,6 +9,7 @@ type AppLayoutProps = {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   userDisplayName?: string | null;
+  userAvatarUrl?: string | null;
   unreadNotifications?: number;
   onLogout?: () => void;
   isAdmin?: boolean;
@@ -19,6 +20,7 @@ export function AppLayout({
   sidebarOpen,
   setSidebarOpen,
   userDisplayName,
+  userAvatarUrl,
   unreadNotifications = 0,
   onLogout,
   isAdmin,
@@ -48,6 +50,7 @@ export function AppLayout({
         <header className="h-16 border-b border-slate-200 bg-white">
           <ZorentaTopbar
             userDisplayName={userDisplayName}
+            userAvatarUrl={userAvatarUrl}
             unreadNotifications={unreadNotifications}
             onMenuClick={() => setSidebarOpen(true)}
             onLogout={onLogout}

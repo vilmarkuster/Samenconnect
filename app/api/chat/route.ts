@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonrepair } from "jsonrepair";
-import { getSupabaseClient } from "@/lib/supabase-client";
-
-// Default Anthropic Claude model for chat
-const CLAUDE_MODEL = "claude-opus-4-6";
+import { getPlatformSupabaseServerClient, getPlatformUserOrNull } from "@/lib/platform-supabase-server";
+import { PLATFORM_ANTHROPIC_CLAUDE_MODEL } from "@/lib/platform-anthropic-model";
 
 const CHAT_SYSTEM_PROMPT = `You are an AI automation copilot inside a web dashboard. Be concise and suggest concrete automations, agents, workflows, and full app plans.
 
@@ -149,6 +147,11 @@ function tryParseAppPlan(text: string): AppPlanPayload | null {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getPlatformUserOrNull(req);
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       // eslint-disable-next-line no-console
@@ -172,7 +175,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = {
-      model: CLAUDE_MODEL,
+      model: PLATFORM_ANTHROPIC_CLAUDE_MODEL,
       max_tokens: 512,
       system: CHAT_SYSTEM_PROMPT,
       messages: [
@@ -235,12 +238,13 @@ export async function POST(req: NextRequest) {
         ? text
         : "No content returned from Claude.";
 
-    const baseUrl = new URL(req.url).origin;
+    const origin = new URL(req.url).origin;
+    const forwardCookie = req.headers.get("cookie") ?? "";
 
     // First, try to interpret the response as a full app plan
     const parsed = tryParseAppPlan(content);
     if (parsed?.action === "create_app_plan") {
-      const supabase = getSupabaseClient();
+      const supabase = getPlatformSupabaseServerClient(req);
       const { data: planRow, error: insertError } = await supabase
         .from("app_plans")
         .insert({
@@ -263,19 +267,35 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const scaffoldUrl =
-        process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-        baseUrl;
-      const scaffoldRes = await fetch(
-        `${scaffoldUrl}/api/app-plans/scaffold`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ appPlanId: planRow.id })
-        }
-      );
+      // Same-origin + session cookie: server-side fetch does not inherit cookies unless forwarded.
+      const scaffoldRes = await fetch(`${origin}/api/app-plans/scaffold`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(forwardCookie ? { Cookie: forwardCookie } : {})
+        },
+        body: JSON.stringify({ appPlanId: String(planRow.id) })
+      });
 
-      await scaffoldRes.json().catch(() => ({}));
+      const scaffoldPayload = await scaffoldRes.json().catch(() => ({}));
+
+      if (!scaffoldRes.ok) {
+        const detail =
+          typeof scaffoldPayload?.error === "string"
+            ? scaffoldPayload.error
+            : typeof scaffoldPayload?.detail === "string"
+              ? scaffoldPayload.detail
+              : scaffoldRes.statusText;
+        return new Response(
+          JSON.stringify({
+            reply: `App plan was saved, but scaffolding failed (${scaffoldRes.status}): ${detail}.`
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
 
       const successMessage = `App scaffold created for ${parsed.appName}`;
       return new Response(
@@ -294,9 +314,12 @@ export async function POST(req: NextRequest) {
     const createPayload = tryParseCreateAction(content);
 
     if (createPayload?.action === "create_agent") {
-      const agentRes = await fetch(`${baseUrl}/api/agents`, {
+      const agentRes = await fetch(`${origin}/api/agents`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(forwardCookie ? { Cookie: forwardCookie } : {})
+        },
         body: JSON.stringify({
           name: createPayload.name,
           description: createPayload.description,
@@ -328,9 +351,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (createPayload?.action === "create_workflow") {
-      const workflowRes = await fetch(`${baseUrl}/api/workflows`, {
+      const workflowRes = await fetch(`${origin}/api/workflows`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(forwardCookie ? { Cookie: forwardCookie } : {})
+        },
         body: JSON.stringify({
           name: createPayload.name,
           description: createPayload.description,

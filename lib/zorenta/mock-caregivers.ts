@@ -7,6 +7,7 @@ export type CaregiverProfile = {
    * When present, messaging and full profile flows can use this id.
    */
   linkedProfileId?: string | null;
+  avatarUrl?: string | null;
   provider_type?: string;
   city: string;
   rate?: number | null;

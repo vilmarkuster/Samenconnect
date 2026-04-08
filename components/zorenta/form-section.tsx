@@ -9,6 +9,8 @@ type ZorentaFormSectionProps = {
   description?: string;
   children: ReactNode;
   className?: string;
+  headerClassName?: string;
+  contentClassName?: string;
 };
 
 export function ZorentaFormSection({
@@ -16,16 +18,18 @@ export function ZorentaFormSection({
   description,
   children,
   className,
+  headerClassName,
+  contentClassName,
 }: ZorentaFormSectionProps) {
   return (
     <Card className={cn("overflow-hidden", className)}>
-      <CardHeader className="pb-3">
+      <CardHeader className={cn("pb-3", headerClassName)}>
         <h3 className="text-base font-semibold text-slate-900">{title}</h3>
         {description && (
           <p className="text-sm text-slate-500">{description}</p>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">{children}</CardContent>
+      <CardContent className={cn("space-y-4", contentClassName)}>{children}</CardContent>
     </Card>
   );
 }

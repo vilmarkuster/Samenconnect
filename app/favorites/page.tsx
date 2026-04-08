@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { Briefcase, MapPin, Clock3 } from "lucide-react";
+import { JobListingCover } from "@/components/zorenta/job-listing-cover";
 
 type Job = {
   id: string;
@@ -23,6 +24,7 @@ type Job = {
   hourly_rate?: number | null;
   budget_min?: number | null;
   budget_max?: number | null;
+  image_urls?: string[] | null;
 };
 
 type FavoriteRow = { job_id: string; created_at: string };
@@ -282,7 +284,12 @@ export default function FavoritesPage() {
                 key={job.id}
                 className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
               >
-                <div className="relative h-28 bg-gradient-to-br from-slate-200 via-slate-100 to-slate-50">
+                <div className="relative">
+                  <JobListingCover
+                    imageUrls={job.image_urls}
+                    alt=""
+                    className="aspect-[16/9] rounded-t-3xl"
+                  />
                   <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
                     {job.care_type || "Zorg"}
                   </div>

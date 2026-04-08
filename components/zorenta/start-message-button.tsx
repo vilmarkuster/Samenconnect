@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
+import { getZorentaAccessToken } from "@/lib/zorenta/client";
+import { createZorentaConversation } from "@/lib/zorenta/create-zorenta-conversation";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type StartMessageButtonProps = {
   otherUserId: string;
   jobId?: string | null;
+  /** Draft text for the inbox composer (URL `prefill`); no auto-send. */
+  prefill?: string;
   size?: "sm" | "md" | "lg";
   variant?: "primary" | "outline" | "ghost";
   label?: string;
@@ -17,6 +21,7 @@ type StartMessageButtonProps = {
 export function StartMessageButton({
   otherUserId,
   jobId,
+  prefill,
   size = "md",
   variant = "primary",
   label = "Stuur bericht",
@@ -35,27 +40,22 @@ export function StartMessageButton({
         return;
       }
 
-      const body: Record<string, unknown> = { other_user_id: otherUserId };
-      if (jobId) body.job_id = jobId;
-
-      const res = await fetch("/api/zorenta/conversations", {
-        method: "POST",
-        headers: zorentaHeaders(token),
-        body: JSON.stringify(body),
+      const result = await createZorentaConversation(token, {
+        otherUserId,
+        jobId,
       });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.id) {
-        setError(
-          typeof data?.error === "string"
-            ? data.error
-            : "Bericht starten is niet gelukt. Probeer het later opnieuw."
-        );
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
       // Canonical inbox + thread (DB-backed, ?conversation= survives refresh).
-      router.push(`/zorenta/berichten?conversation=${encodeURIComponent(data.id)}`);
+      const q = new URLSearchParams();
+      q.set("conversation", result.conversationId);
+      if (prefill && prefill.trim()) {
+        q.set("prefill", prefill.trim());
+      }
+      router.push(`/zorenta/berichten?${q.toString()}`);
     } catch {
       setError("Er ging iets mis bij het starten van een gesprek.");
     } finally {
@@ -71,7 +71,10 @@ export function StartMessageButton({
         variant={variant}
         onClick={handleClick}
         disabled={loading}
-        className="gap-1.5"
+        className={cn(
+          "gap-1.5",
+          variant === "primary" && "bg-[#40ADA8] text-white hover:bg-[#369e9a]"
+        )}
       >
         <MessageSquare className="h-4 w-4" />
         {loading ? "Bezig…" : label}

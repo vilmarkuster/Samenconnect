@@ -20,7 +20,7 @@ import {
 const ADMIN_NAV_ITEMS = [
   { href: "/zorenta/admin", label: "Overzicht", icon: LayoutDashboard },
   { href: "/zorenta/admin/users", label: "Gebruikers", icon: Users },
-  { href: "/zorenta/admin/jobs", label: "Vacatures", icon: Briefcase },
+  { href: "/zorenta/admin/jobs", label: "Opdrachten", icon: Briefcase },
   { href: "/zorenta/admin/applications", label: "Sollicitaties", icon: FileText },
   { href: "/zorenta/admin/reviews", label: "Reviews", icon: Star },
   { href: "/zorenta/admin/conversations", label: "Gesprekken", icon: MessageSquare },

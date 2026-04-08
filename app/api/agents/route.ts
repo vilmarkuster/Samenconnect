@@ -1,17 +1,22 @@
 import { NextRequest } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import {
+  getPlatformSupabaseServerClient,
+  getPlatformUserOrNull,
+} from "@/lib/platform-supabase-server";
 
 type AgentRow = {
-  id: number;
+  id: string;
   name: string;
   description: string;
   status: "Active" | "Draft";
   created_at: string;
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from("agents")
       .select("*")
@@ -47,6 +52,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const body = await req.json();
     const name: string | undefined = body?.name;
     const description: string | undefined = body?.description ?? "";
@@ -59,7 +67,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("agents")
       .insert({
@@ -100,18 +107,20 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const user = await getPlatformUserOrNull(req);
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
+    const supabase = getPlatformSupabaseServerClient(req);
     const url = new URL(req.url);
     const idParam = url.searchParams.get("id");
-    const id = idParam ? Number(idParam) : NaN;
+    const id = idParam?.trim() ?? "";
 
-    if (!id || Number.isNaN(id)) {
+    if (!id) {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid 'id' in query string." }),
+        JSON.stringify({ error: "Missing 'id' in query string." }),
         { status: 400 }
       );
     }
 
-    const supabase = getSupabaseClient();
     const { error } = await supabase.from("agents").delete().eq("id", id);
 
     if (error) {

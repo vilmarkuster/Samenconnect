@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
 import { scoreCaregiverForJob, type JobForScoring, type CaregiverForScoring } from "@/lib/zorenta/matching";
-
 export async function GET(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
@@ -15,7 +14,9 @@ export async function GET(req: NextRequest) {
 
   const { data: job, error: jobErr } = await supabase
     .from("care_jobs")
-    .select("id, title, city, region, country, care_type, availability, budget_min, budget_max, hourly_rate, poster_id")
+    .select(
+      "id, title, city, region, country, care_type, care_context, financiering_regeling, soort_hulp_zorg, zorgniveau, type_inzet, vaardigheden_ervaring, role_sought, experience_requirements, certificates_requirements, schedule, availability, budget_min, budget_max, hourly_rate, poster_id"
+    )
     .eq("id", jobId)
     .single();
   if (jobErr || !job || job.poster_id !== userId) {
@@ -31,7 +32,10 @@ export async function GET(req: NextRequest) {
   }
 
   const profileIds = caregivers.map((c) => c.profile_id);
-  const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", profileIds);
+  const { data: profs } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url")
+    .in("id", profileIds);
   const profileMap = Object.fromEntries((profs ?? []).map((p) => [p.id, p]));
 
   const { data: reviewRows } = await supabase
@@ -49,12 +53,23 @@ export async function GET(req: NextRequest) {
     avgByCaregiver[id] = arr.reduce((a, b) => a + b, 0) / arr.length;
   });
 
+  const j = job as Record<string, unknown>;
   const jobForScoring: JobForScoring = {
     id: job.id,
     city: job.city,
     region: job.region,
     country: job.country,
     care_type: job.care_type,
+    care_context: (j.care_context as string | null) ?? null,
+    financiering_regeling: (j.financiering_regeling as string[] | null) ?? null,
+    soort_hulp_zorg: (j.soort_hulp_zorg as string[] | null) ?? null,
+    zorgniveau: (j.zorgniveau as string[] | null) ?? null,
+    type_inzet: (j.type_inzet as string[] | null) ?? null,
+    vaardigheden_ervaring: (j.vaardigheden_ervaring as string[] | null) ?? null,
+    role_sought: (j.role_sought as string | null) ?? null,
+    experience_requirements: (j.experience_requirements as string | null) ?? null,
+    certificates_requirements: (j.certificates_requirements as string | null) ?? null,
+    schedule: (j.schedule as string | null) ?? null,
     availability: job.availability,
     budget_min: job.budget_min,
     budget_max: job.budget_max,
@@ -84,6 +99,7 @@ export async function GET(req: NextRequest) {
       region: c.region,
       country: c.country,
       hourly_rate: c.hourly_rate,
+      certifications: (c as { certifications?: string | null }).certifications ?? null,
       updated_at: (c as { updated_at?: string }).updated_at ?? null,
       last_activity_at: c.profile_id ? lastActivityByApplicant[c.profile_id] ?? null : null,
     };
@@ -91,10 +107,13 @@ export async function GET(req: NextRequest) {
     const result = scoreCaregiverForJob(caregiver, jobForScoring, rating);
     return {
       caregiver: {
-        id: c.id,
+        /** Public `/zorenta/caregivers/[id]` segment: prefer linked `profiles.id` over marketplace listing id. */
+        id: c.profile_id,
         profile_id: c.profile_id,
+        caregiver_profile_id: c.id,
         headline: c.headline,
         display_name: profileMap[c.profile_id]?.display_name ?? null,
+        avatar_url: profileMap[c.profile_id]?.avatar_url ?? null,
       },
       score: result.score,
       reasons: result.reasons,

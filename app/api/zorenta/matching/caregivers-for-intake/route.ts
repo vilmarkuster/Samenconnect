@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
 import { scoreCaregiverForIntake, type CaregiverForScoring, type IntakeForScoring } from "@/lib/zorenta/matching";
-
+import { intakeTaxonomyFromRow } from "@/lib/zorenta/intake-taxonomy";
 export async function GET(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
@@ -31,7 +31,10 @@ export async function GET(req: NextRequest) {
   }
 
   const profileIds = caregivers.map((c) => c.profile_id);
-  const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", profileIds);
+  const { data: profs } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url")
+    .in("id", profileIds);
   const profileMap = Object.fromEntries((profs ?? []).map((p) => [p.id, p]));
 
   const { data: reviewRows } = await supabase
@@ -49,6 +52,7 @@ export async function GET(req: NextRequest) {
     avgByCaregiver[id] = arr.reduce((a, b) => a + b, 0) / arr.length;
   });
 
+  const tax = intakeTaxonomyFromRow(intake as Record<string, unknown>);
   const intakeForScoring: IntakeForScoring = {
     care_type: intake.care_type,
     preferred_city: intake.preferred_city,
@@ -57,6 +61,11 @@ export async function GET(req: NextRequest) {
     preferred_schedule: intake.preferred_schedule,
     care_frequency: intake.care_frequency,
     skills_required: intake.skills_required ?? [],
+    financiering_regeling: tax.financiering_regeling,
+    soort_hulp_zorg: tax.soort_hulp_zorg,
+    zorgniveau: tax.zorgniveau,
+    type_inzet: tax.type_inzet,
+    vaardigheden_ervaring: tax.vaardigheden_ervaring,
     budget_min: intake.budget_min,
     budget_max: intake.budget_max,
     language_preference: intake.language_preference,
@@ -80,13 +89,15 @@ export async function GET(req: NextRequest) {
     const result = scoreCaregiverForIntake(caregiver, intakeForScoring, rating);
     return {
       caregiver: {
-        id: c.id,
+        id: c.profile_id,
         profile_id: c.profile_id,
+        caregiver_profile_id: c.id,
         headline: c.headline,
         city: c.city,
         hourly_rate: c.hourly_rate,
         experience_years: c.experience_years,
         display_name: profileMap[c.profile_id]?.display_name ?? null,
+          avatar_url: profileMap[c.profile_id]?.avatar_url ?? null,
       },
       score: result.score,
       reasons: result.reasons,

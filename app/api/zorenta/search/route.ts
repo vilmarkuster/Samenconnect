@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getZorentaSupabaseClient, getAccessTokenFromRequest } from "@/lib/zorenta/supabase-server";
 import { jsonResponse } from "@/lib/zorenta/auth";
+import { latestMarketplaceCaregiverIdByProfileId } from "@/lib/zorenta/marketplace-caregiver-id";
 
 export async function GET(req: NextRequest) {
   const token = getAccessTokenFromRequest(req);
@@ -76,7 +77,10 @@ export async function GET(req: NextRequest) {
     }
 
     const ids = [...new Set(list.map((c) => c.profile_id))];
-    const { data: profs } = ids.length ? await supabase.from("profiles").select("id, display_name").in("id", ids) : { data: [] };
+    const marketplaceByProfile = await latestMarketplaceCaregiverIdByProfileId(supabase, ids);
+    const { data: profs } = ids.length
+      ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", ids)
+      : { data: [] };
     const profileMap = Object.fromEntries((profs ?? []).map((p) => [p.id, p]));
     const { data: reviewRows } = ids.length ? await supabase.from("reviews").select("reviewee_id, rating").in("reviewee_id", ids) : { data: [] };
     const sumCount: Record<string, { sum: number; count: number }> = {};
@@ -92,6 +96,7 @@ export async function GET(req: NextRequest) {
       ...c,
       profile: profileMap[c.profile_id] ?? null,
       average_rating: avgRating[c.profile_id] ?? null,
+      marketplace_caregiver_id: marketplaceByProfile.get(c.profile_id) ?? null,
     }));
     return jsonResponse({ caregivers: out });
   }
