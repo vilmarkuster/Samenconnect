@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   description:
     "Het platform dat zorgverleners, cliënten en organisaties verbindt.",
   icons: {
-    icon: "/branding/favicon.ico",
-    apple: "/branding/samenconnect-icon.png",
+    icon: [{ url: "/samenconnect-icon.png", type: "image/png" }],
+    apple: "/samenconnect-icon.png",
   },
 };
 

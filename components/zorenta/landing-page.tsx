@@ -64,11 +64,12 @@ export function ZorentaLandingPage() {
         <div className="mx-auto max-w-4xl text-center">
           <div className="mb-6 flex justify-center">
             <Image
-              src="/branding/samenconnect-logo.png"
+              src="/samenconnect-logo.png"
               alt="SamenConnect"
               width={180}
               height={46}
               priority
+              className="h-auto w-[min(100%,180px)] object-contain"
             />
           </div>
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-medium text-emerald-800 shadow-sm">
@@ -319,12 +320,13 @@ export function ZorentaLandingPage() {
       {/* Footer */}
       <footer className="border-t border-slate-200/80 px-4 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
-          <Link href="/zorenta" className="flex items-center gap-2 font-semibold text-slate-900">
+          <Link href="/zorenta" className="flex items-center font-semibold text-slate-900">
             <Image
-              src="/branding/samenconnect-logo.png"
+              src="/samenconnect-logo.png"
               alt="SamenConnect"
-              width={140}
-              height={36}
+              width={160}
+              height={40}
+              className="h-8 w-auto max-w-[10rem] object-contain sm:h-9 sm:max-w-[11rem]"
             />
           </Link>
           <nav className="flex flex-wrap justify-center gap-6 text-sm text-slate-600">

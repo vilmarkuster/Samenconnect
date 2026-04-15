@@ -315,16 +315,16 @@ export function SamenConnectHomeLanding({
     <div className="min-h-screen bg-gradient-to-b from-[#f0f2f5] via-[#f3f4f6] to-[#f0f2f5] text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-200/50 bg-white/[0.88] backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3.5 sm:py-4">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2" aria-label="SamenConnect">
             <Image
-              src="/branding/samenconnect-logo.png"
-              alt="SamenConnect"
-              width={40}
-              height={40}
+              src="/samenconnect-icon.png"
+              alt=""
+              width={32}
+              height={32}
               priority
-              className="h-9 w-9 sm:h-10 sm:w-10"
+              className="size-8 shrink-0 sm:size-9"
             />
-            <span className="text-lg font-semibold tracking-tight text-slate-900">
+            <span className="text-lg font-semibold leading-none tracking-tight text-slate-900">
               SamenConnect
             </span>
           </Link>
@@ -1023,16 +1023,14 @@ export function SamenConnectHomeLanding({
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="flex flex-col gap-14 lg:flex-row lg:items-start lg:justify-between lg:gap-16">
             <div className="max-w-sm">
-              <Link href="/" className="inline-flex items-center gap-2.5">
+              <Link href="/" className="inline-flex items-center">
                 <Image
-                  src="/branding/samenconnect-logo.png"
-                  alt=""
-                  width={36}
-                  height={36}
+                  src="/samenconnect-logo.png"
+                  alt="SamenConnect"
+                  width={168}
+                  height={40}
+                  className="h-9 w-auto max-w-[11rem] object-contain object-left sm:h-10 sm:max-w-[12rem]"
                 />
-                <span className="text-lg font-semibold tracking-tight text-slate-900">
-                  SamenConnect
-                </span>
               </Link>
               <p className="mt-5 text-sm leading-relaxed text-slate-600">
                 Zorg zonder gedoe: transparant, menselijk — met alles wat bij de zorg hoort
