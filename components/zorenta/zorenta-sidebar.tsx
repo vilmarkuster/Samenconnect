@@ -99,7 +99,7 @@ export function ZorentaSidebar({ onNavigate, isAdmin }: ZorentaSidebarProps) {
           Uitloggen
         </button>
         <Link
-          href="/dashboard"
+          href="/zorenta/dashboard"
           className="mt-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
         >
           ← Terug naar SamenConnect

@@ -8,10 +8,16 @@ import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AdminShell } from "@/components/zorenta/admin-shell";
 import { SamenConnectLogo } from "@/components/samenconnect/logo";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
 
 type ZorentaLayoutMode = "public" | "app";
 
-const PUBLIC_PATHS = new Set<string>(["/zorenta", "/zorenta/login", "/zorenta/register"]);
+const PUBLIC_PATHS = new Set<string>([
+  "/zorenta",
+  "/zorenta/login",
+  "/zorenta/register",
+  "/zorenta/registration-closed",
+]);
 
 function isPublicPath(path: string | null): boolean {
   if (!path) return false;
@@ -102,10 +108,16 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
               <Link href="/zorenta/login" className="text-slate-600 hover:text-slate-900">
                 Inloggen
               </Link>
-              <Link href="/zorenta/register" className="text-slate-600 hover:text-slate-900">
-                Registreren
-              </Link>
-              <Link href="/dashboard" className="text-slate-500 hover:text-slate-700">
+              {REGISTRATION_OPEN ? (
+                <Link href="/zorenta/register" className="text-slate-600 hover:text-slate-900">
+                  Registreren
+                </Link>
+              ) : (
+                <span className="cursor-not-allowed text-sm text-slate-400" title="Registratie tijdelijk gesloten">
+                  Registreren binnenkort
+                </span>
+              )}
+              <Link href="/zorenta/dashboard" className="text-slate-500 hover:text-slate-700">
                 Back to App
               </Link>
             </nav>

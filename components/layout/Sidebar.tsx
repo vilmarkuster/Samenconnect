@@ -86,7 +86,7 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
           </button>
         )}
         <a
-          href="/dashboard"
+          href="/chat"
           className="mt-2 flex items-center rounded-2xl px-3 py-3 text-xs text-white/70 hover:bg-white/10 hover:text-white"
         >
           ← Terug naar AI App

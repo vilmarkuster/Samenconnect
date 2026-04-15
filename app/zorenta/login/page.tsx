@@ -7,6 +7,7 @@ import { FormEvent, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
 
 function safePostLoginPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) return "/zorenta/dashboard";
@@ -30,8 +31,6 @@ export default function ZorentaLoginPage() {
     try {
       await login(email, password);
       const dest = safePostLoginPath(searchParams.get("next"));
-      // eslint-disable-next-line no-console
-      console.log("Login redirect", { dest });
       // Full navigation so middleware sees fresh auth cookies on the next request
       window.location.assign(dest);
     } catch (err) {
@@ -94,9 +93,13 @@ export default function ZorentaLoginPage() {
           </form>
           <p className="mt-4 text-center text-sm text-slate-500">
             Nog geen account?{" "}
-            <Link href="/zorenta/register" className="font-medium text-primary-600 hover:underline">
-              Registreren
-            </Link>
+            {REGISTRATION_OPEN ? (
+              <Link href="/zorenta/register" className="font-medium text-primary-600 hover:underline">
+                Registreren
+              </Link>
+            ) : (
+              <span className="font-medium text-slate-400">Registratie binnenkort beschikbaar</span>
+            )}
           </p>
         </CardContent>
       </Card>

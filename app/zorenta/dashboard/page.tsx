@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { JobListingCover } from "@/components/zorenta/job-listing-cover";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import {
   Briefcase,
@@ -95,7 +96,7 @@ export default function ZorentaDashboardPage() {
       if (!cancelled) {
         setMe(meData);
         if (meRes.ok && meData.profile === null) {
-          router.replace("/zorenta/register");
+          router.replace(REGISTRATION_OPEN ? "/zorenta/register" : "/zorenta/registration-closed");
           return;
         }
         if (meRes.ok && meData.profile) {

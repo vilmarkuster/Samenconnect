@@ -1,23 +1,27 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
+
+/** Same-origin only under /zorenta — voorkomt open redirect + App Builder als default */
+function safeSamenConnectPostLoginPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/zorenta/dashboard";
+  if (!next.startsWith("/zorenta")) return "/zorenta/dashboard";
+  return next;
+}
 
 function LoginForm() {
   const { login } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const next = searchParams.get("next") || "/dashboard";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,7 +29,9 @@ function LoginForm() {
     try {
       await login(email, password);
       setError(null);
-      router.replace(next);
+      const dest = safeSamenConnectPostLoginPath(searchParams.get("next"));
+      // Volledige navigatie zodat cookies/session consistent zijn (zelfde patroon als /zorenta/login)
+      window.location.assign(dest);
     } catch (err: any) {
       // Surface the real Supabase error and log for debugging
       // eslint-disable-next-line no-console
@@ -47,6 +53,15 @@ function LoginForm() {
         <p className="mt-1 text-sm text-slate-500">
           Sign in to access your dashboard.
         </p>
+
+        {!REGISTRATION_OPEN && (
+          <p
+            className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-900"
+            role="status"
+          >
+            Registratie binnenkort beschikbaar.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
@@ -84,14 +99,9 @@ function LoginForm() {
           </div>
 
           {error && (
-            <div className="space-y-1">
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
-                {error}
-              </p>
-              <p className="text-xs font-mono text-red-700 bg-red-50/80 border border-dashed border-red-200 rounded-md px-3 py-1 break-all">
-                Debug: {error}
-              </p>
-            </div>
+            <p className="rounded-md border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
           )}
 
           <Button type="submit" disabled={submitting} className="w-full">
@@ -101,12 +111,7 @@ function LoginForm() {
 
         <p className="mt-4 text-xs text-slate-500">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-primary-500 hover:text-primary-600"
-          >
-            Sign up
-          </Link>
+          <span className="font-medium text-slate-400">Registratie binnenkort beschikbaar</span>
         </p>
       </div>
     </main>

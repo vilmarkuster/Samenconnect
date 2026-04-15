@@ -15,6 +15,7 @@ import { CaregiverProfileSections } from "@/components/zorenta/caregiver-profile
 import { buildCaregiverViewModel } from "@/lib/zorenta/caregiver-profile-view-model";
 import type { AvailabilitySchedule } from "@/lib/zorenta/caregiver-availability-schedule";
 import { formatDisplayName, formatLabelValue, formatLocationLine } from "@/lib/zorenta/profile-display";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
 
 type MeResponse = {
   profile?: { id?: string; display_name?: string | null; role?: string | null; avatar_url?: string | null };
@@ -160,9 +161,18 @@ export default function ProfilePage() {
               {error || "We konden nog geen profielgegevens vinden. Stel je profiel in om verder te gaan."}
             </p>
             <div className="mt-4">
-              <Link href="/zorenta/register">
-                <Button className="bg-[#40ada8] text-white hover:bg-[#369e9a]">Profiel opzetten</Button>
-              </Link>
+              {REGISTRATION_OPEN ? (
+                <Link href="/zorenta/register">
+                  <Button className="bg-[#40ada8] text-white hover:bg-[#369e9a]">Profiel opzetten</Button>
+                </Link>
+              ) : (
+                <div className="space-y-2">
+                  <Button type="button" disabled className="bg-slate-200 text-slate-500">
+                    Profiel opzetten
+                  </Button>
+                  <p className="text-xs text-slate-500">Registratie is tijdelijk gesloten. Probeer het later opnieuw.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

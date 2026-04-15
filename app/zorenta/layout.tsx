@@ -3,7 +3,7 @@ import { ZorentaLayoutClient } from "@/components/zorenta/ZorentaLayoutClient";
 
 type ZorentaLayoutMode = "public" | "app";
 
-const PUBLIC_ROUTES = ["/zorenta", "/zorenta/login", "/zorenta/register"];
+const PUBLIC_ROUTES = ["/zorenta", "/zorenta/login", "/zorenta/register", "/zorenta/registration-closed"];
 
 function resolveMode(pathname: string): ZorentaLayoutMode {
   return PUBLIC_ROUTES.includes(pathname) ? "public" : "app";

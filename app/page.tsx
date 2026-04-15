@@ -17,7 +17,7 @@ export default function HomePage() {
     console.log("HomePage auth state", { isAuthenticated, isLoading });
 
     if (isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace("/zorenta/dashboard");
     } else {
       router.replace("/login");
     }

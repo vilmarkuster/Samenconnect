@@ -1,8 +1,12 @@
- "use client";
+"use client";
 
+import type { ComponentProps } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import type { VariantProps } from "class-variance-authority";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { cn } from "@/lib/utils";
 import {
   Shield,
   Users,
@@ -15,6 +19,42 @@ import {
   Lock,
   Sparkles,
 } from "lucide-react";
+
+type RegisterCtaProps = Omit<ComponentProps<typeof Link>, "href"> &
+  VariantProps<typeof buttonVariants> & { href: string };
+
+function RegisterCta({
+  href,
+  children,
+  className,
+  variant,
+  size,
+  ...linkProps
+}: RegisterCtaProps) {
+  if (!REGISTRATION_OPEN) {
+    return (
+      <div className="inline-flex flex-col items-center gap-1">
+        <button
+          type="button"
+          disabled
+          className={cn(buttonVariants({ variant, size }), className)}
+        >
+          {children}
+        </button>
+        <span className="text-center text-xs text-slate-500">Binnenkort beschikbaar</span>
+      </div>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...linkProps}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function ZorentaLandingPage() {
   return (
@@ -44,25 +84,19 @@ export function ZorentaLandingPage() {
             SamenConnect verbindt zorgverleners, cliënten en organisaties. Snel, betrouwbaar en veilig.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/zorenta/register?role=client">
-              <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                Zorg vinden
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/zorenta/register?role=caregiver">
-              <Button size="lg" variant="outline" className="gap-2 border-slate-300">
-                Zorgverlener worden
-              </Button>
-            </Link>
-            <Link href="/zorenta/register?role=client">
-              <Button size="lg" variant="outline" className="gap-2 border-slate-300">
-                Zorgvraag plaatsen
-              </Button>
-            </Link>
+            <RegisterCta href="/zorenta/register?role=client" size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+              Zorg vinden
+              <ChevronRight className="h-4 w-4" />
+            </RegisterCta>
+            <RegisterCta href="/zorenta/register?role=caregiver" size="lg" variant="outline" className="gap-2 border-slate-300">
+              Zorgverlener worden
+            </RegisterCta>
+            <RegisterCta href="/zorenta/register?role=client" size="lg" variant="outline" className="gap-2 border-slate-300">
+              Zorgvraag plaatsen
+            </RegisterCta>
           </div>
           <p className="mt-4 text-sm text-slate-500">
-            Gratis account · Geen creditcard nodig
+            {REGISTRATION_OPEN ? "Gratis account · Geen creditcard nodig" : "Registratie volgt binnenkort · Inloggen blijft mogelijk"}
           </p>
         </div>
       </section>
@@ -159,12 +193,12 @@ export function ZorentaLandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/zorenta/register?role=client" className="mt-6 inline-block">
-                <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+              <div className="mt-6 inline-block">
+                <RegisterCta href="/zorenta/register?role=client" size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   Zorgvraag plaatsen
                   <ChevronRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                </RegisterCta>
+              </div>
             </div>
           </div>
         </div>
@@ -189,12 +223,12 @@ export function ZorentaLandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/zorenta/register?role=caregiver" className="mt-6 inline-block">
-                <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+              <div className="mt-6 inline-block">
+                <RegisterCta href="/zorenta/register?role=caregiver" size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   Zorgverlener worden
                   <ChevronRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                </RegisterCta>
+              </div>
             </div>
             <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center">
               <Users className="mx-auto h-16 w-16 text-slate-300" />
@@ -269,16 +303,12 @@ export function ZorentaLandingPage() {
           <h2 className="text-xl font-semibold text-slate-900">Klaar om te beginnen?</h2>
           <p className="mt-2 text-slate-600">Registreer gratis en vind zorg of zorgopdrachten.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
-            <Link href="/zorenta/register?role=client">
-              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700">
-                Zorg vinden
-              </Button>
-            </Link>
-            <Link href="/zorenta/register?role=caregiver">
-              <Button size="lg" variant="outline">
-                Zorgverlener worden
-              </Button>
-            </Link>
+            <RegisterCta href="/zorenta/register?role=client" size="lg" className="bg-emerald-600 hover:bg-emerald-700">
+              Zorg vinden
+            </RegisterCta>
+            <RegisterCta href="/zorenta/register?role=caregiver" size="lg" variant="outline">
+              Zorgverlener worden
+            </RegisterCta>
             <Link href="/zorenta/login">
               <Button size="lg" variant="ghost">Inloggen</Button>
             </Link>
@@ -300,8 +330,17 @@ export function ZorentaLandingPage() {
           <nav className="flex flex-wrap justify-center gap-6 text-sm text-slate-600">
             <Link href="/zorenta" className="hover:text-slate-900">Home</Link>
             <Link href="/zorenta/login" className="hover:text-slate-900">Inloggen</Link>
-            <Link href="/zorenta/register" className="hover:text-slate-900">Registreren</Link>
-            <Link href="/zorenta/register?role=client" className="hover:text-slate-900">Zorgvraag</Link>
+            {REGISTRATION_OPEN ? (
+              <>
+                <Link href="/zorenta/register" className="hover:text-slate-900">Registreren</Link>
+                <Link href="/zorenta/register?role=client" className="hover:text-slate-900">Zorgvraag</Link>
+              </>
+            ) : (
+              <>
+                <span className="text-slate-400">Registreren (binnenkort)</span>
+                <span className="text-slate-400">Zorgvraag (binnenkort)</span>
+              </>
+            )}
           </nav>
         </div>
         <p className="mx-auto mt-6 max-w-6xl text-center text-xs text-slate-500">
