@@ -66,10 +66,11 @@ export function ZorentaLandingPage() {
             <Image
               src="/samenconnect-logo.png"
               alt="SamenConnect"
-              width={180}
-              height={46}
+              width={1024}
+              height={731}
               priority
-              className="h-auto w-[min(100%,180px)] object-contain"
+              sizes="(max-width: 768px) 200px, 220px"
+              className="mx-auto h-auto w-[min(100%,220px)] object-contain"
             />
           </div>
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-medium text-emerald-800 shadow-sm">
@@ -324,8 +325,9 @@ export function ZorentaLandingPage() {
             <Image
               src="/samenconnect-logo.png"
               alt="SamenConnect"
-              width={160}
-              height={40}
+              width={1024}
+              height={731}
+              sizes="(max-width: 768px) 160px, 180px"
               className="h-8 w-auto max-w-[10rem] object-contain sm:h-9 sm:max-w-[11rem]"
             />
           </Link>

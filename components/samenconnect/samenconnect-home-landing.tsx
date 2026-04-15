@@ -1023,13 +1023,18 @@ export function SamenConnectHomeLanding({
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="flex flex-col gap-14 lg:flex-row lg:items-start lg:justify-between lg:gap-16">
             <div className="max-w-sm">
-              <Link href="/" className="inline-flex items-center">
+              <Link
+                href="/"
+                className="inline-flex items-center"
+                aria-label="SamenConnect"
+              >
                 <Image
                   src="/samenconnect-logo.png"
-                  alt="SamenConnect"
-                  width={168}
-                  height={40}
-                  className="h-9 w-auto max-w-[11rem] object-contain object-left sm:h-10 sm:max-w-[12rem]"
+                  alt=""
+                  width={1024}
+                  height={731}
+                  sizes="(max-width: 640px) 200px, 220px"
+                  className="h-9 w-auto max-w-[12.5rem] object-contain object-left sm:h-10 sm:max-w-[14rem]"
                 />
               </Link>
               <p className="mt-5 text-sm leading-relaxed text-slate-600">
