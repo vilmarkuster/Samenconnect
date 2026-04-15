@@ -1025,16 +1025,16 @@ export function SamenConnectHomeLanding({
             <div className="max-w-sm">
               <Link
                 href="/"
-                className="inline-flex items-center"
+                className="mb-4 inline-flex items-center"
                 aria-label="SamenConnect"
               >
                 <Image
                   src="/samenconnect-logo.png"
                   alt=""
-                  width={1024}
-                  height={731}
-                  sizes="(max-width: 640px) 200px, 220px"
-                  className="h-9 w-auto max-w-[12.5rem] object-contain object-left sm:h-10 sm:max-w-[14rem]"
+                  width={160}
+                  height={114}
+                  sizes="160px"
+                  className="h-auto w-[160px] object-contain object-left"
                 />
               </Link>
               <p className="mt-5 text-sm leading-relaxed text-slate-600">
