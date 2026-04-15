@@ -1,8 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  getPlatformSupabaseServerClient,
-  getPlatformUserOrNull,
-} from "@/lib/platform-supabase-server";
+import { getSupabaseForAgentsApi } from "@/lib/agents-api-supabase";
 
 type AgentRow = {
   id: string;
@@ -14,9 +11,11 @@ type AgentRow = {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getPlatformUserOrNull(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
-    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from("agents")
       .select("*")
@@ -52,9 +51,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getPlatformUserOrNull(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
-    const supabase = getPlatformSupabaseServerClient(req);
     const body = await req.json();
     const name: string | undefined = body?.name;
     const description: string | undefined = body?.description ?? "";
@@ -107,9 +108,11 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await getPlatformUserOrNull(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
-    const supabase = getPlatformSupabaseServerClient(req);
     const url = new URL(req.url);
     const idParam = url.searchParams.get("id");
     const id = idParam?.trim() ?? "";

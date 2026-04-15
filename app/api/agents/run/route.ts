@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getPlatformSupabaseServerClient, getPlatformUserOrNull } from "@/lib/platform-supabase-server";
+import { getSupabaseForAgentsApi } from "@/lib/agents-api-supabase";
 import { PLATFORM_ANTHROPIC_CLAUDE_MODEL } from "@/lib/platform-anthropic-model";
 
 type CareJobRow = {
@@ -9,6 +9,7 @@ type CareJobRow = {
   city: string | null;
   region: string | null;
   country: string | null;
+  poster_id: string;
 };
 
 type CaregiverRow = {
@@ -74,14 +75,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getPlatformSupabaseServerClient(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user: authUser },
+      error: authUserError,
+    } = await supabase.auth.getUser();
+    if (authUserError || !authUser) {
+      return new Response(JSON.stringify({ error: "Unauthorized." }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
     if (jobId !== undefined && jobId !== null && String(jobId).trim()) {
       const jobIdStr = String(jobId).trim();
       jobIdForMatchResult = jobIdStr;
       const { data: job, error: jobError } = await supabase
         .from("care_jobs")
-        .select("id, title, description, city, region, country")
+        .select("id, title, description, city, region, country, poster_id")
         .eq("id", jobIdStr)
         .single();
 
@@ -96,6 +107,12 @@ export async function POST(req: NextRequest) {
       }
 
       const jobRow = job as CareJobRow;
+      if (jobRow.poster_id !== authUser.id) {
+        return new Response(JSON.stringify({ error: "Forbidden." }), {
+          status: 403,
+          headers: { "content-type": "application/json" },
+        });
+      }
       jobForMatch = jobRow;
       const title = typeof jobRow.title === "string" ? jobRow.title.trim() : "";
       const description = typeof jobRow.description === "string" ? jobRow.description.trim() : "";
@@ -441,11 +458,6 @@ export async function POST(req: NextRequest) {
 
       // Store run + match result (best-effort; failure shouldn't break the response).
       try {
-        const user = await getPlatformUserOrNull(req);
-        if (!user) {
-          return new Response(JSON.stringify({ output }), { status: 200, headers: { "content-type": "application/json" } });
-        }
-        const supabase = getPlatformSupabaseServerClient(req);
         await supabase.from("runs").insert({
           kind: "agent",
           agent_id: agentId,
@@ -535,12 +547,6 @@ export async function POST(req: NextRequest) {
 
     // Store run in Supabase (best-effort; failure shouldn't break the response).
     try {
-      const user = await getPlatformUserOrNull(req);
-      if (!user) {
-        // If no session exists, best-effort persistence should be skipped.
-        return new Response(JSON.stringify({ output }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-      const supabase = getPlatformSupabaseServerClient(req);
       await supabase.from("runs").insert({
         kind: "agent",
         agent_id: agentId,

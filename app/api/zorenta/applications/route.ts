@@ -7,6 +7,41 @@ import {
   ensureConversationForJobApplication,
 } from "@/lib/zorenta/application-conversation";
 
+/** Same rule as inbox / public profile page: only `caregiver_profiles` ⇒ renderbare `/zorenta/caregivers/[id]`. */
+async function withApplicantRenderablePublicProfile(
+  supabase: SupabaseClient,
+  applications: Record<string, unknown>[]
+): Promise<Record<string, unknown>[]> {
+  const applicantIds = [
+    ...new Set(
+      applications
+        .map((a) => {
+          const id = (a as { applicant_id?: string | null }).applicant_id;
+          return typeof id === "string" && id.trim() ? id.trim() : "";
+        })
+        .filter(Boolean)
+    ),
+  ];
+  if (applicantIds.length === 0) {
+    return applications.map((a) => ({ ...a, applicant_has_renderable_public_profile: false }));
+  }
+  const { data: cpRows } = await supabase
+    .from("caregiver_profiles")
+    .select("profile_id")
+    .in("profile_id", applicantIds);
+  const withCaregiverRow = new Set(
+    (cpRows ?? []).map((r: { profile_id: string }) => r.profile_id)
+  );
+  return applications.map((a) => {
+    const aid = (a as { applicant_id?: string | null }).applicant_id;
+    const id = typeof aid === "string" ? aid.trim() : "";
+    return {
+      ...a,
+      applicant_has_renderable_public_profile: id.length > 0 && withCaregiverRow.has(id),
+    };
+  });
+}
+
 async function withConversationIds(
   supabase: SupabaseClient,
   applications: Record<string, unknown>[]
@@ -38,7 +73,8 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) return jsonResponse({ error: error.message }, 500);
-    const enriched = await withConversationIds(supabase, apps ?? []);
+    const flagged = await withApplicantRenderablePublicProfile(supabase, apps ?? []);
+    const enriched = await withConversationIds(supabase, flagged);
     return jsonResponse({ applications: enriched, total: count ?? 0, limit, offset });
   }
 
@@ -59,7 +95,8 @@ export async function GET(req: NextRequest) {
       ...a,
       profiles: profileMap[a.applicant_id] ?? null,
     }));
-    const enriched = await withConversationIds(supabase, withProfiles);
+    const flagged = await withApplicantRenderablePublicProfile(supabase, withProfiles);
+    const enriched = await withConversationIds(supabase, flagged);
     return jsonResponse({ applications: enriched, total: count ?? 0, limit, offset });
   }
 
@@ -80,7 +117,8 @@ export async function GET(req: NextRequest) {
     ...a,
     profiles: profileMap[a.applicant_id] ?? null,
   }));
-  const enriched = await withConversationIds(supabase, withProfiles);
+  const flagged = await withApplicantRenderablePublicProfile(supabase, withProfiles);
+  const enriched = await withConversationIds(supabase, flagged);
   return jsonResponse({ applications: enriched, total: count ?? 0, limit, offset });
 }
 

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS } from "@/lib/zorenta/caregiver-public-profile-route-id";
+import { hasRenderablePublicCaregiverPagePayload } from "@/lib/zorenta/public-caregiver-page";
 
 type Agent = {
   id: number | string;
@@ -21,6 +23,13 @@ type AgentRun = {
   agentId: number | string;
   agentName: string;
   output: string;
+};
+
+type PosterJobOption = {
+  id: string;
+  title: string | null;
+  city: string | null;
+  status: string | null;
 };
 
 function isMatchAgentName(name: string) {
@@ -65,6 +74,9 @@ export default function AgentsPage() {
   const [latestRunByAgentId, setLatestRunByAgentId] = useState<Record<string, string>>({});
   const [runErrorByAgentId, setRunErrorByAgentId] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [matchTestJobs, setMatchTestJobs] = useState<PosterJobOption[]>([]);
+  const [matchTestJobsLoading, setMatchTestJobsLoading] = useState(true);
+  const [matchTestJobId, setMatchTestJobId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +119,39 @@ export default function AgentsPage() {
 
     loadAgents();
 
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPosterJobs() {
+      try {
+        const res = await fetch("/api/agents/match-test-jobs");
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setMatchTestJobs([]);
+          setMatchTestJobId("");
+          return;
+        }
+        const jobs: PosterJobOption[] = Array.isArray(data?.jobs) ? data.jobs : [];
+        setMatchTestJobs(jobs);
+        setMatchTestJobId((prev) => {
+          if (prev && jobs.some((j) => j.id === prev)) return prev;
+          return jobs[0]?.id ?? "";
+        });
+      } catch {
+        if (!cancelled) {
+          setMatchTestJobs([]);
+          setMatchTestJobId("");
+        }
+      } finally {
+        if (!cancelled) setMatchTestJobsLoading(false);
+      }
+    }
+    loadPosterJobs();
     return () => {
       cancelled = true;
     };
@@ -180,18 +225,43 @@ export default function AgentsPage() {
       delete next[String(agent.id)];
       return next;
     });
+
+    const isMatch = isMatchAgentName(agent.name);
+    if (isMatch) {
+      if (matchTestJobsLoading) {
+        const msg = "Still loading your job postings. Try again in a moment.";
+        setError(msg);
+        setRunErrorByAgentId((prev) => ({ ...prev, [String(agent.id)]: msg }));
+        return;
+      }
+      if (matchTestJobs.length === 0) {
+        const msg =
+          "Match Agent needs a job you own. Create a job in Zorenta or run a match from that job’s page.";
+        setError(msg);
+        setRunErrorByAgentId((prev) => ({ ...prev, [String(agent.id)]: msg }));
+        return;
+      }
+      if (!matchTestJobId.trim()) {
+        const msg = "Select which of your jobs to run Match Agent against.";
+        setError(msg);
+        setRunErrorByAgentId((prev) => ({ ...prev, [String(agent.id)]: msg }));
+        return;
+      }
+    }
+
     setActiveRunAgentId(agent.id);
 
     try {
+      const body = isMatch
+        ? { agentId: agent.id, jobId: matchTestJobId.trim() }
+        : { agentId: agent.id };
+
       const res = await fetch("/api/agents/run", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          agentId: agent.id,
-          jobId: "17d4bc01-b3ad-4d43-86c2-d383c80a5b43"
-        })
+        body: JSON.stringify(body)
       });
 
       if (!res.ok) {
@@ -221,8 +291,6 @@ export default function AgentsPage() {
       };
       setRuns(prev => [...prev, newRun]);
     } catch (err: any) {
-      // eslint-disable-next-line no-console
-      console.error("Agent run error", err);
       const message =
         err?.message || (typeof err === "string" ? err : "Agent run failed");
       setError(message);
@@ -294,6 +362,54 @@ export default function AgentsPage() {
                   </p>
                 </CardHeader>
                 <CardContent className="mt-auto space-y-2 pt-0">
+                  {isMatchAgentName(agent.name) && (
+                    <div className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2">
+                      <p className="text-[11px] font-medium text-slate-700">
+                        Match Agent — test context
+                      </p>
+                      {matchTestJobsLoading ? (
+                        <p className="text-xs text-slate-500">Loading your job postings…</p>
+                      ) : matchTestJobs.length === 0 ? (
+                        <p className="text-xs leading-relaxed text-slate-600">
+                          No job postings on your account.{" "}
+                          <Link
+                            href="/zorenta/jobs/new"
+                            className="font-medium text-slate-900 underline underline-offset-2 hover:text-slate-700"
+                          >
+                            Create a job
+                          </Link>{" "}
+                          or use{" "}
+                          <Link
+                            href="/zorenta/jobs"
+                            className="font-medium text-slate-900 underline underline-offset-2 hover:text-slate-700"
+                          >
+                            an existing job page
+                          </Link>{" "}
+                          to run matches.
+                        </p>
+                      ) : (
+                        <label className="block space-y-1">
+                          <span className="sr-only">Job for test run</span>
+                          <select
+                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            value={matchTestJobId}
+                            onChange={(e) => setMatchTestJobId(e.target.value)}
+                          >
+                            {matchTestJobs.map((j) => {
+                              const label = [j.title?.trim() || "Untitled job", j.city?.trim() || null, j.status]
+                                .filter(Boolean)
+                                .join(" · ");
+                              return (
+                                <option key={j.id} value={j.id}>
+                                  {label}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -309,7 +425,13 @@ export default function AgentsPage() {
                       size="sm"
                       className="flex-1"
                       onClick={() => handleRunTest(agent)}
-                      disabled={activeRunAgentId === agent.id}
+                      disabled={
+                        activeRunAgentId === agent.id ||
+                        (isMatchAgentName(agent.name) &&
+                          (matchTestJobsLoading ||
+                            matchTestJobs.length === 0 ||
+                            !matchTestJobId.trim()))
+                      }
                     >
                       {activeRunAgentId === agent.id ? "Running…" : "Run test"}
                     </Button>
@@ -385,12 +507,24 @@ export default function AgentsPage() {
                                         : "rounded-lg border border-emerald-200 bg-white/70 px-3 py-2"
                                     }
                                     onClick={() => {
-                                      if (
-                                        caregiverId &&
-                                        !DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS.has(caregiverId)
-                                      ) {
-                                        router.push(`/zorenta/caregivers/${caregiverId}`);
-                                      }
+                                      void (async () => {
+                                        if (
+                                          !caregiverId ||
+                                          DISALLOWED_PUBLIC_CAREGIVER_ROUTE_IDS.has(caregiverId)
+                                        ) {
+                                          return;
+                                        }
+                                        const res = await fetch(
+                                          `/api/zorenta/caregivers/${encodeURIComponent(caregiverId)}`
+                                        );
+                                        const data = (await res.json().catch(() => ({}))) as Record<
+                                          string,
+                                          unknown
+                                        >;
+                                        if (res.ok && hasRenderablePublicCaregiverPagePayload(data)) {
+                                          router.push(`/zorenta/caregivers/${caregiverId}`);
+                                        }
+                                      })();
                                     }}
                                   >
                                     <div className="flex items-start justify-between gap-2">

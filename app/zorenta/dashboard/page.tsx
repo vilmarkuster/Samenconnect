@@ -7,8 +7,8 @@ import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
-import { JobMatchCard } from "@/components/zorenta/job-match-card";
-import { BestMatchHighlight } from "@/components/match/BestMatchHighlight";
+import { JobListingCover } from "@/components/zorenta/job-listing-cover";
+import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import {
   Briefcase,
   FileText,
@@ -39,6 +39,13 @@ type JobMatch = {
     budget_max?: number | null;
     hourly_rate?: number | null;
     status?: string;
+    /** Opdrachtgever (nodig voor “Reageer” → gesprek) */
+    poster_id?: string | null;
+    /** Publieke storage-URL’s (o.a. GET /matching/jobs-for-me) */
+    image_urls?: string[] | null;
+    image_url?: string | null;
+    cover_image_url?: string | null;
+    photo_url?: string | null;
   };
   score: number;
   reasons: string[];
@@ -162,7 +169,7 @@ export default function ZorentaDashboardPage() {
 
   if (loading || !me?.profile) {
     return (
-      <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 md:px-8 lg:py-10">
+      <div className="mx-auto w-full min-w-0 max-w-none space-y-8 py-6 lg:py-10">
         <div className="mb-4 inline-flex rounded-md bg-black px-3 py-1 text-sm font-bold uppercase tracking-wide text-white">
           DASHBOARD PAGE
         </div>
@@ -307,11 +314,11 @@ export default function ZorentaDashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      {/* Hero welcome section */}
+    <div className="mx-auto w-full min-w-0 max-w-none">
+      {/* Hero — volle breedte binnen AppLayout main (geen extra max-width cap op dashboard) */}
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-[#40ADA8]/18 via-[#40ADA8]/6 to-slate-50 shadow-lg">
-        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)] lg:p-10">
-          <div className="space-y-5">
+        <div className="grid gap-8 p-6 sm:p-8 lg:p-10 xl:grid-cols-[minmax(0,1.45fr)_minmax(260px,1fr)]">
+          <div className="min-w-0 space-y-5">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-[#40ADA8] shadow-sm ring-1 ring-[#40ADA8]/10">
               <Star className="h-3.5 w-3.5" />
               SamenConnect Marketplace
@@ -349,23 +356,23 @@ export default function ZorentaDashboardPage() {
               )}
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             {stats.map((item) => {
               const Icon = item.icon;
               const href = getStatHref(item.label);
               const card = (
                 <div
-                  className={`flex items-center justify-between rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                  className={`flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                     href ? "cursor-pointer" : ""
                   }`}
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                       {item.label}
                     </p>
                     <p className="mt-1 text-lg font-semibold text-slate-900">{item.value}</p>
                   </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#40ADA8]/10 text-[#40ADA8]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#40ADA8]/10 text-[#40ADA8]">
                     <Icon className="h-5 w-5" />
                   </div>
                 </div>
@@ -383,14 +390,14 @@ export default function ZorentaDashboardPage() {
         </div>
       </section>
 
-      {/* Main grid: left content + right sidebar */}
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+      {/* Rail pas naast main vanaf min-[1720px] (viewport − sidebar − padding − rail ≈ genoeg voor 3 kaartkolommen). Tot die breedte: gestapeld = volle breedte voor main. */}
+      <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-6 min-[1720px]:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] min-[1720px]:items-start min-[1720px]:gap-8">
         {/* Left column */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6 lg:space-y-7 min-[1720px]:space-y-8">
           {/* AI recommended jobs */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <div>
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <div className="mb-5 flex min-w-0 items-center justify-between gap-3 sm:mb-6">
+              <div className="min-w-0 flex-1">
                 <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
                   Aanbevolen opdrachten voor jou
                 </h2>
@@ -398,70 +405,94 @@ export default function ZorentaDashboardPage() {
                   Opdrachten die goed aansluiten bij jouw profiel en voorkeuren.
                 </p>
               </div>
-              <Link href="/zorenta/jobs">
+              <Link href="/zorenta/jobs" className="shrink-0">
                 <Button variant="outline" className="border-slate-200 bg-white text-sm">
                   Alle opdrachten
                 </Button>
               </Link>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {/* 1 / md:2 / 2xl:3 — xl zou ~960px main na sidebar geven (~320px/kaart); 3 kolommen pas vanaf 2xl (bredere viewport = genoeg main) */}
+            <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 2xl:grid-cols-3 2xl:gap-6">
               {jobMatches.slice(0, 6).map((m) => (
                 <article
                   key={m.job.id}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="h-32 bg-gradient-to-br from-slate-200 via-slate-100 to-slate-50" />
-                  <div className="space-y-3 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm sm:text-base font-semibold text-slate-900 line-clamp-2">
+                  <JobListingCover
+                    job={{
+                      image_urls: m.job.image_urls,
+                      image_url: m.job.image_url,
+                      cover_image_url: m.job.cover_image_url,
+                      photo_url: m.job.photo_url,
+                      title: m.job.title,
+                      care_type: m.job.care_type,
+                    }}
+                    className="h-36 w-full shrink-0 border-b border-slate-200/80 sm:h-40 md:h-44 lg:h-[11rem] xl:h-44 2xl:h-48"
+                  />
+                  <div className="min-w-0 space-y-3 p-4 sm:p-5 sm:space-y-3.5 md:space-y-4 md:p-5 2xl:p-6">
+                    <div className="flex min-w-0 items-start justify-between gap-3 md:gap-4">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold text-slate-900 line-clamp-2 sm:text-base lg:text-lg lg:leading-snug">
                           {m.job.title}
                         </h3>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-slate-500 md:text-sm">
                           {m.job.city || "Amsterdam"}
                         </p>
                       </div>
-                      <Badge className="rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white">
+                      <Badge className="shrink-0 rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white md:px-3.5 md:py-1.5 md:text-sm">
                         Match {Math.round(m.score)}%
                       </Badge>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 md:gap-2.5">
                       {buildMatchTags(m).map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"
-                          className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 group-hover:bg-slate-200"
+                          className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 group-hover:bg-slate-200 md:px-3.5 md:text-xs"
                         >
                           {tag}
                         </Badge>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-800">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between md:gap-3">
+                      <p className="min-w-0 text-sm font-semibold text-slate-800 md:text-base">
                         {formatJobPrice(m.job)}
                       </p>
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 flex-wrap gap-2 md:gap-3">
                         <Link href={`/zorenta/jobs/${m.job.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-slate-200 bg-white text-xs text-slate-700"
+                            className="border-slate-200 bg-white text-xs text-slate-700 md:h-9 md:px-4 md:text-sm"
                           >
                             Bekijk
                           </Button>
                         </Link>
-                        <Link href={`/zorenta/jobs/${m.job.id}`}>
-                          <Button
+                        {m.job.poster_id ? (
+                          <StartMessageButton
+                            otherUserId={m.job.poster_id}
+                            jobId={m.job.id}
+                            prefill="Hoi, ik heb interesse in deze opdracht."
                             size="sm"
-                            className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a]"
-                          >
-                            Reageer
-                          </Button>
-                        </Link>
+                            variant="primary"
+                            label="Reageer"
+                            showIcon={false}
+                            className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a] md:h-9 md:px-4 md:text-sm"
+                          />
+                        ) : (
+                          <Link href={`/zorenta/jobs/${m.job.id}`}>
+                            <Button
+                              size="sm"
+                              className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a] md:h-9 md:px-4 md:text-sm"
+                            >
+                              Reageer
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="break-words text-xs text-slate-500 md:text-sm md:leading-relaxed">
                       {buildMatchExplanation(m)}
                     </p>
                   </div>
@@ -490,9 +521,9 @@ export default function ZorentaDashboardPage() {
           )}
 
           {/* Jobs in your region */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <div>
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+            <div className="mb-5 flex min-w-0 items-center justify-between gap-3 sm:mb-6">
+              <div className="min-w-0 flex-1">
                 <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
                   Opdrachten in jouw regio
                 </h2>
@@ -500,42 +531,77 @@ export default function ZorentaDashboardPage() {
                   Snel overzicht van interessante opdrachten dicht bij jou in de buurt.
                 </p>
               </div>
-              <Link href="/zorenta/search?type=jobs">
+              <Link href="/zorenta/search?type=jobs" className="shrink-0">
                 <Button variant="outline" className="border-slate-200 bg-white text-sm">
                   Meer in jouw regio
                 </Button>
               </Link>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {/* Zelfde breakpoint-logica als aanbevolen-opdrachten (2xl:3 i.p.v. xl:3 i.v.m. smalle main na sidebar) */}
+            <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 2xl:grid-cols-3 2xl:gap-6">
               {jobMatches.slice(0, 6).map((m) => (
                 <article
                   key={`${m.job.id}-region`}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="h-28 bg-gradient-to-tr from-slate-100 via-slate-50 to-slate-100" />
-                  <div className="space-y-3 p-4">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-slate-900 line-clamp-2">
+                  <JobListingCover
+                    job={{
+                      image_urls: m.job.image_urls,
+                      image_url: m.job.image_url,
+                      cover_image_url: m.job.cover_image_url,
+                      photo_url: m.job.photo_url,
+                      title: m.job.title,
+                      care_type: m.job.care_type,
+                    }}
+                    className="h-36 w-full shrink-0 border-b border-slate-200/80 sm:h-40 md:h-44 lg:h-[10.5rem] xl:h-44 2xl:h-48"
+                  />
+                  <div className="min-w-0 space-y-3 p-4 sm:p-5 sm:space-y-3.5 md:space-y-4 md:p-5 2xl:p-6">
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="text-sm font-semibold text-slate-900 line-clamp-2 md:text-base lg:text-lg lg:leading-snug">
                         {m.job.title}
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-500 md:text-sm">
                         {m.job.city || "Amsterdam"}
                       </p>
                     </div>
-                    <p className="text-sm font-medium text-slate-800">
+                    <p className="text-sm font-medium text-slate-800 md:text-base">
                       {formatJobPrice(m.job)}
                     </p>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-slate-500">Snelle reactie aanbevolen</span>
-                      <Link href={`/zorenta/jobs/${m.job.id}`}>
-                        <Button
-                          size="sm"
-                          className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a]"
-                        >
-                          Snel reageren
-                        </Button>
-                      </Link>
+                    <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between md:gap-3">
+                      <span className="min-w-0 text-[11px] text-slate-500 md:text-xs">Snelle reactie aanbevolen</span>
+                      <div className="flex shrink-0 flex-wrap gap-2 md:gap-3">
+                        <Link href={`/zorenta/jobs/${m.job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-200 bg-white text-xs text-slate-700 md:h-9 md:px-4 md:text-sm"
+                          >
+                            Bekijk
+                          </Button>
+                        </Link>
+                        {m.job.poster_id ? (
+                          <StartMessageButton
+                            otherUserId={m.job.poster_id}
+                            jobId={m.job.id}
+                            prefill="Hoi, ik heb interesse in deze opdracht."
+                            size="sm"
+                            variant="primary"
+                            label="Snel reageren"
+                            showIcon={false}
+                            className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a] md:h-9 md:px-4 md:text-sm"
+                          />
+                        ) : (
+                          <Link href={`/zorenta/jobs/${m.job.id}`}>
+                            <Button
+                              size="sm"
+                              className="bg-[#40ADA8] px-3 text-xs text-white hover:bg-[#369e9a] md:h-9 md:px-4 md:text-sm"
+                            >
+                              Snel reageren
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -545,9 +611,9 @@ export default function ZorentaDashboardPage() {
         </div>
 
         {/* Right column */}
-        <aside className="space-y-6">
-          {/* Recent activity panel */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <aside className="min-w-0 space-y-6 min-[1720px]:space-y-5">
+          {/* Standaard p-6; naast main iets compacter */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm min-[1720px]:p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Recente activiteit</h3>
               <Badge variant="secondary" className="rounded-full bg-slate-100 text-xs text-slate-700">
@@ -601,15 +667,15 @@ export default function ZorentaDashboardPage() {
           </section>
 
           {/* Profile progress */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm min-[1720px]:p-5">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-500">Profiel compleetheid</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-900">
                   {progressPct}% compleet
                 </p>
               </div>
-              <Badge className="rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white">
+              <Badge className="shrink-0 rounded-full bg-[#40ADA8] px-3 py-1 text-xs text-white">
                 {progressPct >= 80 ? "Goed bezig" : "Nog even bijwerken"}
               </Badge>
             </div>
@@ -627,7 +693,7 @@ export default function ZorentaDashboardPage() {
           </section>
 
           {/* AI Job Finder */}
-          <section className="relative overflow-hidden rounded-3xl border border-[#40ADA8]/25 bg-gradient-to-br from-[#40ADA8]/12 via-slate-50 to-white p-6 shadow-md">
+          <section className="relative overflow-hidden rounded-3xl border border-[#40ADA8]/25 bg-gradient-to-br from-[#40ADA8]/12 via-slate-50 to-white p-6 shadow-md min-[1720px]:p-5">
             <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#40ADA8]/15 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-12 right-4 h-28 w-28 rounded-full bg-[#40ADA8]/10 blur-2xl" />
             <div className="relative space-y-3">

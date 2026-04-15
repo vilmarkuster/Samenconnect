@@ -37,6 +37,16 @@ const STEPS = [
   { key: "summary", title: "Samenvatting" },
 ];
 
+/** Stepper row only — korte labels op klein scherm; desktop toont volledige titels. */
+const STEPPER_ROW_LABELS: { short: string; full: string }[] = [
+  { short: "Wie", full: "Voor wie" },
+  { short: "Type", full: "Type zorg" },
+  { short: "Freq.", full: "Frequentie" },
+  { short: "Budget", full: "Budget" },
+  { short: "Loc.", full: "Locatie" },
+  { short: "Overz.", full: "Samenvatting" },
+];
+
 const TARGET_GROUP_LABELS = TARGET_GROUP_OPTIONS.map((o) => o.label);
 
 const AGE_GROUPS = [
@@ -610,50 +620,56 @@ export default function IntakePage() {
         </div>
       )}
 
-      {/* Step indicator */}
+      {/* Step indicator — mobiel: compacte labels + vaste kolombreedte; desnoods horizontaal scrollen binnen deze kaart */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between text-sm">
-          <span className="font-medium text-slate-700">{currentStep.title}</span>
-          <span className="text-slate-500">
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-2 text-sm">
+          <span className="min-w-0 truncate font-medium text-slate-700">{currentStep.title}</span>
+          <span className="shrink-0 text-slate-500">
             Stap {step + 1} van {STEPS.length}
           </span>
         </div>
-        <ol className="flex items-center justify-between gap-3">
-          {["Voor wie", "Type zorg", "Frequentie", "Budget", "Locatie", "Samenvatting"].map(
-            (label, index) => {
+        <div className="min-w-0 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] md:overflow-visible md:pb-0">
+          <ol className="flex w-max max-w-none items-start gap-1.5 sm:gap-2 md:w-full md:max-w-full md:items-center md:justify-between md:gap-3">
+            {STEPPER_ROW_LABELS.map((row, index) => {
               const done = index < step;
               const active = index === step;
               return (
-                <li key={label} className="flex flex-1 flex-col items-center gap-1">
+                <li
+                  key={row.full}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`Stap ${index + 1}: ${row.full}`}
+                  className="flex w-[2.625rem] shrink-0 flex-col items-center gap-0.5 sm:w-12 md:w-auto md:min-w-0 md:flex-1 md:gap-1"
+                >
                   <div
                     className={[
-                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                      "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-colors md:h-7 md:w-7 md:text-xs",
                       done
                         ? "bg-[#40ada8] text-white"
                         : active
-                        ? "bg-[#40ada8]/10 text-[#40ada8] ring-2 ring-[#40ada8]/30"
-                        : "bg-slate-100 text-slate-500",
+                          ? "bg-[#40ada8]/10 text-[#40ada8] ring-2 ring-[#40ada8]/30"
+                          : "bg-slate-100 text-slate-500",
                     ].join(" ")}
                   >
                     {index + 1}
                   </div>
                   <p
                     className={[
-                      "text-[11px] text-center",
+                      "max-w-full text-center text-[9px] leading-tight sm:text-[10px] md:text-[11px]",
                       active
                         ? "font-medium text-slate-900"
                         : done
-                        ? "text-slate-600"
-                        : "text-slate-500",
+                          ? "text-slate-600"
+                          : "text-slate-500",
                     ].join(" ")}
                   >
-                    {label}
+                    <span className="md:hidden">{row.short}</span>
+                    <span className="hidden md:inline">{row.full}</span>
                   </p>
                 </li>
               );
-            }
-          )}
-        </ol>
+            })}
+          </ol>
+        </div>
       </div>
 
       <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">

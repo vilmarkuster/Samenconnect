@@ -37,6 +37,8 @@ import { primaryCareLabelFromTaxonomy } from "@/lib/zorenta/intake-taxonomy";
 import { formatJobPrice } from "@/lib/zorenta/job-price";
 import { cn } from "@/lib/utils";
 import { CaregiverApplicationThreadButton } from "@/components/zorenta/caregiver-application-thread-button";
+import { buildAiMatchFirstMessage } from "@/lib/zorenta/ai-match-intro-message";
+import { hasRenderablePublicCaregiverPagePayload } from "@/lib/zorenta/public-caregiver-page";
 
 type CaregiverMatch = {
   caregiver: {
@@ -52,6 +54,15 @@ type CaregiverMatch = {
   summary: string;
   /** AI Match Agent `recommendation` field; used for message prefill only. */
   aiRecommendation?: string;
+  /** AI: hoofdreden (zonder concerns); voor gescheiden weergave op de kaart. */
+  aiMainReason?: string;
+  /** AI: aandachtspunten uit het model. */
+  aiConcerns?: string[];
+  /**
+   * Na hydrate: zelfde criterium als `/zorenta/caregivers/[id]` (resolveCaregiverPagePayload op API-body).
+   * Organisatie/marktplek-200 met alleen kaart-body telt niet als publiek profiel.
+   */
+  hasPublicProfile?: boolean;
 };
 
 type MatchAgentItem = {
@@ -102,66 +113,6 @@ type HeroFallbackTheme = {
   chip: string;
   headline: string;
 };
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizeJobTitleForMessage(jobTitle?: string, location?: string): string | null {
-  const rawTitle = jobTitle?.trim();
-  if (!rawTitle) return null;
-
-  let normalized = rawTitle.toLocaleLowerCase("nl-NL");
-  normalized = normalized
-    .replace(/[|,/]+/g, " ")
-    .replace(/\b(gezocht|vacature|opdracht)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const cleanLocation = location?.trim();
-  if (cleanLocation) {
-    const locationPattern = new RegExp(`\\b${escapeRegExp(cleanLocation.toLocaleLowerCase("nl-NL"))}\\b`, "g");
-    normalized = normalized.replace(locationPattern, " ").replace(/\s+/g, " ").trim();
-  }
-
-  if (!normalized) return null;
-
-  const invalidTokens = new Set(["te", "in", "de", "het", "een", "en", "of", "-", "—"]);
-  const tokens = normalized.split(/\s+/).filter(Boolean);
-  const meaningful = tokens.filter((t) => !invalidTokens.has(t));
-  if (meaningful.length === 0) return null;
-  if (normalized.length < 3) return null;
-
-  return normalized;
-}
-
-function buildAutoMessage(
-  name: string,
-  jobTitle?: string,
-  location?: string
-): string {
-  const cleanName = name.trim().split(" ")[0] || "zorgverlener";
-  const cleanTitle = normalizeJobTitleForMessage(jobTitle, location);
-  const cleanLocation = location?.trim();
-
-  return [
-    `Hoi ${cleanName},`,
-    "",
-    "Ik zag je profiel en dacht meteen aan deze opdracht.",
-    "",
-    cleanTitle
-      ? `Het gaat om een opdracht als ${cleanTitle}${cleanLocation ? ` in ${cleanLocation}` : ""}.`
-      : "",
-    "",
-    cleanLocation
-      ? `Is reizen naar ${cleanLocation} voor jou te doen?`
-      : "",
-    "",
-    "Lijkt dit je interessant?",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
 
 /** ~5% tolerance: classify as square when nearly equal sides */
 function classifyHeroOrientation(naturalWidth: number, naturalHeight: number): HeroOrientation {
@@ -317,11 +268,6 @@ export default function JobDetailPage() {
               ? m.recommendation.trim()
               : "";
 
-          const headline =
-            recommendation ||
-            (reason && concerns.length === 0 ? reason : "") ||
-            undefined;
-
           const allReasons: string[] = [];
           if (reason) allReasons.push(reason);
           allReasons.push(...concerns);
@@ -331,12 +277,14 @@ export default function JobDetailPage() {
               id: caregiverId || name,
               profile_id: caregiverId || name,
               display_name: name,
-              headline: headline ?? null,
+              headline: null,
             },
             score: fitScore,
             reasons: allReasons,
             summary: recommendation || reason || "",
             aiRecommendation: recommendation || undefined,
+            aiMainReason: reason || undefined,
+            aiConcerns: concerns.length > 0 ? concerns : undefined,
           };
         })
         .filter((m) => m.caregiver.id && Number.isFinite(m.score));
@@ -351,22 +299,58 @@ export default function JobDetailPage() {
     const hydrated = await Promise.all(
       matches.map(async (m) => {
         const routeId = m.caregiver.id?.trim();
-        if (!routeId) return m;
+        if (!routeId) {
+          return { ...m, hasPublicProfile: false };
+        }
         try {
           const res = await fetch(`/api/zorenta/caregivers/${encodeURIComponent(routeId)}`, { headers });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) return m;
-          const avatar = typeof data?.profile?.avatar_url === "string" ? data.profile.avatar_url : null;
-          if (!avatar) return m;
+          if (!res.ok) {
+            return {
+              ...m,
+              hasPublicProfile: false,
+            };
+          }
+          const linkedProfileId =
+            typeof data?.profile?.id === "string" && data.profile.id.trim().length > 0
+              ? data.profile.id.trim()
+              : null;
+          const avatar =
+            typeof data?.profile?.avatar_url === "string" ? data.profile.avatar_url : null;
+          const payload = data as Record<string, unknown>;
+          const publicPageRenderable = hasRenderablePublicCaregiverPagePayload(payload);
+          if (!linkedProfileId) {
+            return {
+              ...m,
+              hasPublicProfile: false,
+              caregiver: {
+                ...m.caregiver,
+                ...(avatar ? { avatar_url: avatar } : {}),
+              },
+            };
+          }
+          if (!publicPageRenderable) {
+            return {
+              ...m,
+              hasPublicProfile: false,
+              caregiver: {
+                ...m.caregiver,
+                profile_id: linkedProfileId,
+                ...(avatar ? { avatar_url: avatar } : {}),
+              },
+            };
+          }
           return {
             ...m,
+            hasPublicProfile: true,
             caregiver: {
               ...m.caregiver,
-              avatar_url: avatar,
+              profile_id: linkedProfileId,
+              ...(avatar ? { avatar_url: avatar } : {}),
             },
           };
         } catch {
-          return m;
+          return { ...m, hasPublicProfile: false };
         }
       })
     );
@@ -418,14 +402,28 @@ export default function JobDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!id || !MATCH_AGENT_ID) return;
+    if (!id || !MATCH_AGENT_ID || !job || !me?.profile) return;
+    const isPosterForJob = me.profile.id === job.poster_id;
+    if (!isPosterForJob) {
+      setAiMatches([]);
+      setAiMatchesError(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadLatestMatches() {
       setAiMatchesLoading(true);
       setAiMatchesError(null);
       try {
-        const res = await fetch(`/api/agent-match-results?jobId=${encodeURIComponent(id)}`);
+        const token = await getZorentaAccessToken();
+        if (!token) {
+          if (!cancelled) setAiMatchesLoading(false);
+          return;
+        }
+        const res = await fetch(`/api/agent-match-results?jobId=${encodeURIComponent(id)}`, {
+          headers: zorentaHeaders(token),
+        });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           if (!cancelled) {
@@ -442,7 +440,6 @@ export default function JobDetailPage() {
           const parsed = parseMatchAgentOutput(
             typeof data?.output === "string" ? data.output : null
           ).slice(0, 3);
-          const token = await getZorentaAccessToken();
           const matches = await hydrateAiMatchAvatars(parsed, token);
           if (cancelled) return;
           setAiMatches(matches);
@@ -463,7 +460,7 @@ export default function JobDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, MATCH_AGENT_ID]);
+  }, [id, MATCH_AGENT_ID, job?.id, job?.poster_id, me?.profile?.id]);
 
   useEffect(() => {
     setHeroImgFailed(false);
@@ -580,14 +577,17 @@ export default function JobDetailPage() {
 
   async function handleRunMatchAgent() {
     if (!id || !MATCH_AGENT_ID) return;
+    const token = await getZorentaAccessToken();
+    if (!token) {
+      setAiMatchesError("Je bent niet ingelogd. Vernieuw de pagina en probeer opnieuw.");
+      return;
+    }
     setAiMatchesLoading(true);
     setAiMatchesError(null);
     try {
       const res = await fetch("/api/agents/run", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: zorentaHeaders(token),
         body: JSON.stringify({
           agentId: MATCH_AGENT_ID,
           jobId: id,
@@ -609,7 +609,6 @@ export default function JobDetailPage() {
             ? data.result
             : null;
       const matches = parseMatchAgentOutput(output).slice(0, 3);
-      const token = await getZorentaAccessToken();
       const hydrated = await hydrateAiMatchAvatars(matches, token);
       setAiMatches(hydrated);
       setSelectedAiProfileIds(new Set());
@@ -660,11 +659,16 @@ export default function JobDetailPage() {
 
       for (const m of ordered) {
         const label = m.caregiver.display_name?.trim() || "Zorgverlener";
-        const prefill = buildAutoMessage(
-          m.caregiver.display_name ?? "Zorgverlener",
-          job?.title ?? undefined,
-          job?.city ?? job?.region ?? undefined
-        );
+        const prefill = buildAiMatchFirstMessage({
+          caregiverDisplayName: m.caregiver.display_name ?? "Zorgverlener",
+          jobTitle: job?.title ?? null,
+          jobLocation: job?.city?.trim() || job?.region?.trim() || null,
+          match: {
+            reasons: m.reasons,
+            aiMainReason: m.aiMainReason,
+            aiConcerns: m.aiConcerns,
+          },
+        });
 
         const convResult = await createZorentaConversation(token, {
           otherUserId: m.caregiver.profile_id,
@@ -1399,11 +1403,17 @@ export default function JobDetailPage() {
                   match={m}
                   rank={index + 1}
                   jobId={id}
-                  messagePrefill={buildAutoMessage(
-                    m.caregiver.display_name ?? "Zorgverlener",
-                    job?.title ?? undefined,
-                    job?.city ?? job?.region ?? undefined
-                  )}
+                  presentationMode="ai"
+                  messagePrefill={buildAiMatchFirstMessage({
+                    caregiverDisplayName: m.caregiver.display_name ?? "Zorgverlener",
+                    jobTitle: job?.title ?? null,
+                    jobLocation: job?.city?.trim() || job?.region?.trim() || null,
+                    match: {
+                      reasons: m.reasons,
+                      aiMainReason: m.aiMainReason,
+                      aiConcerns: m.aiConcerns,
+                    },
+                  })}
                   selectionMode
                   selected={selectedAiProfileIds.has(m.caregiver.profile_id)}
                   onSelectionChange={(checked) => toggleAiProfileSelected(m.caregiver.profile_id, checked)}

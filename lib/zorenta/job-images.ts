@@ -22,6 +22,51 @@ export function getFirstJobImageUrl(value: unknown): string | null {
   return urls[0] ?? null;
 }
 
+/** Minimale job-velden voor kaart/cover — uit API’s met uiteenlopende namen. */
+export type JobCardImageSource = {
+  image_urls?: unknown;
+  image_url?: unknown;
+  cover_image_url?: unknown;
+  cover_image?: unknown;
+  photo_url?: unknown;
+  photo?: unknown;
+  title?: string | null;
+  care_type?: string | null;
+};
+
+function firstLegacyImageUrl(job: JobCardImageSource): string | null {
+  const candidates = [
+    job.image_url,
+    job.cover_image_url,
+    job.cover_image,
+    job.photo_url,
+    job.photo,
+  ];
+  for (const c of candidates) {
+    if (typeof c !== "string") continue;
+    const t = c.trim();
+    if (!t) continue;
+    if (/^https?:\/\//i.test(t) || t.startsWith("/")) return t;
+  }
+  return null;
+}
+
+/**
+ * Eén plek voor dashboard- en lijstkaarten: eerste geldige URL uit bekende velden.
+ * Gebruikt `image_urls` (array) eerst, daarna losse string-velden.
+ */
+export function resolveJobCardImage(job: JobCardImageSource): {
+  src: string | null;
+  alt: string;
+  hasImage: boolean;
+} {
+  const fromUrls = getFirstJobImageUrl(job.image_urls);
+  const src = fromUrls ?? firstLegacyImageUrl(job);
+  const title = typeof job.title === "string" ? job.title.trim() : "";
+  const alt = title ? `Opdracht: ${title}` : "Opdrachtafbeelding";
+  return { src, alt, hasImage: Boolean(src) };
+}
+
 export function isAllowedJobImageMime(mime: string): boolean {
   return ALLOWED_MIME.has(mime.toLowerCase());
 }

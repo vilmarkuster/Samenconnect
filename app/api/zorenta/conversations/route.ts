@@ -73,9 +73,10 @@ export async function GET(req: NextRequest) {
   const profileMap = Object.fromEntries(profileRows.map((p) => [p.id, p]));
 
   /**
-   * Profile navigation for `/zorenta/caregivers/[id]`:
-   * - If `caregiver_profiles` exists for this participant, use `profiles.id` (not marketplace id).
-   * - Else use `public.caregivers.id` when present and not a blocked seed id.
+   * Profile navigation for `/zorenta/caregivers/[id]` (aligned with hasRenderablePublicCaregiverPagePayload):
+   * - If `caregiver_profiles` exists → URL uses `profiles.id`; page renders.
+   * - Else only a marketplace listing → no public profile page (org/kaart-API ≠ renderbare caregiver-pagina).
+   *   `caregiver_route_id` may still be set for debugging; links use `has_renderable_caregiver_profile`.
    */
   const marketplaceByProfile =
     ids.length > 0 ? await latestMarketplaceCaregiverIdByProfileId(supabase, ids) : new Map<string, string>();
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
       return {
         caregiver_route_id: mp,
         caregiver_route_source: "marketplace",
-        has_renderable_caregiver_profile: true,
+        has_renderable_caregiver_profile: false,
       };
     }
     /**
@@ -189,6 +190,20 @@ export async function POST(req: NextRequest) {
       .single();
     if (error) return jsonResponse({ error: error.message }, 500);
     return jsonResponse({ id: data.id, created: true }, 201);
+  }
+
+  // Same job + same pair (e.g. dashboard "Reageer", or thread na sollicitatie): één draad per opdracht.
+  if (jobId) {
+    const { data: forJobPair } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("participant_1", p1)
+      .eq("participant_2", p2)
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (forJobPair?.id) {
+      return jsonResponse({ id: forJobPair.id, created: false }, 200);
+    }
   }
 
   // Legacy: no application_id — at most one conversation per pair without application link.

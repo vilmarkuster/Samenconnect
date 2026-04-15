@@ -16,6 +16,10 @@ type StartMessageButtonProps = {
   size?: "sm" | "md" | "lg";
   variant?: "primary" | "outline" | "ghost";
   label?: string;
+  /** Default true; zet op false voor compacte CTA’s (bijv. dashboardkaarten). */
+  showIcon?: boolean;
+  /** Extra classes op de Button (bijv. dashboard `md:h-9`). */
+  className?: string;
 };
 
 export function StartMessageButton({
@@ -25,6 +29,8 @@ export function StartMessageButton({
   size = "md",
   variant = "primary",
   label = "Stuur bericht",
+  showIcon = true,
+  className,
 }: StartMessageButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +78,12 @@ export function StartMessageButton({
         onClick={handleClick}
         disabled={loading}
         className={cn(
-          "gap-1.5",
-          variant === "primary" && "bg-[#40ADA8] text-white hover:bg-[#369e9a]"
+          showIcon && "gap-1.5",
+          variant === "primary" && "bg-[#40ADA8] text-white hover:bg-[#369e9a]",
+          className
         )}
       >
-        <MessageSquare className="h-4 w-4" />
+        {showIcon ? <MessageSquare className="h-4 w-4" /> : null}
         {loading ? "Bezig…" : label}
       </Button>
       {error && (

@@ -1,8 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  getPlatformSupabaseServerClient,
-  getPlatformUserOrNull,
-} from "@/lib/platform-supabase-server";
+import { getSupabaseForAgentsApi } from "@/lib/agents-api-supabase";
 
 type AgentRow = {
   id: string;
@@ -17,14 +14,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getPlatformUserOrNull(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
     const { id } = await params;
     if (!id?.trim()) {
       return new Response(JSON.stringify({ error: "Agent not found." }), { status: 404 });
     }
 
-    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase.from("agents").select("*").eq("id", id).single();
 
     if (error) {
@@ -60,7 +59,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getPlatformUserOrNull(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized." }), { status: 401 });
     const { id } = await params;
     if (!id?.trim()) {
@@ -97,7 +99,6 @@ export async function PATCH(
       return new Response(JSON.stringify({ error: "No fields to update." }), { status: 400 });
     }
 
-    const supabase = getPlatformSupabaseServerClient(req);
     const { data, error } = await supabase
       .from("agents")
       .update(updates)

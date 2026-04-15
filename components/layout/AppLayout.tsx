@@ -26,7 +26,7 @@ export function AppLayout({
   isAdmin,
 }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 md:min-h-0">
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
         <Sidebar onLogout={onLogout} isAdmin={isAdmin} />
       </aside>
@@ -57,7 +57,7 @@ export function AppLayout({
             isAdmin={isAdmin}
           />
         </header>
-        <main className="flex-1 overflow-auto p-8">
+        <main className="min-h-0 min-w-0 w-full flex-1 overflow-auto px-4 py-6 sm:px-6 md:flex-none md:px-8 md:py-8">
           {children}
         </main>
       </div>

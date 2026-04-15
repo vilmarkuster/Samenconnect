@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getPlatformSupabaseServerClient } from "@/lib/platform-supabase-server";
+import { getSupabaseForAgentsApi } from "@/lib/agents-api-supabase";
 
 const JSON_HEADERS = { "content-type": "application/json" } as const;
 
@@ -17,7 +17,27 @@ export async function GET(req: NextRequest) {
       return json({ error: "Missing required query parameter 'jobId'." }, 400);
     }
 
-    const supabase = getPlatformSupabaseServerClient(req);
+    const supabase = getSupabaseForAgentsApi(req);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return json({ error: "Unauthorized." }, 401);
+    }
+
+    const { data: job, error: jobError } = await supabase
+      .from("care_jobs")
+      .select("id, poster_id")
+      .eq("id", jobId)
+      .single();
+
+    if (jobError || !job) {
+      return json({ error: "Job not found." }, 404);
+    }
+    if (job.poster_id !== user.id) {
+      return json({ error: "Forbidden." }, 403);
+    }
 
     const { data, error } = await supabase
       .from("agent_match_results")
@@ -28,7 +48,6 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error("[agent-match-results] Supabase error:", error.message, error);
       return json(
         {
@@ -62,7 +81,6 @@ export async function GET(req: NextRequest) {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    // eslint-disable-next-line no-console
     console.error("[agent-match-results] Unexpected error:", message, e);
     return json(
       {

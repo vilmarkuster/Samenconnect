@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   const { data: jobs } = await supabase
     .from("care_jobs")
     .select(
-      "id, title, description, city, region, country, care_type, care_context, financiering_regeling, soort_hulp_zorg, zorgniveau, type_inzet, vaardigheden_ervaring, role_sought, experience_requirements, certificates_requirements, schedule, availability, budget_min, budget_max, hourly_rate, status, created_at, image_urls"
+      "id, title, description, city, region, country, care_type, care_context, financiering_regeling, soort_hulp_zorg, zorgniveau, type_inzet, vaardigheden_ervaring, role_sought, experience_requirements, certificates_requirements, schedule, availability, budget_min, budget_max, hourly_rate, status, created_at, image_urls, poster_id"
     )
     .eq("status", "open")
     .order("created_at", { ascending: false })
@@ -88,6 +88,7 @@ export async function GET(req: NextRequest) {
         budget_max: job.budget_max,
         hourly_rate: job.hourly_rate,
         status: job.status,
+        poster_id: (job as { poster_id?: string }).poster_id ?? null,
         image_urls: (job as { image_urls?: string[] | null }).image_urls ?? null,
       },
       score: result.score,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
@@ -22,6 +22,22 @@ import {
   showIncomingMessageBrowserNotification,
 } from "@/lib/zorenta/browser-notifications";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+
+/** `<768px` — aligned with Tailwind `md` breakpoint. */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia(query);
+    const apply = () => setMatches(mql.matches);
+    apply();
+    mql.addEventListener("change", apply);
+    return () => mql.removeEventListener("change", apply);
+  }, [query]);
+  return matches;
+}
 
 /** Compare conversation / profile ids from URL, Realtime, or API without casing mismatches. */
 function idsEqual(a: string | null, b: string | null | undefined): boolean {
@@ -222,6 +238,19 @@ function formatListTime(iso: string | null | undefined) {
     d.getFullYear() === now.getFullYear();
   if (sameDay) return formatMessageTime(iso);
   return d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+/** Gespreklijst: relatief voor recente activiteit zodat labels kunnen verouderen (tick in inbox). */
+function formatConversationListTime(iso: string | null | undefined) {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const ageMs = Date.now() - t;
+  if (ageMs < 0) return formatListTime(iso);
+  if (ageMs < 60 * 1000) return "Zojuist";
+  if (ageMs < 60 * 60 * 1000) return `${Math.max(1, Math.floor(ageMs / 60000))} min geleden`;
+  if (ageMs < 24 * 60 * 60 * 1000) return `${Math.floor(ageMs / 3600000)} u geleden`;
+  return formatListTime(iso);
 }
 
 /** Client-only relative time (presence “last seen” or conversation activity). */
@@ -471,6 +500,26 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const conversationsLoadRequestIdRef = useRef(0);
   const [composerBody, setComposerBody] = useState("");
   const [sending, setSending] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const prevUrlConversationRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isMobile) return;
+    const prev = prevUrlConversationRef.current;
+    prevUrlConversationRef.current = urlConversationId;
+    if (urlConversationId && urlConversationId !== prev) {
+      setMobileView("chat");
+    } else if (!urlConversationId && prev) {
+      setMobileView("list");
+    }
+  }, [isMobile, urlConversationId]);
+  /** Periodieke re-render voor relatieve tijden (lijst + header). */
+  const [listTimeTick, setListTimeTick] = useState(0);
+  /** Subtiele highlight op het net verstuurde eigen bericht. */
+  const [recentlySentMessageId, setRecentlySentMessageId] = useState<string | null>(null);
+  /** Browser timer id (avoids NodeJS.Timeout vs number under @types/node). */
+  const recentlySentClearRef = useRef<number | null>(null);
 
   /** Rows that briefly highlight when another conversation gets new activity (client-side only). */
   const [flashConversationIds, setFlashConversationIds] = useState<string[]>([]);
@@ -525,6 +574,13 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
 
   const prefillParam = searchParams.get("prefill");
 
+  // Na `router.replace` zonder prefill: reset zodat een volgende navigatie met prefill weer mag vullen.
+  useEffect(() => {
+    if (!prefillParam) {
+      prefillAppliedKeyRef.current = null;
+    }
+  }, [prefillParam]);
+
   // Remember which thread the URL prefill targets (survives after `prefill` is stripped from URL).
   useEffect(() => {
     if (prefillParam && urlConversationId) {
@@ -540,6 +596,18 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     prefillAppliedKeyRef.current = key;
     setComposerBody(prefillParam);
   }, [prefillParam, selectedId, urlConversationId]);
+
+  // Timing na navigatie: zelfde key-gate als hierboven — nooit opnieuw vullen na versturen/leegmaken
+  // zolang `prefill` nog 1 frame in de URL staat vóór replace.
+  useEffect(() => {
+    if (!prefillParam || !selectedId || !urlConversationId || selectedId !== urlConversationId) return;
+    if (loadingMessages) return;
+    const key = `${selectedId}|${prefillParam}`;
+    if (prefillAppliedKeyRef.current === key) return;
+    if (composerBody.trim().length > 0) return;
+    prefillAppliedKeyRef.current = key;
+    setComposerBody(prefillParam);
+  }, [loadingMessages, prefillParam, selectedId, urlConversationId, composerBody]);
 
   // Leave prefill thread (or after prefill removed from URL) → clear composer; normal inbox unchanged when no scope
   useEffect(() => {
@@ -603,6 +671,22 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     if (!token) return;
     loadConversations(token);
   }, [token, loadConversations]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setListTimeTick((n) => n + 1);
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recentlySentClearRef.current) {
+        window.clearTimeout(recentlySentClearRef.current);
+        recentlySentClearRef.current = null;
+      }
+    };
+  }, []);
 
   // Brief highlight on rows whose preview/time/unread changed (not the open thread) — pure UX, no API/realtime changes.
   useEffect(() => {
@@ -722,22 +806,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     void (async () => {
       const {
         data: { session },
-        error: sessionError,
       } = await supabase.auth.getSession();
       if (cancelled) return;
 
-      // eslint-disable-next-line no-console -- temporary Realtime debug
-      console.log("[zorenta-realtime] subscribe preflight", {
-        hasSession: !!session,
-        userId: session?.user?.id ?? null,
-        sessionError: sessionError?.message ?? null,
-      });
-
       if (!session?.user) {
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.warn(
-          "[zorenta-realtime] skipping subscribe — no Supabase auth session (postgres_changes INSERT will not be delivered)"
-        );
         return;
       }
 
@@ -750,19 +822,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       }) => {
         const t = tokenRef.current;
         const loadFn = loadConversationsRef.current;
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] INSERT payload received", {
-          eventType: payload.eventType,
-          schema: payload.schema,
-          table: payload.table,
-          commit_timestamp: payload.commit_timestamp,
-          new: payload.new,
-        });
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] INSERT context", {
-          selectedIdRef: selectedIdRef.current,
-          tokenPresent: Boolean(t),
-        });
 
         const row = payload.new as {
           id?: string;
@@ -775,8 +834,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         };
         if (!row?.id || !row.conversation_id) return;
         if (!t || !loadFn) {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.warn("[zorenta-realtime] INSERT skipped — missing token or loadConversations ref");
           return;
         }
 
@@ -794,13 +851,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         const senderId = String(row.sender_id ?? "");
         const me = meIdRef.current;
         const incomingFromOther = Boolean(me && senderId && !idsEqual(me, senderId));
-
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] INSERT thread routing", {
-          currentSelectedId,
-          insertConversationId: convId,
-          matchedOpenThread,
-        });
 
         if (incomingFromOther) {
           const dupInOpenThread =
@@ -827,17 +877,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         }
 
         if (!matchedOpenThread) {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] INSERT outcome", {
-            appendedToThread: false,
-            loadConversationsSilent: true,
-            onlyConversationsListRefreshed: true,
-          });
           void loadFn(t, { silent: true });
           return;
         }
 
-        let appendedToThread = false;
         setMessages((prev) => {
           if (!idsEqual(selectedIdRef.current, convId)) {
             return prev;
@@ -845,62 +888,38 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
           if (prev.some((m) => m.id === msg.id)) {
             return prev;
           }
-          appendedToThread = true;
+          const optIdx = prev.findIndex(
+            (m) =>
+              m.id.startsWith("optimistic:") &&
+              me != null &&
+              idsEqual(String(m.sender_id), senderId) &&
+              m.body === msg.body
+          );
+          if (optIdx !== -1) {
+            const next = [...prev];
+            next[optIdx] = msg;
+            return sortMessagesByCreatedAtAsc(next);
+          }
           return sortMessagesByCreatedAtAsc([...prev, msg]);
         });
 
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] INSERT outcome", {
-          appendedToThread,
-          loadConversationsSilent: false,
-          onlyConversationsListRefreshed: false,
-        });
-
         if (incomingFromOther) {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] INSERT GET /messages refetch triggered", {
-            conversation_id: convId,
-          });
           void fetchMessagesForThreadView(t, convId)
             .then((threadResult) => {
               if (!threadResult.ok) {
-                // eslint-disable-next-line no-console -- temporary Realtime debug
-                console.log("[zorenta-realtime] INSERT GET /messages failed", threadResult.error);
                 return;
               }
               if (!idsEqual(selectedIdRef.current, convId)) {
-                // eslint-disable-next-line no-console -- temporary Realtime debug
-                console.log("[zorenta-realtime] INSERT GET skip replace (thread changed)", {
-                  expected: convId,
-                  current: selectedIdRef.current,
-                });
                 return;
               }
-              // eslint-disable-next-line no-console -- temporary Realtime debug
-              console.log("[zorenta-realtime] INSERT GET OK → replace with canonical messages", {
-                count: threadResult.messages.length,
-              });
               setMessages(threadResult.messages);
               setMessagesError(null);
               const t2 = tokenRef.current;
               const load2 = loadConversationsRef.current;
-              // eslint-disable-next-line no-console -- temporary Realtime debug
-              console.log("[zorenta-realtime] INSERT loadConversations(silent) after GET /messages OK", {
-                ran: Boolean(t2 && load2),
-              });
               if (t2 && load2) void load2(t2, { silent: true });
             })
-            .catch((e) => {
-              // eslint-disable-next-line no-console -- temporary Realtime debug
-              console.log("[zorenta-realtime] INSERT GET error", e);
-            });
+            .catch(() => {});
         } else {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] INSERT no GET refetch", {
-            reason: me ? "own_message" : "meId_not_ready",
-          });
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] INSERT loadConversations(silent) after own message", true);
           void loadFn(t, { silent: true });
         }
       };
@@ -920,27 +939,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         const idStr = String(row.id);
         const matchedOpen = idsEqual(openThreadId, String(row.conversation_id));
 
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] UPDATE received", {
-          id: idStr,
-          conversation_id: row.conversation_id,
-          delivered_at: row.delivered_at,
-          read_at: row.read_at,
-          matchedOpenThread: matchedOpen,
-        });
-
         if (matchedOpen) {
           setMessages((prev) =>
             prev.map((m) => (m.id === idStr ? patchMessageFromRealtimeRow(m, row) : m))
           );
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] UPDATE patched message in open thread", idStr);
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] UPDATE loadConversations(silent) after open-thread patch", true);
           void loadFn(t, { silent: true });
         } else {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.log("[zorenta-realtime] UPDATE loadConversations(silent) triggered", true);
           void loadFn(t, { silent: true });
         }
       };
@@ -961,14 +965,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       if (cancelled) return;
 
       channel.subscribe((status, err) => {
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] channel subscribe status", {
-          status,
-          error: err?.message ?? null,
-        });
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // eslint-disable-next-line no-console -- temporary Realtime debug
-          console.warn("[zorenta-realtime] channel problem — INSERT events may be missing", status, err);
+        if (
+          process.env.NODE_ENV === "development" &&
+          (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+        ) {
+          // eslint-disable-next-line no-console -- dev-only Realtime diagnostics
+          console.warn("[zorenta-inbox] Realtime messages channel", status, err?.message ?? "");
         }
       });
 
@@ -985,8 +987,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       channelRef.current = null;
       if (ch) {
         void supabase.removeChannel(ch);
-        // eslint-disable-next-line no-console -- temporary Realtime debug
-        console.log("[zorenta-realtime] channel teardown (inbox unmount or token change)");
       }
     };
   }, [token]);
@@ -1245,9 +1245,15 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     tryRequestNotificationPermissionOnUserGesture();
     setSelectedId(id);
     onUrlConversationChange(id);
+    if (isMobile) setMobileView("chat");
+  }
+
+  function handleMobileChatBack() {
+    setMobileView("list");
   }
 
   function handleClearSelectionMobile() {
+    setMobileView("list");
     setSelectedId(null);
     onUrlConversationChange(null);
   }
@@ -1287,52 +1293,108 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     if (!token || !selectedId || !composerBody.trim() || sending) return;
     tryRequestNotificationPermissionOnUserGesture();
     const text = composerBody.trim();
+    const convId = selectedId;
+    const optimisticId = `optimistic:${crypto.randomUUID()}`;
+    const nowIso = new Date().toISOString();
+    const canOptimistic = Boolean(meId);
+
+    sendTypingStopBroadcast();
     setSending(true);
+    if (canOptimistic) {
+      setComposerBody("");
+      setMessages((prev) =>
+        sortMessagesByCreatedAtAsc([
+          ...prev,
+          {
+            id: optimisticId,
+            sender_id: meId!,
+            body: text,
+            created_at: nowIso,
+            delivered_at: null,
+            read_at: null,
+          },
+        ])
+      );
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === convId
+            ? {
+                ...c,
+                updated_at: nowIso,
+                last_message: { body: text, created_at: nowIso },
+                unread_count: 0,
+              }
+            : c
+        );
+        return sortConversationsByLatest(next);
+      });
+    }
+
     const res = await fetch("/api/zorenta/messages", {
       method: "POST",
       headers: zorentaHeaders(token),
-      body: JSON.stringify({ conversation_id: selectedId, body: text }),
+      body: JSON.stringify({ conversation_id: convId, body: text }),
     });
     const data = await res.json().catch(() => ({}));
     setSending(false);
+
     if (res.ok && data?.id) {
-      sendTypingStopBroadcast();
-      trackZorentaEvent("message_sent", { conversation_id: selectedId });
+      trackZorentaEvent("message_sent", { conversation_id: convId });
       const createdAt =
         typeof data?.created_at === "string"
           ? data.created_at
           : new Date().toISOString();
+      const serverMsg = data as ApiMessage;
 
-      // Optimistic reorder: update the conversation immediately so it moves to
-      // the top before the next GET /api/zorenta/conversations returns.
+      setMessages((prev) => {
+        const withoutOpt = canOptimistic
+          ? prev.filter((m) => m.id !== optimisticId)
+          : prev;
+        if (withoutOpt.some((m) => m.id === serverMsg.id)) {
+          return sortMessagesByCreatedAtAsc(withoutOpt);
+        }
+        return sortMessagesByCreatedAtAsc([...withoutOpt, serverMsg]);
+      });
+
       setConversations((prev) => {
         const next = prev.map((c) =>
-          c.id === selectedId
+          c.id === convId
             ? {
                 ...c,
                 updated_at: createdAt,
                 last_message: { body: text, created_at: createdAt },
+                unread_count: 0,
               }
             : c
         );
         return sortConversationsByLatest(next);
       });
 
-      setMessages((prev) =>
-        sortMessagesByCreatedAtAsc([...prev, data as ApiMessage])
-      );
-      setComposerBody("");
+      if (!canOptimistic) {
+        setComposerBody("");
+      }
       setFakeTypingAfterSend(true);
-      loadConversations(token);
+      if (recentlySentClearRef.current) {
+        window.clearTimeout(recentlySentClearRef.current);
+      }
+      setRecentlySentMessageId(String(serverMsg.id));
+      recentlySentClearRef.current = window.setTimeout(() => {
+        setRecentlySentMessageId(null);
+        recentlySentClearRef.current = null;
+      }, 750) as unknown as number;
+
+      void loadConversations(token, { silent: true });
 
       if (searchParams.has("prefill")) {
-        prefillConversationScopeRef.current = null;
-        prefillAppliedKeyRef.current = null;
         router.replace(
-          `/zorenta/berichten?conversation=${encodeURIComponent(selectedId)}`,
+          `/zorenta/berichten?conversation=${encodeURIComponent(convId)}`,
           { scroll: false }
         );
       }
+    } else if (canOptimistic) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setComposerBody(text);
+      void loadConversations(token, { silent: true });
     }
   }
 
@@ -1390,24 +1452,58 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     );
   }
 
+  const showListPanel = !isMobile || mobileView === "list";
+  const showThreadPanel = !isMobile || mobileView === "chat";
+
+  /**
+   * Mobiel + actieve chat: vaste hoogte binnen AppLayout (topbar h-16 + main p-8) zodat alleen
+   * het berichtenpaneel scrollt — niet de hele /zorenta main.
+   */
+  const mobileChatViewportLock =
+    isMobile && mobileView === "chat"
+      ? "flex h-[calc(100dvh-8rem)] max-h-[calc(100dvh-8rem)] min-h-0 w-full flex-col overflow-hidden"
+      : "";
+
   return (
-    <PageContainer maxWidth="default" className="space-y-6">
-      <ZorentaPageHeader
-        title="Berichten"
-        description="Bekijk en beheer je gesprekken met zorgverleners en organisaties."
-        backHref="/zorenta/dashboard"
-        backLabel="Dashboard"
-      />
+    <div className={cn("md:contents", mobileChatViewportLock)}>
+      <PageContainer
+        maxWidth="default"
+        className={cn(
+          "w-full min-w-0",
+          isMobile && mobileView === "chat"
+            ? "flex h-full min-h-0 max-w-full flex-1 flex-col space-y-2 overflow-hidden px-2 py-2 !pb-0 md:max-w-4xl md:h-auto md:flex-none md:space-y-6 md:overflow-visible md:px-6 md:py-0"
+            : "space-y-6",
+          isMobile && mobileView === "list" && "px-2 md:px-6"
+        )}
+      >
+        <span className="hidden" aria-hidden suppressHydrationWarning>
+          {listTimeTick}
+        </span>
+        <div className={cn(isMobile && mobileView === "chat" && "shrink-0")}>
+          <ZorentaPageHeader
+            title="Berichten"
+            description="Bekijk en beheer je gesprekken met zorgverleners en organisaties."
+            backHref="/zorenta/dashboard"
+            backLabel="Dashboard"
+          />
+        </div>
 
-      {convosError && (
-        <p className="text-sm text-red-600" role="alert">
-          {convosError}
-        </p>
-      )}
+        {convosError && (
+          <p className="shrink-0 text-sm text-red-600" role="alert">
+            {convosError}
+          </p>
+        )}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+        <div
+          className={cn(
+            "w-full min-w-0 gap-3 md:grid md:grid-cols-[260px_minmax(0,1fr)] md:items-start md:gap-4",
+            isMobile && mobileView === "chat" && "flex min-h-0 flex-1 flex-col overflow-hidden",
+            isMobile && mobileView === "list" && "grid grid-cols-1"
+          )}
+        >
         {/* Left: conversation list */}
-        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+        {showListPanel ? (
+        <Card className="w-full min-w-0 rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardContent className="p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-slate-900">Gesprekken</p>
@@ -1451,7 +1547,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       ? `Sollicitatie · ${jobTitle}`
                       : "Reactie · opdracht"
                     : preview;
-                  const timeLabel = formatListTime(conv.last_message?.created_at ?? conv.updated_at);
+                  const timeLabel = formatConversationListTime(
+                    conv.last_message?.created_at ?? conv.updated_at
+                  );
                   const hasUnread = unread > 0;
                   const isFlashing = flashConversationIds.includes(conv.id);
                   const avatarTone: ConversationListAvatarTone = isActive
@@ -1475,7 +1573,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         }
                       }}
                       className={cn(
-                        "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-[border-color,box-shadow,background-color] duration-200",
+                        "flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-[border-color,box-shadow,background-color] duration-200",
                         isActive
                           ? "relative z-[1] ring-2 ring-[#40ada8] ring-offset-2 ring-offset-white border-2 border-[#40ada8] bg-gradient-to-br from-[#40ada8]/18 via-[#40ada8]/10 to-white shadow-md"
                           : isFlashing
@@ -1589,16 +1687,27 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
             )}
           </CardContent>
         </Card>
+        ) : null}
 
         {/* Right: thread */}
-        <Card className="flex flex-col overflow-hidden rounded-2xl border-slate-200 bg-white shadow-sm lg:h-[70vh]">
-          <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        {showThreadPanel ? (
+        <Card
+          className={cn(
+            "flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border-slate-200 bg-white shadow-sm md:h-[70vh]",
+            isMobile &&
+              mobileView === "chat" &&
+              "h-full min-h-0 max-h-full flex-1 rounded-xl border-slate-200"
+          )}
+        >
+          <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain p-0">
             {!selectedId ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-6 text-center">
                 <MessageCircle className="h-8 w-8 text-slate-300" />
                 <p className="text-sm font-medium text-slate-800">Kies een gesprek om berichten te bekijken</p>
                 <p className="text-xs text-slate-500">
-                  Selecteer een gesprek in de lijst aan de linkerkant.
+                  {isMobile
+                    ? "Ga terug naar de lijst en tik op een gesprek."
+                    : "Selecteer een gesprek in de lijst aan de linkerkant."}
                 </p>
               </div>
             ) : messagesError ? (
@@ -1617,17 +1726,24 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
               </div>
             ) : (
               <>
-                <div className="shrink-0 border-b border-slate-100 px-3 pb-3 pt-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <button
-                        type="button"
-                        className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 lg:hidden"
-                        onClick={handleClearSelectionMobile}
-                        aria-label="Terug naar gesprekken"
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                      </button>
+                <div
+                  className={cn(
+                    "shrink-0 border-b border-slate-100 bg-white px-3 pb-3 pt-2.5",
+                    isMobile && mobileView === "chat" && "px-2 pb-2 pt-2"
+                  )}
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                      {isMobile && mobileView === "chat" ? (
+                        <button
+                          type="button"
+                          className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          onClick={handleMobileChatBack}
+                          aria-label="Terug naar gesprekken"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       {headerProfileHref ? (
                         <Link
                           href={headerProfileHref}
@@ -1711,13 +1827,23 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     {listTime && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
                         <Clock className="h-3 w-3" />
-                        {formatListTime(listTime)}
+                        {formatConversationListTime(listTime)}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/80 px-3 pb-3 pt-3 sm:px-4">
+                <div
+                  className={cn(
+                    "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/80 px-3 pb-3 pt-3 sm:px-4 [scrollbar-gutter:stable]",
+                    isMobile && mobileView === "chat" && "px-2"
+                  )}
+                  style={
+                    isMobile && mobileView === "chat"
+                      ? { WebkitOverflowScrolling: "touch" }
+                      : undefined
+                  }
+                >
                   {loadingMessages ? (
                     <p className="py-8 text-center text-sm text-slate-500">Berichten laden…</p>
                   ) : messages.length === 0 ? (
@@ -1761,13 +1887,14 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                             >
                             <div
                               className={cn(
-                                "max-w-[70%] md:max-w-[62%] lg:max-w-[58%] text-sm leading-relaxed",
+                                "max-w-[85%] break-words text-sm leading-relaxed motion-safe:transition-[box-shadow,transform] motion-safe:duration-200 md:max-w-[62%] lg:max-w-[58%]",
                                 mine
-                                  ? "rounded-2xl rounded-br-md bg-[#40ada8] px-4 py-2.5 text-white shadow-sm"
-                                  : "rounded-2xl rounded-bl-md bg-white px-4 py-2.5 text-slate-900 shadow-sm ring-1 ring-slate-200/70"
+                                  ? "rounded-2xl rounded-br-md bg-[#40ada8] px-3 py-2 text-white shadow-sm md:px-4 md:py-2.5"
+                                  : "rounded-2xl rounded-bl-md bg-white px-3 py-2 text-slate-900 shadow-sm ring-1 ring-slate-200/70 md:px-4 md:py-2.5",
+                                mine && recentlySentMessageId === m.id && "ring-2 ring-white/50 ring-offset-0"
                               )}
                             >
-                              <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.body}</p>
                               {mine ? (
                                 <div className="mt-1.5 flex items-center justify-end gap-1.5">
                                   <time
@@ -1818,7 +1945,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                 </div>
 
                 {!loadingMessages && selectedId && remoteTypingName ? (
-                  <div className="shrink-0 border-t border-emerald-100/80 bg-emerald-50/40 px-3 py-2 sm:px-4">
+                  <div
+                    className={cn(
+                      "shrink-0 border-t border-emerald-100/80 bg-emerald-50/40 px-3 py-2 sm:px-4",
+                      isMobile && mobileView === "chat" && "px-2"
+                    )}
+                  >
                     <p className="text-xs text-slate-600">
                       <span className="font-medium text-slate-800">{remoteTypingName}</span>{" "}
                       <span className="italic text-slate-500">is aan het typen…</span>
@@ -1827,7 +1959,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                 ) : null}
 
                 {!loadingMessages && selectedId && fakeTypingAfterSend ? (
-                  <div className="shrink-0 border-t border-slate-100/80 bg-slate-50/60 px-3 py-2 sm:px-4">
+                  <div
+                    className={cn(
+                      "shrink-0 border-t border-slate-100/80 bg-slate-50/60 px-3 py-2 sm:px-4",
+                      isMobile && mobileView === "chat" && "px-2"
+                    )}
+                  >
                     <p className="text-xs text-slate-500">
                       <span className="tracking-wide text-slate-400">...</span>{" "}
                       <span className="italic">typt</span>
@@ -1835,8 +1972,15 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                   </div>
                 ) : null}
 
-                <div className="shrink-0 border-t border-slate-100 bg-white px-3 pb-3 pt-3 sm:px-4">
-                  <div className="flex items-end gap-2.5">
+                <div
+                  className={cn(
+                    "shrink-0 border-t border-slate-100 bg-white px-3 pb-3 pt-3 sm:px-4",
+                    isMobile &&
+                      mobileView === "chat" &&
+                      "px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_14px_rgba(15,23,42,0.06)]"
+                  )}
+                >
+                  <div className="flex min-w-0 items-end gap-2">
                     <textarea
                       rows={2}
                       value={composerBody}
@@ -1845,7 +1989,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         scheduleTypingBroadcast();
                       }}
                       placeholder="Typ je bericht..."
-                      className="min-h-[44px] flex-1 resize-none rounded-2xl border border-slate-200/90 bg-slate-50/40 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#40ada8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#40ada8]/18"
+                      className="min-h-[44px] min-w-0 flex-1 resize-none rounded-2xl border border-slate-200/90 bg-slate-50/40 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#40ada8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#40ada8]/18 md:px-3.5"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -1863,7 +2007,12 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                       Versturen
                     </Button>
                   </div>
-                  <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div
+                    className={cn(
+                      "mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
+                      isMobile && mobileView === "chat" && "hidden"
+                    )}
+                  >
                     <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
                       <MessageCircle className="h-3 w-3" />
                       Veilig berichten via SamenConnect
@@ -1899,7 +2048,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
             )}
           </CardContent>
         </Card>
+        ) : null}
       </div>
-    </PageContainer>
+      </PageContainer>
+    </div>
   );
 }

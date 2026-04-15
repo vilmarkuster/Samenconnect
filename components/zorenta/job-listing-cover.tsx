@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { Briefcase, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getFirstJobImageUrl } from "@/lib/zorenta/job-images";
+import { getFirstJobImageUrl, resolveJobCardImage, type JobCardImageSource } from "@/lib/zorenta/job-images";
 
 type JobListingCoverProps = {
-  imageUrls: unknown;
+  /** Ruwe `image_urls` van de API (backward compatible). */
+  imageUrls?: unknown;
+  /** Optioneel volledig job-fragment: resolved via `resolveJobCardImage` (incl. legacy string-velden). */
+  job?: JobCardImageSource;
   careType?: string | null;
   /** Extra classes on the outer frame (aspect ratio, rounding). */
   className?: string;
-  /** Screen-reader label when an image is shown */
+  /** Screen-reader label when an image is shown (alleen als geen `job` meegegeven) */
   alt?: string;
 };
 
@@ -46,11 +49,13 @@ function fallbackTheme(careType?: string | null): {
 /**
  * Eerste opdrachtafbeelding of rustige placeholder; bij laadfout geen console spam (onError → placeholder).
  */
-export function JobListingCover({ imageUrls, careType, className, alt = "" }: JobListingCoverProps) {
-  const url = getFirstJobImageUrl(imageUrls);
+export function JobListingCover({ imageUrls, job, careType, className, alt = "" }: JobListingCoverProps) {
+  const resolved = job ? resolveJobCardImage(job) : null;
+  const url = resolved?.src ?? getFirstJobImageUrl(imageUrls);
+  const altText = resolved?.alt ?? alt;
   const [failed, setFailed] = useState(false);
   const showImg = Boolean(url) && !failed;
-  const theme = fallbackTheme(careType);
+  const theme = fallbackTheme(careType ?? job?.care_type);
 
   return (
     <div
@@ -63,7 +68,7 @@ export function JobListingCover({ imageUrls, careType, className, alt = "" }: Jo
       {showImg ? (
         <img
           src={url!}
-          alt={alt}
+          alt={altText}
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"

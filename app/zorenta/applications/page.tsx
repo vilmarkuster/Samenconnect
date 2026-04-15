@@ -18,6 +18,8 @@ type App = {
   id: string;
   job_id: string;
   applicant_id?: string;
+  /** Van API: alleen true bij `caregiver_profiles` voor deze sollicitant (renderbare publieke profielpagina). */
+  applicant_has_renderable_public_profile?: boolean;
   conversation_id?: string | null;
   status: string;
   message: string | null;
@@ -145,11 +147,20 @@ export default function ApplicationsPage() {
                   ) : null}
                   {myRole !== "caregiver" && app.applicant_id ? (
                     <>
-                      <Link href={`/zorenta/caregivers/${app.applicant_id}`}>
-                        <Button variant="outline" size="sm">
-                          Profiel bekijken
-                        </Button>
-                      </Link>
+                      {app.applicant_has_renderable_public_profile === true ? (
+                        <Link href={`/zorenta/caregivers/${app.applicant_id}`}>
+                          <Button variant="outline" size="sm">
+                            Bekijk profiel
+                          </Button>
+                        </Link>
+                      ) : (
+                        <div className="inline-flex flex-col gap-0.5">
+                          <Button variant="outline" size="sm" disabled className="border-slate-200">
+                            Bekijk profiel
+                          </Button>
+                          <span className="text-[11px] text-slate-500">Profiel nog niet beschikbaar</span>
+                        </div>
+                      )}
                       <StartConversationButton
                         applicantId={app.applicant_id}
                         applicationId={app.id}

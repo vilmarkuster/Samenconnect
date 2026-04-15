@@ -10,10 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Star, AlertCircle } from "lucide-react";
 
+/** Shape from GET /api/zorenta/admin/jobs — keeps strict TS happy without widening UI types */
+type AdminJobRow = {
+  id: string;
+  title?: string | null;
+  status?: string | null;
+  poster_type?: string | null;
+  featured_until?: string | null;
+  city?: string | null;
+  care_type?: string | null;
+  poster_id?: string | null;
+};
+
 export default function AdminJobDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const [job, setJob] = useState<Record<string, unknown> | null>(null);
+  const [job, setJob] = useState<AdminJobRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +39,8 @@ export default function AdminJobDetailPage() {
         .then((r) => r.json())
         .then((d) => {
           if (!cancelled && !d.error) {
-            const found = (d.jobs ?? []).find((j: { id: string }) => j.id === id);
+            const jobs = (d.jobs ?? []) as AdminJobRow[];
+            const found = jobs.find((row) => row.id === id);
             setJob(found ?? null);
           }
         })
@@ -60,7 +73,19 @@ export default function AdminJobDetailPage() {
     );
   }
 
-  const j = job as Record<string, unknown>;
+  const j = job;
+
+  const status =
+    typeof j.status === "string" || typeof j.status === "number"
+      ? String(j.status)
+      : null;
+
+  const posterType =
+    typeof j.poster_type === "string" || typeof j.poster_type === "number"
+      ? String(j.poster_type)
+      : null;
+
+  const isFeatured = Boolean(j.featured_until);
 
   return (
     <ZorentaPageContainer maxWidth="default" className="space-y-6">
@@ -74,22 +99,20 @@ export default function AdminJobDetailPage() {
 
       <Card className="border-slate-200">
         <CardHeader>
-          <CardTitle className="text-lg">{String(j.title ?? "")}</CardTitle>
+          <CardTitle className="text-lg">{j.title ?? ""}</CardTitle>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{String(j.status ?? "")}</Badge>
-            {Boolean(j.poster_type) && (
-              <Badge variant="secondary">{String(j.poster_type ?? "")}</Badge>
-            )}
-            {Boolean(j.featured_until) && (
+            {status ? <Badge variant="outline">{status}</Badge> : null}
+            {posterType ? <Badge variant="secondary">{posterType}</Badge> : null}
+            {isFeatured ? (
               <Badge className="bg-amber-100 text-amber-800">Uitgelicht</Badge>
-            )}
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-600">
-          <p>Plaats: {String(j.city ?? "—")}</p>
-          <p>Type zorg: {String(j.care_type ?? "—")}</p>
-          <p>Poster ID: <code className="bg-slate-100 px-1 rounded">{String(j.poster_id)}</code></p>
-          <Link href={`/zorenta/admin/users/${j.poster_id}`}>
+          <p>Plaats: {j.city ?? "—"}</p>
+          <p>Type zorg: {j.care_type ?? "—"}</p>
+          <p>Poster ID: <code className="bg-slate-100 px-1 rounded">{j.poster_id ?? "—"}</code></p>
+          <Link href={`/zorenta/admin/users/${encodeURIComponent(j.poster_id ?? "")}`}>
             <Button variant="outline" size="sm">Bekijk poster</Button>
           </Link>
         </CardContent>
