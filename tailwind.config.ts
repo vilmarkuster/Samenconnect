@@ -9,6 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        /** SamenConnect marketing / product accent */
+        brand: {
+          DEFAULT: "#40ADA8",
+          dark: "#35948f",
+          light: "#e8f6f5"
+        },
         primary: {
           50: "#f0f9ff",
           100: "#e0f2fe",
@@ -31,7 +37,16 @@ const config: Config = {
       },
       boxShadow: {
         "soft": "0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)",
-        "card": "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)"
+        "card": "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
+        "lift":
+          "0 4px 6px -1px rgb(0 0 0 / 0.05), 0 12px 40px -12px rgb(15 23 42 / 0.09)",
+        "hero-mockup":
+          "0 24px 60px -16px rgb(15 23 42 / 0.12), 0 0 0 1px rgb(226 232 240 / 0.8)",
+        /** Marketing cards — soft depth, minimal hover target */
+        premium:
+          "0 2px 6px -1px rgb(15 23 42 / 0.05), 0 10px 28px -8px rgb(15 23 42 / 0.09)",
+        "premium-hover":
+          "0 6px 14px -4px rgb(15 23 42 / 0.07), 0 18px 40px -14px rgb(15 23 42 / 0.11)"
       }
     }
   },

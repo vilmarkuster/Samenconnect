@@ -1,31 +1,18 @@
-"use client";
+import type { Metadata } from "next";
+import { AuthLandingGate } from "@/components/samenconnect/auth-landing-gate";
+import { HomeLandingSkeleton } from "@/components/samenconnect/home-landing-skeleton";
+import { SamenConnectHomeLanding } from "@/components/samenconnect/samenconnect-home-landing";
 
-import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+export const metadata: Metadata = {
+  title: "SamenConnect | Zorg zonder gedoe",
+  description:
+    "SamenConnect verbindt zorgverleners, opdrachtgevers en organisaties — met direct contact, transparantie en alles op één plek. Vraag early access aan.",
+};
 
 export default function HomePage() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-
-    // eslint-disable-next-line no-console
-    console.log("HomePage auth state", { isAuthenticated, isLoading });
-
-    if (isAuthenticated) {
-      router.replace("/zorenta/dashboard");
-    } else {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
-
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-slate-500">Loading...</p>
-    </main>
+    <AuthLandingGate fallback={<HomeLandingSkeleton />}>
+      <SamenConnectHomeLanding heroBackgroundSrc="/images/landing/hero-connection.jpg" />
+    </AuthLandingGate>
   );
 }
