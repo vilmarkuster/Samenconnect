@@ -21,6 +21,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { SamenConnectMarketingHeader } from "@/components/samenconnect/samenconnect-marketing-header";
 
 const contactEmail = "info@samenconnect.nl";
 
@@ -31,6 +32,15 @@ const nav = [
   { href: "#voor-wie", label: "Voor wie" },
   { href: "#anders", label: "Verschil" },
   { href: "#technologie", label: "Technologie" },
+  { href: "#platform", label: "Platform" },
+  { href: "#early-access", label: "Early access" },
+] as const;
+
+/** Fewer anchors on small screens (technologie folded into #anders on mobile). */
+const navMobile = [
+  { href: "#waarom", label: "Waarom" },
+  { href: "#voor-wie", label: "Voor wie" },
+  { href: "#anders", label: "Aanpak" },
   { href: "#platform", label: "Platform" },
   { href: "#early-access", label: "Early access" },
 ] as const;
@@ -61,7 +71,7 @@ function LandingImageCap({
       className={cn(
         layout === "cap"
           ? "relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-slate-200/40"
-          : "relative min-h-[220px] w-full shrink-0 overflow-hidden bg-slate-200/40 md:min-h-[260px] lg:min-h-0 lg:h-full lg:min-h-[300px]",
+          : "relative min-h-[180px] w-full shrink-0 overflow-hidden bg-slate-200/40 sm:min-h-[220px] md:min-h-[260px] lg:min-h-0 lg:h-full lg:min-h-[300px]",
         className
       )}
     >
@@ -90,7 +100,7 @@ function PhotoHeroSection({ src }: { src: string }) {
             alt="SamenConnect — zorg en verbinding"
             fill
             priority
-            className="object-cover object-center [image-rendering:auto]"
+            className="object-cover object-[70%_center] sm:object-center [image-rendering:auto]"
             sizes="100vw"
           />
         </div>
@@ -110,20 +120,20 @@ function PhotoHeroSection({ src }: { src: string }) {
           className="absolute inset-x-0 bottom-0 z-[1] h-48 bg-gradient-to-t from-slate-950/95 via-slate-950/45 to-transparent"
           aria-hidden
         />
-        <div className="relative z-[2] mx-auto flex min-h-[min(86dvh,780px)] max-w-6xl flex-col items-center justify-center px-4 py-24 text-center sm:min-h-[min(88dvh,840px)] sm:py-28 md:py-32">
-          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.1] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/95 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.35)] backdrop-blur-md sm:mb-6 sm:text-xs">
+        <div className="relative z-[2] mx-auto flex min-h-[min(80dvh,640px)] max-w-6xl flex-col items-center justify-center px-4 py-16 text-center sm:min-h-[min(86dvh,780px)] sm:py-24 md:min-h-[min(88dvh,840px)] md:py-32">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.1] px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/95 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.35)] backdrop-blur-md sm:mb-6 sm:px-4 sm:py-2 sm:text-xs">
             <Sparkles className="h-3.5 w-3.5 text-[#7fd4cf]" aria-hidden />
             Zorgplatform · Nederland
           </p>
-          <h1 className="max-w-[22rem] text-balance text-[1.65rem] font-semibold leading-[1.12] tracking-[-0.02em] text-white drop-shadow-[0_4px_32px_rgba(0,0,0,0.45)] sm:max-w-3xl sm:text-4xl sm:leading-[1.08] md:text-[2.65rem] md:leading-[1.05]">
+          <h1 className="max-w-[20rem] text-balance text-[1.55rem] font-semibold leading-[1.14] tracking-[-0.02em] text-white drop-shadow-[0_4px_32px_rgba(0,0,0,0.45)] sm:max-w-3xl sm:text-4xl sm:leading-[1.08] md:max-w-3xl md:text-[2.65rem] md:leading-[1.05]">
             De juiste zorgverbinding —{" "}
             <span className="font-semibold text-[#b8ebe6]">zonder gedoe</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-[0.95rem] font-normal leading-[1.65] text-slate-100/95 drop-shadow-[0_2px_16px_rgba(0,0,0,0.35)] sm:mt-7 sm:text-lg sm:leading-relaxed md:max-w-2xl">
+          <p className="mx-auto mt-5 max-w-xl text-[0.9rem] font-normal leading-[1.6] text-slate-100/95 drop-shadow-[0_2px_16px_rgba(0,0,0,0.35)] sm:mt-7 sm:text-lg sm:leading-relaxed md:max-w-2xl">
             Sneller een passende match, minder gedoe in het traject — en direct
             menselijk contact met wie zorg geeft, zonder eindeloos heen en weer.
           </p>
-          <div className="mt-11 flex w-full max-w-md flex-col items-stretch gap-3.5 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
+          <div className="mt-8 flex w-full max-w-md flex-col items-stretch gap-3 sm:mt-11 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
             <div className="flex flex-col items-center gap-2 sm:items-start">
               <a
                 href={earlyAccessHref}
@@ -154,35 +164,37 @@ function PhotoHeroSection({ src }: { src: string }) {
               Bekijk hoe het werkt
             </a>
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/20 pt-8 text-[11px] font-semibold tracking-wide text-white/90 sm:text-xs">
-            <span className="inline-flex items-center gap-1.5">
-              <MessageCircle className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
-              Direct contact met zorgverleners
-            </span>
-            <span className="hidden text-white/35 sm:inline" aria-hidden>
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Ban className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
-              Geen tussenpersonen
-            </span>
-            <span className="hidden text-white/35 sm:inline" aria-hidden>
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
-              Binnen 24u reactie
-            </span>
+          <div className="mt-6 w-full max-w-md border-t border-white/20 pt-6 text-[11px] font-semibold tracking-wide text-white/90 sm:mt-8 sm:max-w-none sm:pt-8 sm:text-xs">
+            <div className="flex flex-col gap-2.5 text-left sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-5 sm:gap-y-2 sm:text-center">
+              <span className="inline-flex items-center gap-1.5">
+                <MessageCircle className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
+                Direct contact met zorgverleners
+              </span>
+              <span className="hidden text-white/35 sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Ban className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
+                Geen tussenpersonen
+              </span>
+              <span className="hidden text-white/35 sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
+                Binnen 24u reactie
+              </span>
+            </div>
           </div>
           <p className="mx-auto mt-6 max-w-md text-center text-xs font-medium leading-relaxed text-slate-100/95 sm:mt-7 sm:text-sm">
             Beperkte plekken — we selecteren actief en nemen persoonlijk contact op
           </p>
         </div>
       </section>
-      <div className="relative z-[3] -mt-10 px-4 pb-2 sm:-mt-12 sm:pb-3 md:-mt-14">
+      <div className="relative z-[3] -mt-8 px-4 pb-2 sm:-mt-12 sm:pb-3 md:-mt-14">
         <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-slate-200/55 bg-white/95 shadow-[0_-6px_36px_-10px_rgba(15,23,42,0.12),0_16px_40px_-18px_rgba(15,23,42,0.08)] backdrop-blur-xl backdrop-saturate-150 ring-1 ring-slate-900/[0.04]">
           <div className="h-px w-full bg-gradient-to-r from-transparent via-[#40ADA8]/35 to-transparent" aria-hidden />
-          <div className="px-6 py-7 text-center sm:px-10 sm:py-8 md:text-left">
+          <div className="px-5 py-5 text-center sm:px-10 sm:py-8 md:text-left">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#2d8f8a]">
               In de praktijk
             </p>
@@ -198,7 +210,7 @@ function PhotoHeroSection({ src }: { src: string }) {
             </p>
           </div>
         </div>
-        <p className="mx-auto mt-5 max-w-2xl px-4 text-center text-sm leading-relaxed text-slate-600 sm:mt-6">
+        <p className="mx-auto mt-4 hidden max-w-2xl px-4 text-center text-sm leading-relaxed text-slate-600 sm:mt-6 sm:block">
           <span className="font-medium text-slate-800">
             In de praktijk getest met echte zorgteams.
           </span>{" "}
@@ -313,61 +325,16 @@ export function SamenConnectHomeLanding({
 }: SamenConnectHomeLandingProps = {}) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f0f2f5] via-[#f3f4f6] to-[#f0f2f5] text-slate-900">
-      <header className="sticky top-0 z-50 border-b border-slate-200/50 bg-white/[0.88] backdrop-blur-xl backdrop-saturate-150">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3.5 sm:py-4">
-          <Link href="/" className="flex items-center gap-2" aria-label="SamenConnect">
-            <Image
-              src="/samenconnect-icon.png"
-              alt=""
-              width={32}
-              height={32}
-              priority
-              className="size-8 shrink-0 sm:size-9"
-            />
-            <span className="text-lg font-semibold leading-none tracking-tight text-slate-900">
-              SamenConnect
-            </span>
-          </Link>
-
-          <nav className="order-3 flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-slate-600 sm:order-none sm:flex sm:w-auto sm:justify-end">
-            {nav.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="transition-colors duration-300 hover:text-brand-dark"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/login"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              )}
-            >
-              Inloggen
-            </Link>
-            <a
-              href={earlyAccessHref}
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "border-0 bg-brand text-white shadow-md shadow-brand/30 ring-1 ring-brand/25 hover:bg-brand-dark hover:shadow-lg hover:shadow-brand/35"
-              )}
-            >
-              Claim je plek
-            </a>
-          </div>
-        </div>
-      </header>
+      <SamenConnectMarketingHeader
+        navItems={nav}
+        mobileMenuNavItems={navMobile}
+        earlyAccessHref={earlyAccessHref}
+      />
 
       {heroBackgroundSrc ? (
         <PhotoHeroSection src={heroBackgroundSrc} />
       ) : (
-        <section className="relative overflow-x-hidden border-b border-slate-200/45 bg-gradient-to-b from-white via-[#f6faf9] to-[#eef4f3]">
+        <section className="relative overflow-x-hidden border-b border-slate-200/45 bg-gradient-to-b from-white via-[#f6faf9] to-[#eef4f3] scroll-mt-24 sm:scroll-mt-20">
           <div
             className="pointer-events-none absolute -right-16 top-0 h-[460px] w-[460px] rounded-full bg-[radial-gradient(circle_at_center,rgba(64,173,168,0.14)_0%,transparent_68%)] blur-3xl"
             aria-hidden
@@ -376,8 +343,8 @@ export function SamenConnectHomeLanding({
             className="pointer-events-none absolute -left-28 bottom-0 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle_at_center,rgba(64,173,168,0.1)_0%,transparent_65%)] blur-3xl"
             aria-hidden
           />
-          <div className="relative mx-auto max-w-6xl px-4 pb-20 pt-14 sm:pb-24 sm:pt-20 md:pt-24 lg:pt-28">
-            <div className="grid items-center gap-10 sm:gap-12 lg:grid-cols-2 lg:gap-x-14 lg:gap-y-10">
+          <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-12 sm:pb-24 sm:pt-20 md:pt-24 lg:pt-28">
+            <div className="grid items-center gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-x-14 lg:gap-y-10">
               <div className="max-w-xl lg:max-w-none">
                 <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand-light/70 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-dark sm:text-xs">
                   <Sparkles className="h-3.5 w-3.5 text-brand" aria-hidden />
@@ -480,7 +447,7 @@ export function SamenConnectHomeLanding({
 
       <section
         id="waarom"
-        className="relative border-b border-slate-200/45 bg-gradient-to-b from-[#e9edf1] via-[#e6eaef] to-[#e2e7ec] py-20 sm:py-24 md:py-28"
+        className="relative scroll-mt-24 border-b border-slate-200/45 bg-gradient-to-b from-[#e9edf1] via-[#e6eaef] to-[#e2e7ec] py-10 sm:scroll-mt-20 sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/30 to-transparent"
@@ -495,21 +462,32 @@ export function SamenConnectHomeLanding({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[1.85rem] md:leading-snug">
               Waarom SamenConnect
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-slate-600 sm:mt-5 sm:text-lg sm:leading-relaxed">
+            <p className="mx-auto mt-3 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:hidden">
+              Minder ruis rond de zorg: intake, match en vervolg in één lijn — gebouwd
+              door mensen die weten hoe zorg in de praktijk loopt.
+            </p>
+            <p className="mx-auto mt-3 hidden max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:mt-5 sm:block sm:max-w-none sm:text-lg sm:leading-relaxed">
               Minder ruis rond de zorg. Meer tijd voor mensen — minder voor spreadsheets,
               gemiste telefoontjes en losse e-mails die nergens op slaan.
             </p>
-            <p className="mx-auto mt-4 max-w-2xl text-sm font-normal italic leading-relaxed text-slate-500 sm:mt-5 sm:text-[0.95rem]">
-              Geen platform bedacht door developers — maar door mensen die weten hoe zorg
-              écht werkt.
+            <p className="mx-auto mt-3 max-w-[20rem] text-pretty text-sm font-normal italic leading-relaxed text-slate-500 sm:mt-5 sm:max-w-2xl sm:text-[0.95rem]">
+              <span className="sm:hidden">
+                Geen slide-deck-platform — wél afgestemd op echte zorgprocessen.
+              </span>
+              <span className="hidden sm:inline">
+                Geen platform bedacht door developers — maar door mensen die weten hoe zorg
+                écht werkt.
+              </span>
             </p>
           </div>
-          <div className="mt-12 grid gap-5 sm:mt-14 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4 lg:gap-7">
+          <div className="mt-6 grid gap-3 sm:mt-14 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4 lg:gap-7">
             {[
               {
                 icon: HeartPulse,
                 title: "Zorg zonder gedoe",
                 text: "Intake, match en vervolg in één rustige lijn — zodat je energie houdt voor waar het toe doet, ook als zorg thuis speelt.",
+                textMobile:
+                  "Intake, match en vervolg op één plek — minder zoeken tussen tools en mailtjes.",
                 imageSrc: landingImg.careHome,
                 imageAlt: "Zorg en rust aan huis",
               },
@@ -517,6 +495,8 @@ export function SamenConnectHomeLanding({
                 icon: MessageCircle,
                 title: "Direct contact",
                 text: "Gesprekken binnen het platform: minder heen-en-weer, sneller tot de kern — veilig, menselijk en terug te lezen.",
+                textMobile:
+                  "Gesprekken in context van de opdracht — sneller tot de kern, veilig en terug te lezen.",
                 imageSrc: landingImg.careSmile,
                 imageAlt: "Persoonlijk contact",
               },
@@ -524,6 +504,8 @@ export function SamenConnectHomeLanding({
                 icon: Eye,
                 title: "Transparantie",
                 text: "Duidelijk wie wat doet, waarom iemand past, en wat je redelijkerwijs mag verwachten.",
+                textMobile:
+                  "Duidelijk wie wat doet, waarom iemand past, en wat je mag verwachten.",
                 imageSrc: landingImg.nurse,
                 imageAlt: "Zorgprofessional",
               },
@@ -531,39 +513,68 @@ export function SamenConnectHomeLanding({
                 icon: LayoutGrid,
                 title: "Alles op één plek",
                 text: "Zorgvraag, profielen, matches en berichten samen — minder zoeken, minder versnippering.",
+                textMobile:
+                  "Zorgvraag, profielen, matches en berichten samen — minder versnippering.",
                 imageSrc: landingImg.remote,
                 imageAlt: "Rustig werken met overzicht",
               },
-            ].map(({ icon: Icon, title, text, imageSrc, imageAlt }) => (
+            ].map(({ icon: Icon, title, text, textMobile, imageSrc, imageAlt }, cardIndex) => (
               <div
                 key={title}
-                className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/65 bg-white/95 shadow-[0_6px_36px_-10px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.035] transition-all duration-500 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_48px_-14px_rgba(15,23,42,0.14)]"
+                className={cn(
+                  "flex flex-col overflow-hidden rounded-3xl border border-slate-200/65 bg-white/95 shadow-[0_6px_36px_-10px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.035] transition-all duration-500 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_48px_-14px_rgba(15,23,42,0.14)]",
+                  cardIndex >= 2 && "hidden sm:flex"
+                )}
               >
                 <LandingImageCap
                   src={imageSrc}
                   alt={imageAlt}
-                  className="aspect-[16/9] shrink-0 md:aspect-[5/3]"
+                  className="aspect-[5/4] shrink-0 sm:aspect-[16/9] md:aspect-[5/3]"
                 />
-                <div className="flex flex-1 flex-col p-8 pt-7">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-light/90 text-brand-dark ring-1 ring-brand/20">
+                <div className="flex flex-1 flex-col p-5 pt-5 sm:p-8 sm:pt-7">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-light/90 text-brand-dark ring-1 ring-brand/20 sm:mb-5 sm:h-12 sm:w-12">
                     <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
                   </div>
-                  <h3 className="text-lg font-semibold tracking-tight text-slate-900">
+                  <h3 className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
                     {title}
                   </h3>
-                  <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  <p className="mt-2.5 text-sm leading-relaxed text-slate-600 sm:mt-3 sm:hidden">
+                    {textMobile}
+                  </p>
+                  <p className="mt-2.5 hidden text-sm leading-relaxed text-slate-600 sm:mt-3 sm:block">
                     {text}
                   </p>
                 </div>
               </div>
             ))}
           </div>
+          <div className="mt-3 rounded-2xl border border-slate-200/70 bg-white/85 px-4 py-3.5 sm:hidden">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Ook op SamenConnect
+            </p>
+            <ul className="mt-2 space-y-2 text-sm leading-snug text-slate-700">
+              <li className="flex gap-2">
+                <Eye className="mt-0.5 h-4 w-4 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+                <span>
+                  <span className="font-medium text-slate-900">Transparantie</span> — heldere
+                  keuzes en verwachtingen voor iedereen zichtbaar.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <LayoutGrid className="mt-0.5 h-4 w-4 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+                <span>
+                  <span className="font-medium text-slate-900">Één plek</span> — vraag, profielen,
+                  matches en berichten bij elkaar.
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
       <section
         id="voor-wie"
-        className="relative border-b border-slate-200/45 bg-gradient-to-b from-[#f0f2f5] via-white to-white py-20 sm:py-24 md:py-28"
+        className="relative scroll-mt-24 border-b border-slate-200/45 bg-gradient-to-b from-[#f0f2f5] via-white to-white py-10 sm:scroll-mt-20 sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-300/35 to-transparent"
@@ -574,41 +585,52 @@ export function SamenConnectHomeLanding({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[1.85rem] md:leading-snug">
               Voor wie is het?
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-slate-600 sm:mt-5 sm:text-lg sm:leading-relaxed">
+            <p className="mx-auto mt-3 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:hidden">
+              Professionals en opdrachtgevers: dezelfde heldere lijn van vraag naar match —
+              met eerlijke afspraken.
+            </p>
+            <p className="mx-auto mt-3 hidden max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:mt-5 sm:block sm:max-w-none sm:text-lg sm:leading-relaxed">
               Twee kanten van dezelfde realiteit: wie zorg geeft — en wie zorg nodig heeft
               of organiseert. Beide verdienen rust, overzicht en eerlijke afspraken.
             </p>
           </div>
-          <div className="mt-12 grid gap-7 sm:mt-14 lg:grid-cols-2 lg:gap-10">
+          <div className="mt-6 grid gap-4 sm:mt-14 sm:gap-7 lg:grid-cols-2 lg:gap-10">
             <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-gradient-to-b from-[#f6faf9] to-white shadow-[0_8px_40px_-12px_rgba(15,23,42,0.1)] ring-1 ring-brand/10 transition-all duration-500 ease-out hover:-translate-y-0.5 hover:shadow-[0_20px_52px_-18px_rgba(64,173,168,0.14)]">
               <LandingImageCap
                 src={landingImg.nurse}
                 alt="Zorgprofessional"
-                className="aspect-[16/9] md:aspect-[2/1]"
+                className="aspect-[5/4] sm:aspect-[16/9] md:aspect-[2/1]"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
-              <div className="flex flex-1 flex-col p-8 sm:p-10 sm:pt-9">
+              <div className="flex flex-1 flex-col p-5 sm:p-10 sm:pt-9">
                 <p className="text-xs font-semibold uppercase tracking-wider text-brand-dark">
                   Voor professionals
                 </p>
-                <div className="mt-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-md shadow-brand/20">
+                <div className="mt-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand text-white shadow-md shadow-brand/20 sm:mt-4 sm:h-12 sm:w-12">
                   <Users className="h-6 w-6" strokeWidth={2} aria-hidden />
                 </div>
-                <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">
+                <h3 className="mt-4 text-lg font-semibold tracking-tight text-slate-900 sm:mt-5 sm:text-xl">
                   Zorgverleners
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                <p className="mt-2.5 text-sm leading-relaxed text-slate-600 sm:hidden">
+                  Minder zoeken en mailen: passende opdrachten, een sterk profiel en
+                  gesprekken met context.
+                </p>
+                <p className="mt-2.5 hidden text-sm leading-relaxed text-slate-600 sm:mt-3 sm:block sm:text-base">
                   Minder tijd kwijt aan zoeken en mailen. Meer grip op passende
                   opdrachten, je profiel en je communicatie — zodat je eerlijker kunt
                   verdienen en rustiger kunt plannen.
                 </p>
-                <ul className="mt-8 space-y-3.5 text-sm leading-snug text-slate-700">
+                <ul className="mt-5 space-y-2.5 text-sm leading-snug text-slate-700 sm:mt-8 sm:space-y-3.5">
                   {[
                     "Zicht op opdrachten die écht bij je passen",
                     "Profiel dat je expertise laat zien — geen generieke cv-molen",
                     "Berichten gekoppeld aan context: minder misverstanden",
-                  ].map((line) => (
-                    <li key={line} className="flex gap-3">
+                  ].map((line, li) => (
+                    <li
+                      key={line}
+                      className={cn("flex gap-3", li === 2 && "hidden sm:flex")}
+                    >
                       <CheckCircle2
                         className="mt-0.5 h-4 w-4 shrink-0 text-brand"
                         strokeWidth={2}
@@ -624,31 +646,38 @@ export function SamenConnectHomeLanding({
               <LandingImageCap
                 src={landingImg.careHome}
                 alt="Zorg aan huis"
-                className="aspect-[16/9] md:aspect-[2/1]"
+                className="aspect-[5/4] sm:aspect-[16/9] md:aspect-[2/1]"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
-              <div className="flex flex-1 flex-col p-8 sm:p-10 sm:pt-9">
+              <div className="flex flex-1 flex-col p-5 sm:p-10 sm:pt-9">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Voor opdracht &amp; organisatie
                 </p>
-                <div className="mt-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-white shadow-md">
+                <div className="mt-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-800 text-white shadow-md sm:mt-4 sm:h-12 sm:w-12">
                   <Building2 className="h-6 w-6" strokeWidth={2} aria-hidden />
                 </div>
-                <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">
+                <h3 className="mt-4 text-lg font-semibold tracking-tight text-slate-900 sm:mt-5 sm:text-xl">
                   Opdrachtgevers, PGB-houders &amp; organisaties
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                <p className="mt-2.5 text-sm leading-relaxed text-slate-600 sm:hidden">
+                  Je zorgvraag helder neerzetten, inhoudelijk vergelijken en zelf kiezen —
+                  met zicht op de volgende stap.
+                </p>
+                <p className="mt-2.5 hidden text-sm leading-relaxed text-slate-600 sm:mt-3 sm:block sm:text-base">
                   Minder tussenpersonen, meer zeggenschap: je zorgvraag helder
                   neerzetten, inhoudelijk vergelijken en bewust kiezen — met
                   transparantie over verwachtingen en vervolg, thuis of in teamverband.
                 </p>
-                <ul className="mt-8 space-y-3.5 text-sm leading-snug text-slate-700">
+                <ul className="mt-5 space-y-2.5 text-sm leading-snug text-slate-700 sm:mt-8 sm:space-y-3.5">
                   {[
                     "Eén traject: van vraag tot match tot contact",
                     "Minder overhead: minder bellen, minder losse tools",
                     "Vertrouwen door duidelijkheid — geen verborgen stappen",
-                  ].map((line) => (
-                    <li key={line} className="flex gap-3">
+                  ].map((line, li) => (
+                    <li
+                      key={line}
+                      className={cn("flex gap-3", li === 2 && "hidden sm:flex")}
+                    >
                       <CheckCircle2
                         className="mt-0.5 h-4 w-4 shrink-0 text-brand"
                         strokeWidth={2}
@@ -666,7 +695,7 @@ export function SamenConnectHomeLanding({
 
       <section
         id="anders"
-        className="relative border-b border-slate-200/45 bg-gradient-to-b from-[#e8ecf1] via-[#e6eaef] to-[#e2e7ee] py-20 sm:py-24 md:py-28"
+        className="relative scroll-mt-24 border-b border-slate-200/45 bg-gradient-to-b from-[#e8ecf1] via-[#e6eaef] to-[#e2e7ee] py-10 sm:scroll-mt-20 sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/40 to-transparent"
@@ -677,7 +706,11 @@ export function SamenConnectHomeLanding({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[1.85rem] md:leading-snug">
               Wat maakt ons anders?
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-slate-600 sm:mt-5 sm:text-lg sm:leading-relaxed">
+            <p className="mx-auto mt-3 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:hidden">
+              Geen schreeuwerige marktplaats, geen black box. Wél eerlijke afspraken en
+              uitleg waar het helpt — afgestemd op de zorgpraktijk.
+            </p>
+            <p className="mx-auto mt-3 hidden max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:mt-5 sm:block sm:max-w-none sm:text-lg sm:leading-relaxed">
               Geen schreeuwerige marktplaats en geen black box zonder uitleg. Wél een
               platform met{" "}
               <strong className="font-semibold text-slate-800">
@@ -686,7 +719,7 @@ export function SamenConnectHomeLanding({
               — afgestemd op hoe zorg in de praktijk werkt.
             </p>
           </div>
-          <div className="mt-12 grid gap-5 sm:mt-14 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7">
+          <div className="mt-6 grid gap-3 sm:mt-14 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-7">
             {[
               {
                 icon: MessageCircle,
@@ -722,30 +755,54 @@ export function SamenConnectHomeLanding({
               <div
                 key={title}
                 className={cn(
-                  "flex h-full flex-col rounded-3xl border bg-white/92 p-7 transition-all duration-500 ease-out hover:-translate-y-0.5 sm:p-8",
+                  "flex h-full flex-col rounded-3xl border bg-white/92 p-5 transition-all duration-500 ease-out hover:-translate-y-0.5 sm:p-8",
+                  index >= 3 && "hidden sm:flex",
                   index < 2
                     ? "border-slate-200/70 shadow-[0_5px_32px_-10px_rgba(15,23,42,0.09)] ring-1 ring-slate-900/[0.04] hover:shadow-[0_16px_44px_-14px_rgba(15,23,42,0.12)]"
                     : "border-slate-200/80 shadow-[0_2px_22px_-8px_rgba(15,23,42,0.055)] hover:shadow-[0_12px_36px_-12px_rgba(15,23,42,0.09)]"
                 )}
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-light/90 text-brand-dark ring-1 ring-brand/18">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light/90 text-brand-dark ring-1 ring-brand/18 sm:h-11 sm:w-11">
                   <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
                 </div>
-                <h3 className="mt-6 font-semibold tracking-tight text-slate-900">
+                <h3 className="mt-4 font-semibold tracking-tight text-slate-900 sm:mt-6">
                   {title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                <p className="mt-2.5 text-pretty text-sm leading-relaxed text-slate-600 sm:mt-3">
                   {body}
                 </p>
               </div>
             ))}
+          </div>
+          <div className="mt-4 rounded-2xl border border-brand/20 bg-gradient-to-br from-white/95 to-brand-light/25 px-4 py-3.5 sm:hidden">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-dark">
+              Technologie (compact)
+            </p>
+            <p className="mt-1.5 text-pretty text-sm leading-snug text-slate-700">
+              Matching op context, geleide intake en gesprekken op de opdracht — met
+              optionele AI alleen waar jij dat wilt. Geen black box.
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {["Contextuele match", "Intake", "AI optioneel"].map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2.5 text-xs leading-relaxed text-slate-600">
+              Ook: één lijn door het traject, ruimte voor professionele tarieven, geen
+              advertenties op jouw zorgdata.
+            </p>
           </div>
         </div>
       </section>
 
       <section
         id="technologie"
-        className="relative border-b border-slate-200/45 border-t border-brand/25 bg-gradient-to-b from-[#dff3f0] via-[#eaf6f5] to-[#eef1f4] py-20 sm:py-24 md:py-28"
+        className="relative hidden scroll-mt-24 border-b border-slate-200/45 border-t border-brand/25 bg-gradient-to-b from-[#dff3f0] via-[#eaf6f5] to-[#eef1f4] py-14 sm:scroll-mt-20 sm:block sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/35 to-transparent"
@@ -760,12 +817,12 @@ export function SamenConnectHomeLanding({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[1.85rem] md:leading-snug">
               Slimme technologie die voor je werkt
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-slate-600 sm:mt-5 sm:text-lg sm:leading-relaxed">
+            <p className="mx-auto mt-3 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:mt-5 sm:max-w-none sm:text-lg sm:leading-relaxed">
               Technologie is hier geen doel op zich: die ondersteunt intake, matching en
               communicatie — met controles waar het moet, en uitleg waar het helpt.
             </p>
           </div>
-          <div className="mt-12 grid gap-6 sm:mt-14 md:grid-cols-3 md:gap-6 md:pb-1">
+          <div className="mt-8 grid gap-4 sm:mt-14 sm:gap-5 md:grid-cols-3 md:gap-6 md:pb-1">
             {[
               {
                 icon: ScanSearch,
@@ -786,19 +843,19 @@ export function SamenConnectHomeLanding({
               <div
                 key={title}
                 className={cn(
-                  "flex h-full flex-col rounded-3xl border bg-white/95 p-8 transition-all duration-500 ease-out hover:-translate-y-0.5",
+                  "flex h-full flex-col rounded-3xl border bg-white/95 p-5 transition-all duration-500 ease-out hover:-translate-y-0.5 sm:p-8",
                   index === 1
                     ? "border-brand/28 shadow-[0_14px_48px_-18px_rgba(64,173,168,0.22)] ring-1 ring-brand/18 md:-translate-y-1 md:px-8 md:py-9"
                     : "border-slate-200/85 shadow-[0_3px_28px_-8px_rgba(15,23,42,0.07)] hover:shadow-[0_14px_40px_-14px_rgba(15,23,42,0.1)]"
                 )}
               >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-light/90 text-brand ring-1 ring-brand/22 shadow-sm">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-light/90 text-brand ring-1 ring-brand/22 shadow-sm sm:h-12 sm:w-12">
                   <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
                 </div>
-                <h3 className="mt-6 text-lg font-semibold tracking-tight text-slate-900">
+                <h3 className="mt-4 text-base font-semibold tracking-tight text-slate-900 sm:mt-6 sm:text-lg">
                   {title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                <p className="mt-2.5 text-pretty text-sm leading-relaxed text-slate-600 sm:mt-3">
                   {text}
                 </p>
               </div>
@@ -809,7 +866,7 @@ export function SamenConnectHomeLanding({
 
       <section
         id="platform"
-        className="relative border-b border-slate-200/45 bg-gradient-to-b from-[#f6f8fa] via-[#f3f5f8] to-[#eef1f5] py-20 sm:py-24 md:py-28"
+        className="relative scroll-mt-24 border-b border-slate-200/45 bg-gradient-to-b from-[#f6f8fa] via-[#f3f5f8] to-[#eef1f5] py-10 sm:scroll-mt-20 sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-[#eaf6f4]/80 to-transparent"
@@ -820,34 +877,54 @@ export function SamenConnectHomeLanding({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[1.85rem] md:leading-snug">
               Zo oogt het platform
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-slate-600 sm:mt-5 sm:text-lg sm:leading-relaxed">
+            <p className="mx-auto mt-3 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:hidden">
+              Voorbeeldweergave — straks met jouw profielen en intake. Matching, berichten
+              en intake op één plek.
+            </p>
+            <p className="mx-auto mt-3 hidden max-w-[22rem] text-pretty text-base leading-relaxed text-slate-600 sm:mt-5 sm:block sm:max-w-none sm:text-lg sm:leading-relaxed">
               Voorbeeldweergave — straks met jouw echte profielen, berichten en intake.
               Rustig, overzichtelijk, gemaakt om mee te werken in de zorgpraktijk.
             </p>
           </div>
-          <div className="mt-12 overflow-hidden rounded-3xl border border-slate-200/75 bg-white/96 shadow-[0_6px_36px_-12px_rgba(15,23,42,0.1)] ring-1 ring-slate-900/[0.03] transition-shadow duration-500 hover:shadow-[0_12px_44px_-16px_rgba(15,23,42,0.12)] sm:mt-14 md:grid md:min-h-[260px] md:grid-cols-[minmax(0,1.12fr)_minmax(0,1fr)] md:items-stretch">
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/75 bg-white/96 shadow-[0_6px_36px_-12px_rgba(15,23,42,0.1)] ring-1 ring-slate-900/[0.03] transition-shadow duration-500 hover:shadow-[0_12px_44px_-16px_rgba(15,23,42,0.12)] sm:mt-14 sm:rounded-3xl md:grid md:min-h-[260px] md:grid-cols-[minmax(0,1.12fr)_minmax(0,1fr)] md:items-stretch">
             <LandingImageCap
               src={landingImg.remote}
               alt="Rustig werken met het platform"
               layout="panel"
-              className="md:min-h-0"
+              className="max-sm:max-h-[148px] max-sm:min-h-0 md:min-h-0"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
-            <div className="flex flex-col justify-center border-t border-slate-200/65 bg-white/40 px-8 py-9 sm:px-10 sm:py-10 md:border-l md:border-t-0 md:py-12">
+            <div className="flex flex-col justify-center border-t border-slate-200/65 bg-white/40 px-5 py-5 sm:px-10 sm:py-10 md:border-l md:border-t-0 md:py-12">
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-dark">
                 Werken op het platform
               </p>
-              <h3 className="mt-3 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                Overzicht thuis of op locatie
+              <h3 className="mt-2 text-base font-semibold tracking-tight text-slate-900 sm:mt-3 sm:text-xl md:text-2xl">
+                <span className="sm:hidden">Eén plek voor match, intake en contact</span>
+                <span className="hidden sm:inline">Overzicht thuis of op locatie</span>
               </h3>
-              <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
-                Matching, intake en berichten blijven op één plek — handig wanneer je
-                coördineert vanuit huis, op kantoor of onderweg. Minder tabbladen, meer
-                rust in het proces.
+              <p className="mt-2.5 text-pretty text-sm leading-relaxed text-slate-600 sm:mt-4 sm:text-base">
+                <span className="sm:hidden">
+                  Thuis, op kantoor of onderweg: minder tabbladen, meer grip op het traject.
+                </span>
+                <span className="hidden sm:inline">
+                  Matching, intake en berichten blijven op één plek — handig wanneer je
+                  coördineert vanuit huis, op kantoor of onderweg. Minder tabbladen, meer
+                  rust in het proces.
+                </span>
               </p>
             </div>
           </div>
-          <div className="mt-12 grid gap-6 md:mt-14 md:grid-cols-3 md:gap-7">
+          <div className="mt-4 flex flex-wrap justify-center gap-2 sm:hidden">
+            {["Matching", "Berichten", "Intake"].map((label) => (
+              <span
+                key={label}
+                className="rounded-full border border-slate-200/80 bg-white/90 px-3 py-1 text-xs font-medium text-slate-600"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className="mt-6 hidden gap-4 sm:grid sm:gap-5 md:mt-14 md:grid-cols-3 md:gap-7">
             {[
               {
                 title: "Matching",
@@ -886,7 +963,7 @@ export function SamenConnectHomeLanding({
                     : "border-slate-200/80 shadow-[0_3px_26px_-8px_rgba(15,23,42,0.07)] hover:shadow-[0_14px_40px_-14px_rgba(15,23,42,0.1)]"
                 )}
               >
-                <div className="border-b border-slate-200/80 bg-white px-6 py-5">
+                <div className="border-b border-slate-200/80 bg-white px-4 py-4 sm:px-6 sm:py-5">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-dark">
                       {card.hint}
@@ -895,15 +972,15 @@ export function SamenConnectHomeLanding({
                       Demo
                     </span>
                   </div>
-                  <p className="mt-2.5 text-lg font-semibold tracking-tight text-slate-900">
+                  <p className="mt-2 text-base font-semibold tracking-tight text-slate-900 sm:mt-2.5 sm:text-lg">
                     {card.title}
                   </p>
                 </div>
-                <div className="flex flex-1 flex-col gap-2.5 p-5">
+                <div className="flex flex-1 flex-col gap-2 p-4 sm:gap-2.5 sm:p-5">
                   {card.rows.map((row, i) => (
                     <div
                       key={row.label}
-                      className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                      className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm sm:p-4"
                     >
                       <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
                         <span className="text-xs font-semibold text-slate-800">
@@ -930,12 +1007,32 @@ export function SamenConnectHomeLanding({
               </div>
             ))}
           </div>
+          <div className="mx-auto mt-6 max-w-md sm:hidden">
+            <div className="rounded-2xl border border-brand/25 bg-gradient-to-br from-brand-light/50 to-white/90 px-5 py-4 text-center shadow-sm ring-1 ring-slate-900/[0.04]">
+              <p className="text-sm font-semibold tracking-tight text-slate-900">
+                Meepraten in early access?
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                Laat kort weten wat je zoekt — we nemen persoonlijk contact op.
+              </p>
+              <a
+                href={earlyAccessHref}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "mt-3 inline-flex w-full justify-center gap-2 rounded-xl border-0 bg-brand text-white shadow-md shadow-brand/30 ring-1 ring-brand/20 hover:bg-brand-dark"
+                )}
+              >
+                Claim je plek
+                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
       <section
         id="early-access"
-        className="relative overflow-hidden border-t border-slate-800/60 bg-slate-950 py-20 text-white sm:py-24 md:py-28"
+        className="relative scroll-mt-24 overflow-hidden border-t border-slate-800/60 bg-slate-950 py-10 text-white sm:scroll-mt-20 sm:py-24 md:py-28"
       >
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_70%_0%,rgba(64,173,168,0.18),transparent_58%)]"
@@ -955,16 +1052,16 @@ export function SamenConnectHomeLanding({
               ? "Meld je aan en bouw mee"
               : "Early access — eerst toegang, dan live"}
           </h2>
-          <p className="mt-6 text-base leading-relaxed text-slate-300/95 sm:text-lg sm:leading-relaxed">
+          <p className="mx-auto mt-4 max-w-[22rem] text-pretty text-base leading-relaxed text-slate-300/95 sm:mt-6 sm:max-w-none sm:text-lg sm:leading-relaxed">
             {REGISTRATION_OPEN
               ? "We breiden het platform gefaseerd uit. Laat weten wie je bent en wat je zoekt — dan nemen we persoonlijk contact op."
               : "Publieke registratie staat tijdelijk uit. Early access is beperkt: je staat op de lijst en we laten weten wanneer je kunt starten."}
           </p>
-          <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-slate-400">
+          <p className="mx-auto mt-4 max-w-md text-pretty text-sm leading-relaxed text-slate-400 sm:mt-5">
             Beperkte toegang. We laten je weten wanneer je kunt starten — geen
             wachtlijst-theater, wél zorgvuldige uitrol.
           </p>
-          <div className="mt-11 flex w-full max-w-md flex-col gap-3.5 sm:mx-auto sm:max-w-lg sm:flex-row sm:justify-center">
+          <div className="mt-6 flex w-full max-w-md flex-col gap-3 sm:mx-auto sm:mt-11 sm:max-w-lg sm:flex-row sm:justify-center sm:gap-3.5">
             <a
               href={earlyAccessHref}
               className={cn(
@@ -979,13 +1076,21 @@ export function SamenConnectHomeLanding({
               href="/login"
               className={cn(
                 buttonVariants({ variant: "ghost", size: "lg" }),
-                "w-full justify-center rounded-xl border border-white/15 text-slate-100 hover:bg-white/[0.08] hover:text-white sm:flex-1 sm:max-w-[200px]"
+                "hidden w-full justify-center rounded-xl border border-white/15 text-slate-100 hover:bg-white/[0.08] hover:text-white sm:flex sm:max-w-[200px]"
               )}
             >
               Inloggen
             </Link>
           </div>
-          <p className="mt-5">
+          <p className="mt-3 sm:hidden">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-slate-400 underline-offset-4 transition-colors hover:text-slate-200 hover:underline"
+            >
+              Inloggen voor bestaande accounts
+            </Link>
+          </p>
+          <p className="mt-5 hidden sm:block">
             <a
               href="#platform"
               className="text-sm font-medium text-slate-400 underline-offset-4 transition-colors hover:text-slate-200 hover:underline"
@@ -993,7 +1098,7 @@ export function SamenConnectHomeLanding({
               Bekijk hoe het werkt
             </a>
           </p>
-          <div className="mx-auto mt-8 flex max-w-md flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] font-semibold text-slate-300/95 sm:text-xs">
+          <div className="mx-auto mt-6 hidden max-w-md flex-col items-center gap-2 text-[11px] font-semibold text-slate-300/95 sm:mt-8 sm:flex sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-5 sm:gap-y-2 sm:text-xs">
             <span className="inline-flex items-center gap-1.5">
               <MessageCircle className="h-3.5 w-3.5 shrink-0 text-[#7fd4cf]" strokeWidth={2} aria-hidden />
               Direct contact met zorgverleners
@@ -1013,15 +1118,15 @@ export function SamenConnectHomeLanding({
               Binnen 24u reactie
             </span>
           </div>
-          <p className="mt-6 text-xs font-medium leading-relaxed text-slate-400 sm:mt-7 sm:text-sm">
+          <p className="mt-5 text-xs font-medium leading-relaxed text-slate-400 sm:mt-7 sm:text-sm">
             Beperkte plekken — we selecteren actief en nemen persoonlijk contact op
           </p>
         </div>
       </section>
 
       <footer className="border-t border-slate-200/90 bg-gradient-to-b from-slate-50 to-white">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="flex flex-col gap-14 lg:flex-row lg:items-start lg:justify-between lg:gap-16">
+        <div className="mx-auto max-w-6xl px-4 py-11 sm:px-6 sm:py-20">
+          <div className="flex flex-col gap-9 sm:gap-14 lg:flex-row lg:items-start lg:justify-between lg:gap-16">
             <div className="max-w-sm">
               <Link
                 href="/"
@@ -1037,11 +1142,17 @@ export function SamenConnectHomeLanding({
                   className="h-auto w-[160px] object-contain object-left"
                 />
               </Link>
-              <p className="mt-5 text-sm leading-relaxed text-slate-600">
-                Zorg zonder gedoe: transparant, menselijk — met alles wat bij de zorg hoort
-                op één rustige plek.
+              <p className="mt-4 text-pretty text-sm leading-relaxed text-slate-600 sm:mt-5">
+                <span className="sm:hidden">
+                  Transparant en menselijk: zorgdata hoort bij jouw traject — niet bij
+                  advertenties.
+                </span>
+                <span className="hidden sm:inline">
+                  Zorg zonder gedoe: transparant, menselijk — met alles wat bij de zorg hoort
+                  op één rustige plek.
+                </span>
               </p>
-              <div className="mt-8 rounded-2xl border border-slate-200/90 bg-white px-4 py-3.5 shadow-sm">
+              <div className="mt-5 rounded-2xl border border-slate-200/90 bg-white px-4 py-3.5 shadow-sm sm:mt-8">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Contact
                 </p>
@@ -1054,12 +1165,12 @@ export function SamenConnectHomeLanding({
               </div>
             </div>
 
-            <div className="grid flex-1 grid-cols-2 gap-12 sm:grid-cols-3 lg:max-w-xl lg:gap-14">
+            <div className="grid flex-1 grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-12 lg:max-w-xl lg:gap-14">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Platform
                 </p>
-                <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                <ul className="mt-3 space-y-2.5 text-sm text-slate-600 sm:mt-4 sm:space-y-3">
                   <li>
                     <Link
                       href="/zorenta"
@@ -1082,7 +1193,7 @@ export function SamenConnectHomeLanding({
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Early access
                 </p>
-                <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                <ul className="mt-3 space-y-2.5 text-sm text-slate-600 sm:mt-4 sm:space-y-3">
                   <li>
                     <a
                       href={earlyAccessHref}
@@ -1097,7 +1208,7 @@ export function SamenConnectHomeLanding({
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Juridisch
                 </p>
-                <ul className="mt-4 space-y-3 text-sm text-slate-500">
+                <ul className="mt-3 space-y-2.5 text-sm text-slate-500 sm:mt-4 sm:space-y-3">
                   <li>Privacybeleid (binnenkort)</li>
                   <li>Algemene voorwaarden (binnenkort)</li>
                 </ul>
@@ -1105,7 +1216,7 @@ export function SamenConnectHomeLanding({
             </div>
           </div>
 
-          <div className="mt-10 border-t border-slate-200/60 pt-6 text-center text-xs text-slate-400 sm:mt-12 sm:pt-8">
+          <div className="mt-8 border-t border-slate-200/60 pt-5 text-center text-xs text-slate-400 sm:mt-12 sm:pt-8">
             © {new Date().getFullYear()} SamenConnect. Alle rechten voorbehouden.
           </div>
         </div>
