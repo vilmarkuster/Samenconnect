@@ -22,10 +22,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
 import { SamenConnectMarketingHeader } from "@/components/samenconnect/samenconnect-marketing-header";
+import { earlyAccessUrl } from "@/lib/samenconnect/marketing-paths";
 
 const contactEmail = "info@samenconnect.nl";
-
-const earlyAccessHref = `mailto:${contactEmail}?subject=${encodeURIComponent("Early access — SamenConnect")}`;
 
 const nav = [
   { href: "#waarom", label: "Waarom" },
@@ -90,7 +89,13 @@ function LandingImageCap({
   );
 }
 
-function PhotoHeroSection({ src }: { src: string }) {
+function PhotoHeroSection({
+  src,
+  earlyAccessCtaHref,
+}: {
+  src: string;
+  earlyAccessCtaHref: string;
+}) {
   return (
     <div className="relative">
       <section className="relative min-h-[min(86dvh,780px)] overflow-hidden sm:min-h-[min(88dvh,840px)]">
@@ -136,7 +141,7 @@ function PhotoHeroSection({ src }: { src: string }) {
           <div className="mt-8 flex w-full max-w-md flex-col items-stretch gap-3 sm:mt-11 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
             <div className="flex flex-col items-center gap-2 sm:items-start">
               <a
-                href={earlyAccessHref}
+                href={earlyAccessCtaHref}
                 className={cn(
                   buttonVariants({ size: "lg" }),
                   "inline-flex min-h-[3rem] justify-center gap-2 rounded-xl border-0 bg-brand px-8 text-[0.9375rem] font-semibold text-white shadow-[0_12px_40px_-8px_rgba(64,173,168,0.55),0_0_0_1px_rgba(255,255,255,0.12)] transition-[transform,box-shadow,background-color] duration-300 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_18px_48px_-10px_rgba(64,173,168,0.6)] sm:min-w-[15.5rem]"
@@ -328,11 +333,14 @@ export function SamenConnectHomeLanding({
       <SamenConnectMarketingHeader
         navItems={nav}
         mobileMenuNavItems={navMobile}
-        earlyAccessHref={earlyAccessHref}
+        earlyAccessHref={earlyAccessUrl("landing_nav")}
       />
 
       {heroBackgroundSrc ? (
-        <PhotoHeroSection src={heroBackgroundSrc} />
+        <PhotoHeroSection
+          src={heroBackgroundSrc}
+          earlyAccessCtaHref={earlyAccessUrl("landing_hero_photo")}
+        />
       ) : (
         <section className="relative overflow-x-hidden border-b border-slate-200/45 bg-gradient-to-b from-white via-[#f6faf9] to-[#eef4f3] scroll-mt-24 sm:scroll-mt-20">
           <div
@@ -365,7 +373,7 @@ export function SamenConnectHomeLanding({
                 <div className="mt-10 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-start">
                   <div className="flex w-full flex-col gap-2 sm:w-auto">
                     <a
-                      href={earlyAccessHref}
+                      href={earlyAccessUrl("landing_hero")}
                       className={cn(
                         buttonVariants({ size: "lg" }),
                         "inline-flex w-full justify-center gap-2 border-0 bg-brand text-white shadow-lg shadow-brand/35 ring-1 ring-brand/30 transition-[box-shadow,background-color] duration-300 hover:bg-brand-dark hover:shadow-xl hover:shadow-brand/40 sm:w-auto sm:min-w-[260px]"
@@ -1016,7 +1024,7 @@ export function SamenConnectHomeLanding({
                 Laat kort weten wat je zoekt — we nemen persoonlijk contact op.
               </p>
               <a
-                href={earlyAccessHref}
+                href={earlyAccessUrl("landing_mid_cta")}
                 className={cn(
                   buttonVariants({ size: "lg" }),
                   "mt-3 inline-flex w-full justify-center gap-2 rounded-xl border-0 bg-brand text-white shadow-md shadow-brand/30 ring-1 ring-brand/20 hover:bg-brand-dark"
@@ -1063,7 +1071,7 @@ export function SamenConnectHomeLanding({
           </p>
           <div className="mt-6 flex w-full max-w-md flex-col gap-3 sm:mx-auto sm:mt-11 sm:max-w-lg sm:flex-row sm:justify-center sm:gap-3.5">
             <a
-              href={earlyAccessHref}
+              href={earlyAccessUrl("landing_early_section")}
               className={cn(
                 buttonVariants({ size: "lg" }),
                 "inline-flex w-full justify-center gap-2 rounded-xl border-0 bg-brand text-white shadow-[0_12px_40px_-10px_rgba(64,173,168,0.45)] ring-1 ring-white/15 transition-[box-shadow,background-color,transform] duration-300 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_16px_44px_-10px_rgba(64,173,168,0.5)] sm:flex-1 sm:max-w-xs"
@@ -1196,7 +1204,7 @@ export function SamenConnectHomeLanding({
                 <ul className="mt-3 space-y-2.5 text-sm text-slate-600 sm:mt-4 sm:space-y-3">
                   <li>
                     <a
-                      href={earlyAccessHref}
+                      href={earlyAccessUrl("landing_footer")}
                       className="transition-colors hover:text-brand-dark"
                     >
                       Aanmelden
