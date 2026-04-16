@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "compose:locations": "node scripts/compose-nl-locations-json.mjs",
+    "import:woonplaatsen:csv": "node scripts/import-woonplaatsen-from-csv.mjs",
     "validate:locations": "node scripts/validate-locations.mjs",
     "seed:locations": "node scripts/seed-locations.mjs",
     "verify:locations": "npm run compose:locations && npm run validate:locations && npm run seed:locations"

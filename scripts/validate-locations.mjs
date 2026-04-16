@@ -105,6 +105,52 @@ function validateExtraJsonl() {
   ok(`nl-locations-extra.jsonl: ${n} geldige regels.`);
 }
 
+function validateImportedWoonplaatsenJsonl() {
+  const path = join(root, "data", "nl-woonplaatsen-import.jsonl");
+  if (!existsSync(path)) {
+    ok("nl-woonplaatsen-import.jsonl: ontbreekt (optioneel; run import-woonplaatsen-from-csv.mjs).");
+    return;
+  }
+  const raw = readFileSync(path, "utf8");
+  let n = 0;
+  let lineNo = 0;
+  const byNorm = new Map();
+  for (const line of raw.split(/\r?\n/)) {
+    lineNo += 1;
+    const t = line.trim();
+    if (!t) continue;
+    let o;
+    try {
+      o = JSON.parse(t);
+    } catch {
+      fail(`nl-woonplaatsen-import.jsonl regel ${lineNo}: ongeldige JSON`);
+      continue;
+    }
+    if (typeof o.name !== "string" || !o.name.trim()) {
+      fail(`nl-woonplaatsen-import.jsonl regel ${lineNo}: ontbrekende of lege "name"`);
+      continue;
+    }
+    if ("municipality" in o && o.municipality != null && typeof o.municipality !== "string") {
+      fail(`nl-woonplaatsen-import.jsonl regel ${lineNo}: municipality moet string of null zijn`);
+    }
+    if ("province" in o && o.province != null && typeof o.province !== "string") {
+      fail(`nl-woonplaatsen-import.jsonl regel ${lineNo}: province moet string of null zijn`);
+    }
+    if (typeof o.province === "string" && o.province.trim() && !NL_PROVINCES.has(o.province.trim())) {
+      fail(`nl-woonplaatsen-import.jsonl regel ${lineNo}: onbekende province "${o.province}"`);
+    }
+    const nk = normalizeNlPlaceName(o.name);
+    if (byNorm.has(nk)) {
+      fail(
+        `nl-woonplaatsen-import.jsonl regel ${lineNo}: dubbele normalized_name "${nk}" (ook regel met "${byNorm.get(nk)}")`
+      );
+    }
+    byNorm.set(nk, o.name.trim());
+    n += 1;
+  }
+  ok(`nl-woonplaatsen-import.jsonl: ${n} geldige regels, ${byNorm.size} unieke normalized_name.`);
+}
+
 function validateNlLocationsJson() {
   const path = join(root, "data", "nl-locations.json");
   if (!existsSync(path)) {
@@ -162,6 +208,7 @@ function validateNlLocationsJson() {
 }
 
 validateGemeentenTsv();
+validateImportedWoonplaatsenJsonl();
 validateExtraJsonl();
 validateNlLocationsJson();
 

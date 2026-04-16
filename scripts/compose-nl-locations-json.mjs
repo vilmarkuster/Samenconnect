@@ -1,13 +1,17 @@
 /**
  * Bouwt `data/nl-locations.json` uit lokale bronnen (geen netwerk).
- * Volgorde: gemeenten (canoniek) → extra (woonplaatsen/alias/regio) alleen als normalized_name nog vrij is.
+ * Volgorde:
+ *   1) gemeenten.tsv (canoniek)
+ *   2) nl-woonplaatsen-import.jsonl (optioneel; output van import-woonplaatsen-from-csv.mjs)
+ *   3) nl-locations-extra.jsonl (aliases / regio’s) alleen als normalized_name nog vrij is
  *
  * Run: npm run compose:locations
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeNlPlaceName } from "./_normalize-nl-place.mjs";
+import { readLocationsJsonl } from "./_read-locations-jsonl.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -60,12 +64,30 @@ function readExtraJsonl() {
   return rows;
 }
 
+function readImportedWoonplaatsenJsonl() {
+  const path = join(root, "data", "nl-woonplaatsen-import.jsonl");
+  if (!existsSync(path)) return [];
+  return readLocationsJsonl(path);
+}
+
 function main() {
   const byNorm = new Map();
 
   for (const r of readGemeentenTsv()) {
     const norm = normalizeNlPlaceName(r.name);
     if (!norm) continue;
+    byNorm.set(norm, {
+      name: r.name,
+      municipality: r.municipality,
+      province: r.province,
+      normalized_name: norm,
+    });
+  }
+
+  for (const r of readImportedWoonplaatsenJsonl()) {
+    const norm = normalizeNlPlaceName(r.name);
+    if (!norm) continue;
+    if (byNorm.has(norm)) continue;
     byNorm.set(norm, {
       name: r.name,
       municipality: r.municipality,

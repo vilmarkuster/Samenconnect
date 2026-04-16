@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   const qRaw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   const limitParam = Number(req.nextUrl.searchParams.get("limit") ?? MAX_DEFAULT);
   const limit = Number.isFinite(limitParam)
-    ? Math.min(Math.max(1, Math.floor(limitParam)), 20)
+    ? Math.min(Math.max(1, Math.floor(limitParam)), 10)
     : MAX_DEFAULT;
 
   if (qRaw.length < MIN_LEN) {
