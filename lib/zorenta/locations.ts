@@ -1,44 +1,6 @@
-export const DUTCH_LOCATIONS = [
-  "Amsterdam",
-  "Rotterdam",
-  "Den Haag",
-  "Utrecht",
-  "Eindhoven",
-  "Groningen",
-  "Tilburg",
-  "Almere",
-  "Breda",
-  "Nijmegen",
-  "Arnhem",
-  "Haarlem",
-  "Amersfoort",
-  "Apeldoorn",
-  "Leiden",
-  "Dordrecht",
-  "Zwolle",
-  "Maastricht",
-  "Deventer",
-  "Den Bosch",
-  "Alkmaar",
-  "Zaandam",
-  "Purmerend",
-  "Hilversum",
-  "Hoofddorp",
-  "Enschede",
-  "Hengelo",
-  "Amstelveen",
-  "Schiedam",
-  "Spijkenisse",
-  "Lelystad",
-  "Helmond",
-  "Oss",
-  "Venlo",
-  "Roosendaal",
-  "Zoetermeer",
-  // Regio-opties
-  "Regio Amsterdam",
-  "Regio Utrecht",
-  "Regio Rotterdam",
-  "Randstad",
-] as const;
-
+/**
+ * Vroeger: vaste stad/regio-strings voor autocomplete.
+ * Autocomplete gebruikt nu `public.locations` + `/api/locations/search`.
+ * Regio-/aliasregels staan in `data/nl-locations-extra.jsonl` en worden via compose in `data/nl-locations.json` gezet.
+ */
+export const DUTCH_LOCATIONS = [] as const;

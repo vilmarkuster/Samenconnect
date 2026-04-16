@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MOCK_CAREGIVERS } from "@/lib/zorenta/mock-caregivers";
-import { DUTCH_LOCATIONS } from "@/lib/zorenta/locations";
 import { formatLocation } from "@/lib/zorenta/formatters";
+import { searchNlLocations } from "@/lib/locations/search-client";
 
 const CARE_TYPES = [
   "Thuiszorg",
@@ -13,7 +13,6 @@ const CARE_TYPES = [
   "Dagbesteding",
 ] as const;
 
-type LocationSuggestion = string;
 type CaregiverSuggestion = { id: string; name: string };
 type CareTypeSuggestion = (typeof CARE_TYPES)[number];
 type OrganisationSuggestion = { id: string; name: string };
@@ -53,26 +52,60 @@ export function GlobalSearchAutocomplete({
 }: Props) {
   const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
+  const [locationLabels, setLocationLabels] = useState<string[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setDraft(value);
   }, [value]);
 
+  useEffect(() => {
+    const q = draft.trim();
+    if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+    if (abortRef.current) abortRef.current.abort();
+
+    if (q.length < 2) {
+      setLocationLabels([]);
+      setLocationLoading(false);
+      return;
+    }
+
+    setLocationLoading(true);
+    debounceRef.current = window.setTimeout(() => {
+      abortRef.current = new AbortController();
+      const ac = abortRef.current;
+      searchNlLocations(q, ac.signal)
+        .then((hits) => {
+          if (ac.signal.aborted) return;
+          setLocationLabels(hits.map((h) => h.name));
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          setLocationLabels([]);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setLocationLoading(false);
+        });
+    }, 220);
+
+    return () => {
+      if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, [draft]);
+
   const groupedSuggestions = useMemo(() => {
     const q = draft.trim().toLowerCase();
     if (!q) {
       return {
-        locations: [] as LocationSuggestion[],
+        locations: [] as string[],
         careTypes: [] as CareTypeSuggestion[],
         caregivers: [] as CaregiverSuggestion[],
         organisations: [] as OrganisationSuggestion[],
       };
     }
-
-    const locations = startsWithThenIncludes(
-      DUTCH_LOCATIONS as unknown as string[],
-      q
-    );
 
     const careTypes = startsWithThenIncludes(
       CARE_TYPES as unknown as string[],
@@ -107,17 +140,19 @@ export function GlobalSearchAutocomplete({
     );
     const organisations = [...orgStarts, ...orgIncludes].slice(0, 8);
 
-    return { locations, careTypes, caregivers, organisations };
-  }, [draft]);
+    return { locations: locationLabels, careTypes, caregivers, organisations };
+  }, [draft, locationLabels]);
 
   useEffect(() => {
-    const hasAny =
-      groupedSuggestions.locations.length > 0 ||
-      groupedSuggestions.careTypes.length > 0 ||
-      groupedSuggestions.caregivers.length > 0 ||
-      groupedSuggestions.organisations.length > 0;
-    setOpen(Boolean(draft.trim()) && hasAny);
-  }, [draft, groupedSuggestions]);
+    const q = draft.trim();
+    const hasLocations = q.length >= 2 && (locationLabels.length > 0 || locationLoading);
+    const hasShortQueryHits =
+      q.length > 0 &&
+      (groupedSuggestions.careTypes.length > 0 ||
+        groupedSuggestions.caregivers.length > 0 ||
+        groupedSuggestions.organisations.length > 0);
+    setOpen(Boolean(q && (hasLocations || hasShortQueryHits)));
+  }, [draft, groupedSuggestions, locationLabels.length, locationLoading]);
 
   return (
     <div className="relative mx-auto w-full max-w-2xl">
@@ -165,7 +200,18 @@ export function GlobalSearchAutocomplete({
       {open && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
           <div className="max-h-64 overflow-y-auto py-2">
-            {/* Locaties */}
+            {draft.trim().length >= 2 && locationLoading && (
+              <div className="px-3 py-1.5 text-xs text-slate-500">Locaties zoeken…</div>
+            )}
+            {draft.trim().length >= 2 &&
+              !locationLoading &&
+              groupedSuggestions.locations.length === 0 &&
+              groupedSuggestions.careTypes.length === 0 &&
+              groupedSuggestions.caregivers.length === 0 &&
+              groupedSuggestions.organisations.length === 0 && (
+                <div className="px-3 py-1.5 text-xs text-slate-500">Geen suggesties</div>
+              )}
+
             {groupedSuggestions.locations.length > 0 && (
               <div className="px-3 py-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -190,7 +236,6 @@ export function GlobalSearchAutocomplete({
               </div>
             )}
 
-            {/* Zorgtypes */}
             {groupedSuggestions.careTypes.length > 0 && (
               <div className="px-3 py-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -215,7 +260,6 @@ export function GlobalSearchAutocomplete({
               </div>
             )}
 
-            {/* Zorgverleners */}
             {groupedSuggestions.caregivers.length > 0 && (
               <div className="px-3 py-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -240,7 +284,6 @@ export function GlobalSearchAutocomplete({
               </div>
             )}
 
-            {/* Organisaties */}
             {groupedSuggestions.organisations.length > 0 && (
               <div className="px-3 py-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -270,4 +313,3 @@ export function GlobalSearchAutocomplete({
     </div>
   );
 }
-

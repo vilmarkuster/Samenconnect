@@ -1,36 +1,86 @@
- "use client";
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { DUTCH_LOCATIONS } from "@/lib/zorenta/locations";
+import { searchNlLocations } from "@/lib/locations/search-client";
+import type { LocationSearchHit } from "@/lib/locations/types";
 
 export type CityAutocompleteProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  id?: string;
+  name?: string;
+  "aria-invalid"?: boolean;
 };
 
-export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompleteProps) {
+function subtitle(hit: LocationSearchHit): string | null {
+  const parts = [hit.municipality, hit.province].filter(
+    (x): x is string => typeof x === "string" && x.trim().length > 0 && x !== hit.name
+  );
+  if (parts.length === 0) return null;
+  return parts.join(" · ");
+}
+
+export function CityAutocomplete({
+  value,
+  onChange,
+  placeholder,
+  id,
+  name,
+  "aria-invalid": ariaInvalid,
+}: CityAutocompleteProps) {
   const [query, setQuery] = useState(value ?? "");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [suggestions, setSuggestions] = useState<LocationSearchHit[]>([]);
+  const [loading, setLoading] = useState(false);
   const blurTimeoutRef = useRef<number | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setQuery(value ?? "");
   }, [value]);
 
-  const matches = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    const startsWith = DUTCH_LOCATIONS.filter((c) => c.toLowerCase().startsWith(q));
-    const includes = DUTCH_LOCATIONS.filter(
-      (c) => !startsWith.includes(c) && c.toLowerCase().includes(q),
-    );
-    return [...startsWith, ...includes].slice(0, 8);
+  useEffect(() => {
+    const q = query.trim();
+    if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+    if (abortRef.current) abortRef.current.abort();
+
+    if (q.length < 2) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    debounceRef.current = window.setTimeout(() => {
+      abortRef.current = new AbortController();
+      const ac = abortRef.current;
+      searchNlLocations(q, ac.signal)
+        .then((hits) => {
+          if (ac.signal.aborted) return;
+          setSuggestions(hits);
+          setActiveIndex(0);
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          setSuggestions([]);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setLoading(false);
+        });
+    }, 220);
+
+    return () => {
+      if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [query]);
 
-  const hasMatches = matches.length > 0;
+  const hasMatches = suggestions.length > 0;
+  const showPanel = open && query.trim().length >= 2;
 
   function selectValue(next: string) {
     setQuery(next);
@@ -43,15 +93,15 @@ export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompl
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
-      setActiveIndex((prev) => (prev + 1) % matches.length);
+      setActiveIndex((prev) => (prev + 1) % suggestions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setOpen(true);
-      setActiveIndex((prev) => (prev - 1 + matches.length) % matches.length);
+      setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === "Enter") {
-      if (open && matches[activeIndex]) {
+      if (open && suggestions[activeIndex]) {
         e.preventDefault();
-        selectValue(matches[activeIndex]);
+        selectValue(suggestions[activeIndex].name);
       }
     } else if (e.key === "Escape") {
       if (open) {
@@ -62,7 +112,6 @@ export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompl
   }
 
   function handleBlur() {
-    // Kleine delay zodat klik op suggestie nog kan registreren
     blurTimeoutRef.current = window.setTimeout(() => {
       setOpen(false);
     }, 120);
@@ -73,19 +122,22 @@ export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompl
       window.clearTimeout(blurTimeoutRef.current);
       blurTimeoutRef.current = null;
     }
-    if (hasMatches) setOpen(true);
+    if (query.trim().length >= 2) setOpen(true);
   }
 
   return (
     <div className="relative">
       <Input
+        id={id}
+        name={name}
+        aria-invalid={ariaInvalid}
         placeholder={placeholder ?? "Bijv. Amsterdam"}
         value={query}
         onChange={(e) => {
           const next = e.target.value;
           setQuery(next);
           onChange(next);
-          if (next.trim()) {
+          if (next.trim().length >= 2) {
             setOpen(true);
             setActiveIndex(0);
           } else {
@@ -97,32 +149,44 @@ export function CityAutocomplete({ value, onChange, placeholder }: CityAutocompl
         onFocus={handleFocus}
         className="rounded-lg border-slate-200 bg-white"
         autoComplete="off"
+        aria-autocomplete="list"
+        aria-expanded={showPanel}
       />
-      {open && hasMatches && (
+      {showPanel && (
         <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white text-sm shadow-lg">
-          {matches.map((city, idx) => (
-            <button
-              key={city}
-              type="button"
-              onMouseDown={(e) => {
-                // voorkom dat blur de selectie annuleert
-                e.preventDefault();
-                if (blurTimeoutRef.current != null) {
-                  window.clearTimeout(blurTimeoutRef.current);
-                  blurTimeoutRef.current = null;
-                }
-                selectValue(city);
-              }}
-              className={`flex w-full items-center px-3 py-2 text-left hover:bg-slate-50 ${
-                idx === activeIndex ? "bg-slate-50" : ""
-              }`}
-            >
-              {city}
-            </button>
-          ))}
+          {loading && (
+            <div className="px-3 py-2 text-xs text-slate-500">Zoeken…</div>
+          )}
+          {!loading && !hasMatches && (
+            <div className="px-3 py-2 text-xs text-slate-500">Geen resultaten</div>
+          )}
+          {!loading &&
+            hasMatches &&
+            suggestions.map((hit, idx) => {
+              const sub = subtitle(hit);
+              return (
+                <button
+                  key={`${hit.name}-${idx}`}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (blurTimeoutRef.current != null) {
+                      window.clearTimeout(blurTimeoutRef.current);
+                      blurTimeoutRef.current = null;
+                    }
+                    selectValue(hit.name);
+                  }}
+                  className={`flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50 ${
+                    idx === activeIndex ? "bg-slate-50" : ""
+                  }`}
+                >
+                  <span className="font-medium text-slate-800">{hit.name}</span>
+                  {sub ? <span className="text-xs text-slate-500">{sub}</span> : null}
+                </button>
+              );
+            })}
         </div>
       )}
     </div>
   );
 }
-

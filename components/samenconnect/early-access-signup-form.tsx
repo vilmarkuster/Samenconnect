@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { cn } from "@/lib/utils";
 import type { ApplicantType, EarlyAccessSource } from "@/lib/samenconnect/early-access-signup-schema";
 import { SamenConnectMarketingHeader } from "@/components/samenconnect/samenconnect-marketing-header";
@@ -277,17 +278,16 @@ function EarlyAccessSignupForm({ initialSource }: { initialSource: EarlyAccessSo
           <label htmlFor="ea-region" className="block text-sm font-medium text-slate-800">
             Regio / woonplaats <span className="text-red-600">*</span>
           </label>
-          <Input
-            id="ea-region"
-            name="region"
-            autoComplete="address-level2"
-            required
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className="mt-1.5"
-            placeholder="Bijv. Utrecht of Midden-Nederland"
-            aria-invalid={!!fieldErrors.region}
-          />
+          <div className="mt-1.5">
+            <CityAutocomplete
+              id="ea-region"
+              name="region"
+              value={region}
+              onChange={setRegion}
+              placeholder="Typ minimaal 2 letters (bijv. Utrecht, Randstad)"
+              aria-invalid={!!fieldErrors.region}
+            />
+          </div>
           {fieldErrors.region?.[0] ? (
             <p className="mt-1 text-xs text-red-600">{fieldErrors.region[0]}</p>
           ) : null}

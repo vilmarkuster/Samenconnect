@@ -6,7 +6,11 @@
     "dev": "next dev -p 3002",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "compose:locations": "node scripts/compose-nl-locations-json.mjs",
+    "validate:locations": "node scripts/validate-locations.mjs",
+    "seed:locations": "node scripts/seed-locations.mjs",
+    "verify:locations": "npm run compose:locations && npm run validate:locations && npm run seed:locations"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
