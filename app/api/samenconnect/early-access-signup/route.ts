@@ -167,10 +167,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await sendEarlyAccessApplicantConfirmation({
-    to: data.email,
-    firstName: data.first_name,
-  });
+  let applicantEmailDelivered = false;
+  let applicantEmailSkipped = false;
+  let applicantEmailError: string | undefined;
+  try {
+    const applicantResult = await sendEarlyAccessApplicantConfirmation({
+      to: insertPayload.email,
+      firstName: data.first_name,
+    });
+    applicantEmailDelivered = applicantResult.sent;
+    applicantEmailSkipped = applicantResult.skipped === true;
+    applicantEmailError = applicantResult.error;
+    if (applicantResult.skipped) {
+      // eslint-disable-next-line no-console
+      console.info("[early-access] signup: applicant mail skipped (flag off or not recognized)");
+    } else if (!applicantResult.sent && applicantResult.error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        "[early-access] signup: applicant mail failed (signup still ok)",
+        applicantResult.error
+      );
+    }
+  } catch (e) {
+    applicantEmailError = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.error("[early-access] signup: applicant mail threw (signup still ok)", e);
+  }
 
   if (!teamMail.sent && isDev) {
     if (teamMail.error) {
@@ -183,5 +205,8 @@ export async function POST(req: NextRequest) {
     ok: true,
     id: row.id,
     emailDelivered: teamMail.sent,
+    applicantEmailDelivered,
+    applicantEmailSkipped,
+    applicantEmailError,
   });
 }

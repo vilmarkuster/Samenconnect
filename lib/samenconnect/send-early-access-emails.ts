@@ -56,6 +56,12 @@ function buildTeamEmailHtml(row: EarlyAccessSignupRow): string {
   </body></html>`;
 }
 
+/** `1`, `true`, `yes` (case-insensitive, getrimd). */
+export function isEarlyAccessApplicantConfirmEnabled(): boolean {
+  const v = process.env.EARLY_ACCESS_SEND_APPLICANT_CONFIRM?.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 async function sendResendEmail(params: {
   to: string[];
   subject: string;
@@ -87,7 +93,7 @@ async function sendResendEmail(params: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    return { ok: false, status: res.status, body: text.slice(0, 500) };
+    return { ok: false, status: res.status, body: text.slice(0, 8000) };
   }
   return { ok: true };
 }
@@ -121,15 +127,36 @@ export async function sendEarlyAccessTeamNotification(
 export async function sendEarlyAccessApplicantConfirmation(params: {
   to: string;
   firstName: string;
-}): Promise<{ sent: boolean; error?: string }> {
-  if (process.env.EARLY_ACCESS_SEND_APPLICANT_CONFIRM !== "1") {
-    return { sent: false };
+}): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
+  const enabled = isEarlyAccessApplicantConfirmEnabled();
+  const flagRaw = process.env.EARLY_ACCESS_SEND_APPLICANT_CONFIRM;
+
+  if (!enabled) {
+    // eslint-disable-next-line no-console
+    console.info("[early-access] applicant-confirm disabled", {
+      flagDefined: flagRaw !== undefined,
+      flagPreview: flagRaw == null ? null : `${String(flagRaw).slice(0, 20)}…(len=${String(flagRaw).length})`,
+    });
+    return { sent: false, skipped: true };
   }
+
+  // eslint-disable-next-line no-console
+  console.info("[early-access] applicant-confirm enabled", {
+    toDomain: params.to.includes("@") ? params.to.split("@")[1] : "(invalid)",
+  });
+
   const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.55;color:#0f172a">
   <p>Beste ${escapeHtml(params.firstName)},</p>
   <p>Bedankt voor je interesse in SamenConnect. We hebben je aanvraag ontvangen en nemen persoonlijk contact op zodra we een passende volgende stap zien.</p>
   <p style="color:#64748b;font-size:14px">Met vriendelijke groet,<br/>Team SamenConnect</p>
+  <p style="margin-top:24px;font-size:12px;color:#888;line-height:1.5">Je ontvangt deze mail omdat je je hebt aangemeld voor early access via samenconnect.nl</p>
   </body></html>`;
+
+  // eslint-disable-next-line no-console
+  console.info("[early-access] applicant-confirm attempt", {
+    to: params.to,
+    subject: "We hebben je early access aanvraag ontvangen – SamenConnect",
+  });
 
   const result = await sendResendEmail({
     to: [params.to],
@@ -138,8 +165,20 @@ export async function sendEarlyAccessApplicantConfirmation(params: {
   });
 
   if (!result.ok) {
-    return { sent: false, error: result.status === 0 ? result.body : `Resend ${result.status}` };
+    const errMsg =
+      result.status === 0
+        ? result.body
+        : `Resend HTTP ${result.status}: ${result.body}`;
+    // eslint-disable-next-line no-console
+    console.error("[early-access] applicant-confirm failure", {
+      to: params.to,
+      message: errMsg,
+    });
+    return { sent: false, error: errMsg };
   }
+
+  // eslint-disable-next-line no-console
+  console.info("[early-access] applicant-confirm success", { to: params.to });
   return { sent: true };
 }
 
