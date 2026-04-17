@@ -86,6 +86,16 @@ function caregiverProfileRouteId(other: OtherParticipantProfile | null | undefin
   return raw;
 }
 
+/** Link naar publiek zorgverlener-profiel; valt terug op `profiles.id` als de API geen route-id gaf. */
+function caregiverProfileHref(other: OtherParticipantProfile | null | undefined): string | null {
+  const fromApi = caregiverProfileRouteId(other);
+  if (fromApi) return `/zorenta/caregivers/${fromApi}`;
+  const role = (other?.role ?? "").trim().toLowerCase();
+  const pid = other?.id?.trim();
+  if (role === "caregiver" && pid) return `/zorenta/caregivers/${pid}`;
+  return null;
+}
+
 type ApiMessage = {
   id: string;
   sender_id: string;
@@ -1402,8 +1412,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const displayName =
     getPresentableOtherName(selectedConvo, meId, resolvedOtherNames)?.trim() || "Contact";
   threadOtherDisplayNameRef.current = displayName;
-  const headerCaregiverRoute = caregiverProfileRouteId(selectedConvo?.other);
-  const headerProfileHref = headerCaregiverRoute ? `/zorenta/caregivers/${headerCaregiverRoute}` : null;
+  const headerProfileHref = caregiverProfileHref(selectedConvo?.other);
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
   const selectedApplicationStatus = applicationStatusLabelNl(selectedConvo?.application?.status);
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
@@ -1557,8 +1566,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     : hasUnread
                       ? "unread"
                       : "default";
-                  const profileRouteId = caregiverProfileRouteId(conv.other);
-                  const profileHref = profileRouteId ? `/zorenta/caregivers/${profileRouteId}` : null;
+                  const profileHref = caregiverProfileHref(conv.other);
                   return (
                     <div
                       key={conv.id}

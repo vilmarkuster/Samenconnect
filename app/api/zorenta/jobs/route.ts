@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getZorentaSupabaseClient, getAccessTokenFromRequest } from "@/lib/zorenta/supabase-server";
 import { jsonResponse } from "@/lib/zorenta/auth";
+import { resolveJobPosterType } from "@/lib/zorenta/resolve-job-poster-type";
 import { createJobSchema } from "@/lib/zorenta/validations";
 import { normalizeJobImageUrls } from "@/lib/zorenta/job-images";
 import { logger } from "@/lib/zorenta/logger";
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
   const auth = await import("@/lib/zorenta/auth").then((m) => m.requireZorentaAuth(req));
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
   const { supabase, userId, profile } = auth;
-  if (profile.role !== "client" && profile.role !== "organization") {
+  const posterType = await resolveJobPosterType(supabase, userId, profile.role);
+  if (!posterType) {
     return jsonResponse({ error: "Alleen cliënten en organisaties kunnen vacatures plaatsen." }, 403);
   }
   try {
@@ -89,7 +91,6 @@ export async function POST(req: NextRequest) {
       (typeof care_context === "string" && care_context.trim()) ||
       (typeof care_type === "string" && care_type.trim()) ||
       (soortLabels[0] ?? null);
-    const posterType = profile.role as "client" | "organization";
     const payload = {
       poster_id: userId,
       poster_type: posterType,

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
 import { primaryCareLabelFromTaxonomy } from "@/lib/zorenta/intake-taxonomy";
+import { resolveJobPosterType } from "@/lib/zorenta/resolve-job-poster-type";
 
 function inferRelationLabel(who: string | null): string | null {
   const raw = (who ?? "").trim().toLowerCase();
@@ -76,7 +77,8 @@ export async function POST(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
   const { supabase, userId, profile } = auth;
-  if (profile.role !== "client" && profile.role !== "organization") {
+  const posterTypeResolved = await resolveJobPosterType(supabase, userId, profile.role);
+  if (!posterTypeResolved) {
     return jsonResponse({ error: "Alleen cliënten kunnen een intake invullen." }, 403);
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -156,7 +158,7 @@ export async function POST(req: NextRequest) {
   );
   const jobPayload = {
     poster_id: userId,
-    poster_type: profile.role as "client" | "organization",
+    poster_type: posterTypeResolved,
     title,
     description: typeof intakeRow.notes === "string" ? intakeRow.notes : null,
     city:

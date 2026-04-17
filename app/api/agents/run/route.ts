@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabaseForAgentsApi } from "@/lib/agents-api-supabase";
+import { getAnthropicServerApiKey } from "@/lib/zorenta/anthropic-server-key";
 import { PLATFORM_ANTHROPIC_CLAUDE_MODEL } from "@/lib/platform-anthropic-model";
 
 type CareJobRow = {
@@ -47,7 +48,7 @@ function extractJsonObjectFromText(text: string): string | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = getAnthropicServerApiKey();
     if (!apiKey) {
       return new Response(
         JSON.stringify({
@@ -196,7 +197,54 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const caregiverRows: CaregiverRow[] = (caregivers ?? []) as CaregiverRow[];
+      let caregiverRows: CaregiverRow[] = (caregivers ?? []) as CaregiverRow[];
+
+      if (caregiverRows.length === 0) {
+        const { data: cps, error: cpErr } = await supabase
+          .from("caregiver_profiles")
+          .select(
+            "profile_id, headline, bio, skills, experience_years, availability, city, region, country, updated_at"
+          )
+          .order("updated_at", { ascending: false })
+          .limit(30);
+        if (cpErr) {
+          return new Response(
+            JSON.stringify({
+              output: `Failed to load caregiver_profiles: ${cpErr.message}`
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+        const pids = [...new Set((cps ?? []).map((c) => c.profile_id).filter(Boolean))] as string[];
+        const { data: profRows } =
+          pids.length > 0
+            ? await supabase.from("profiles").select("id, display_name").in("id", pids)
+            : { data: [] as { id: string; display_name: string | null }[] };
+        const byPid = Object.fromEntries((profRows ?? []).map((p) => [p.id, p]));
+        caregiverRows = (cps ?? [])
+          .filter((cp) => cp.profile_id)
+          .map((cp) => {
+            const pid = String(cp.profile_id);
+            const prof = byPid[pid];
+            const parts = [cp.city, cp.region, cp.country]
+              .filter((x) => typeof x === "string" && String(x).trim().length > 0)
+              .map((x) => String(x).trim());
+            return {
+              id: pid,
+              name: (prof?.display_name ?? "").trim() || "Zorgverlener",
+              location: parts.length > 0 ? parts.join(", ") : "",
+              zorgtype: null,
+              specialisaties: null,
+              vaardigheden: cp.skills ?? null,
+              certificaten: null,
+              registraties: null,
+              beschikbaarheid: cp.availability ?? null,
+              prijs: null,
+              profile_id: pid,
+            } as CaregiverRow;
+          });
+      }
+
       if (caregiverRows.length === 0) {
         return new Response(
           JSON.stringify({

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
+import { getAnthropicServerApiKey } from "@/lib/zorenta/anthropic-server-key";
 import { PLATFORM_ANTHROPIC_CLAUDE_MODEL } from "@/lib/platform-anthropic-model";
 
 function extractFirstText(output: unknown): string {
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getAnthropicServerApiKey();
   if (!apiKey) return jsonResponse({ error: "AI is momenteel niet beschikbaar." }, 500);
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
