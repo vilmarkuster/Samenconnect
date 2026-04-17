@@ -1,5 +1,5 @@
 /**
- * Id selection for `/zorenta/caregivers/[id]`.
+ * Id selection for `/caregivers/[id]`.
  * GET resolves profiles.id (linked caregiver), caregiver_profiles PK, or public.caregivers.id.
  * Prefer linked profile ids over marketplace listing ids so seed/demo marketplace rows never win.
  */

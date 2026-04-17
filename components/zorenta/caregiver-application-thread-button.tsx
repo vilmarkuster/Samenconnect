@@ -60,7 +60,7 @@ export function CaregiverApplicationThreadButton({
       });
     }
     setLoading(false);
-    router.push(`/zorenta/berichten?conversation=${encodeURIComponent(data.id)}`);
+    router.push(`/berichten?conversation=${encodeURIComponent(data.id)}`);
   }
 
   return (

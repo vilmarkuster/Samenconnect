@@ -226,7 +226,7 @@ export function ZorentaMessageModal({ recipientName, recipientId, onClose }: Pro
                 className="mt-1 border-slate-200 text-xs"
                 onClick={() => {
                   onClose();
-                  router.push("/zorenta/berichten");
+                  router.push("/berichten");
                 }}
               >
                 Bekijk berichten

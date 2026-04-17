@@ -24,13 +24,13 @@ export function ZorentaTopbar({ unreadCount, onMenuClick, isAdmin }: ZorentaTopb
             <Menu className="h-5 w-5" />
           </button>
         )}
-        <Link href="/zorenta/dashboard" className="hidden font-semibold text-slate-900 md:block">
+        <Link href="/dashboard" className="hidden font-semibold text-slate-900 md:block">
           SamenConnect
         </Link>
       </div>
       <div className="flex items-center gap-1.5">
         {isAdmin && (
-          <Link href="/zorenta/admin">
+          <Link href="/admin">
             <Button
               variant="outline"
               size="sm"
@@ -42,7 +42,7 @@ export function ZorentaTopbar({ unreadCount, onMenuClick, isAdmin }: ZorentaTopb
           </Link>
         )}
         <Link
-          href="/zorenta/notifications"
+          href="/notifications"
           className="relative flex items-center justify-center rounded-lg p-2.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
           aria-label="Notificaties"
         >
@@ -53,7 +53,7 @@ export function ZorentaTopbar({ unreadCount, onMenuClick, isAdmin }: ZorentaTopb
             </span>
           )}
         </Link>
-        <Link href="/zorenta/dashboard">
+        <Link href="/dashboard">
           <Button variant="ghost" size="sm" className="gap-1.5 text-slate-600">
             <ExternalLink className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Terug naar SamenConnect</span>

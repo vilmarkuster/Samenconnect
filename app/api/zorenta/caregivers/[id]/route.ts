@@ -171,7 +171,7 @@ function pageCaregiverFromOrganizationLinked(
   };
 }
 
-/** Response shape for `/zorenta/caregivers/[id]` page (expects `profile` + structured `caregiver`). */
+/** Response shape for `/caregivers/[id]` page (expects `profile` + structured `caregiver`). */
 function buildZorentaCaregiverPageResponse(linked: {
   profileId: string;
   profile: { id: string; display_name: string | null; role: string | null; avatar_url?: string | null };

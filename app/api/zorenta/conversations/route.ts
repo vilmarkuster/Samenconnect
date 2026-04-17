@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
   const profileMap = Object.fromEntries(profileRows.map((p) => [p.id, p]));
 
   /**
-   * Profile navigation for `/zorenta/caregivers/[id]` (aligned with hasRenderablePublicCaregiverPagePayload):
+   * Profile navigation for `/caregivers/[id]` (aligned with hasRenderablePublicCaregiverPagePayload):
    * - If `caregiver_profiles` exists → URL uses `profiles.id`; page renders.
    * - Else only a marketplace listing → no public profile page (org/kaart-API ≠ renderbare caregiver-pagina).
    *   `caregiver_route_id` may still be set for debugging; links use `has_renderable_caregiver_profile`.

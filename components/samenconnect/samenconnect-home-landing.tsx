@@ -1181,7 +1181,7 @@ export function SamenConnectHomeLanding({
                 <ul className="mt-3 space-y-2.5 text-sm text-slate-600 sm:mt-4 sm:space-y-3">
                   <li>
                     <Link
-                      href="/zorenta"
+                      href="/"
                       className="transition-colors hover:text-brand-dark"
                     >
                       Ontdek SamenConnect

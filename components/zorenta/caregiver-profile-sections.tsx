@@ -27,7 +27,7 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
 }
 
 /**
- * Shared caregiver body: exact section order and styling as /zorenta/profile.
+ * Shared caregiver body: exact section order and styling as /profile.
  * Over mij → Vaardigheden → Ervaring → Beschikbaarheid → Tarief → Mobiliteit → Certificaten → Talen
  */
 export function CaregiverProfileSections({

@@ -20,7 +20,7 @@ export function AuthLandingGate({
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/zorenta/dashboard");
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, isLoading, router]);
 

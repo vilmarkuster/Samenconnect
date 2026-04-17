@@ -4,30 +4,41 @@ import { createServerClient } from "@supabase/ssr";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
 
 const ZORENTA_PUBLIC = [
-  "/zorenta",
-  "/zorenta/login",
-  "/zorenta/register",
-  "/zorenta/registration-closed",
+  "/",
+  "/login",
+  "/register",
+  "/registration-closed",
 ];
 const ZORENTA_PROTECTED = [
-  "/zorenta/dashboard",
-  "/zorenta/matches",
-  "/zorenta/profile",
-  "/zorenta/messages",
-  "/zorenta/berichten",
-  "/zorenta/notifications",
-  "/zorenta/reviews",
-  "/zorenta/search",
-  "/zorenta/applications",
-  "/zorenta/jobs",
-  "/zorenta/intake",
+  "/dashboard",
+  "/matches",
+  "/profile",
+  "/messages",
+  "/berichten",
+  "/notifications",
+  "/reviews",
+  "/search",
+  "/applications",
+  "/jobs",
+  "/intake",
+  "/admin",
+  "/settings",
+  "/caregivers/me",
+  "/clients",
+  "/organizations",
+  "/profielen",
+  "/favorites",
+  "/opgeslagen",
+  "/sollicitaties",
+  "/zorgvraag-nieuw",
+  "/vacatures",
 ];
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 120;
 const apiCounts = new Map<string, { count: number; resetAt: number }>();
 
 function isZorentaPublic(pathname: string): boolean {
-  if (!pathname.startsWith("/zorenta")) return true;
+  if (!pathname.startsWith("/")) return true;
   return ZORENTA_PUBLIC.includes(pathname);
 }
 
@@ -57,53 +68,20 @@ function nextWithPathname(req: NextRequest, pathname: string) {
 }
 
 function isZorentaProtected(pathname: string): boolean {
-  if (!pathname.startsWith("/zorenta")) return false;
+  if (!pathname.startsWith("/")) return false;
   if (ZORENTA_PROTECTED.includes(pathname)) return true;
   return ZORENTA_PROTECTED.some((p) => pathname.startsWith(p + "/"));
 }
 
-/** Avoid open redirects: only same-origin paths under /zorenta */
+/** Avoid open redirects: only same-origin app paths (relative, single leading slash). */
 function safeZorentaNext(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/zorenta/dashboard";
-  if (!next.startsWith("/zorenta")) return "/zorenta/dashboard";
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  if (!next.startsWith("/")) return "/dashboard";
   return next;
 }
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
-
-  // Ingelogde gebruikers: legacy `/dashboard` → SamenConnect (geen App Builder als default)
-  if (pathname === "/dashboard") {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (supabaseUrl && supabaseAnonKey) {
-      let dashboardResponse = NextResponse.next();
-      const supabaseDashboard = createServerClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          getAll() {
-            return req.cookies.getAll();
-          },
-          setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              dashboardResponse.cookies.set(
-                name,
-                value,
-                options as Parameters<typeof dashboardResponse.cookies.set>[2]
-              );
-            });
-          },
-        },
-      });
-      const {
-        data: { user: dashboardUser },
-      } = await supabaseDashboard.auth.getUser();
-      if (dashboardUser) {
-        return NextResponse.redirect(new URL("/zorenta/dashboard", req.url));
-      }
-      return dashboardResponse;
-    }
-    return NextResponse.next();
-  }
 
   if (pathname.startsWith("/api/zorenta")) {
     const rateLimited = checkApiRateLimit(req);
@@ -118,7 +96,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (!pathname.startsWith("/zorenta")) return NextResponse.next();
+  if (!pathname.startsWith("/")) return NextResponse.next();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -130,7 +108,7 @@ export async function middleware(req: NextRequest) {
   // No Supabase config: keep previous behavior (do not block on missing cookie name)
   if (!supabaseUrl || !supabaseAnonKey) {
     if (isZorentaProtected(pathname) && !isZorentaPublic(pathname)) {
-      const loginUrl = new URL("/zorenta/login", req.url);
+      const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -155,18 +133,18 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   const registerPath = pathname.replace(/\/$/, "") || "/";
-  if (!REGISTRATION_OPEN && registerPath === "/zorenta/register" && !user) {
-    return NextResponse.redirect(new URL("/zorenta/registration-closed", req.url));
+  if (!REGISTRATION_OPEN && registerPath === "/register" && !user) {
+    return NextResponse.redirect(new URL("/registration-closed", req.url));
   }
 
   // Logged in but on login → send to intended destination (no loop: login is public)
-  if (pathname === "/zorenta/login" && user) {
+  if (pathname === "/login" && user) {
     const dest = safeZorentaNext(req.nextUrl.searchParams.get("next"));
     return NextResponse.redirect(new URL(dest, req.url));
   }
 
   if (isZorentaProtected(pathname) && !isZorentaPublic(pathname) && !user) {
-    const loginUrl = new URL("/zorenta/login", req.url);
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -175,5 +153,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/signup", "/registration-closed", "/zorenta", "/zorenta/:path*", "/api/zorenta/:path*"],
+  matcher: ["/dashboard", "/signup", "/registration-closed", "/", "/:path*", "/api/:path*"],
 };

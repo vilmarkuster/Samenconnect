@@ -59,42 +59,42 @@ export function ZorentaTopbar({
           placeholder="Zoek opdrachten, locatie, zorgtype..."
           onValueChange={(val) => {
             // Only update results live when you're already on the matches page.
-            if (pathname === "/zorenta/matches") {
+            if (pathname === "/matches") {
               const trimmed = val.trim();
               if (!trimmed) {
-                router.push("/zorenta/matches");
+                router.push("/matches");
               } else {
-                router.push(`/zorenta/matches?q=${encodeURIComponent(trimmed)}`);
+                router.push(`/matches?q=${encodeURIComponent(trimmed)}`);
               }
             }
           }}
           onSubmit={(val) => {
             const trimmed = val.trim();
-            if (!trimmed) router.push("/zorenta/matches");
-            else router.push(`/zorenta/matches?q=${encodeURIComponent(trimmed)}`);
+            if (!trimmed) router.push("/matches");
+            else router.push(`/matches?q=${encodeURIComponent(trimmed)}`);
           }}
           onSelectLocation={(location) => {
-            router.push(`/zorenta/matches?q=${encodeURIComponent(location)}`);
+            router.push(`/matches?q=${encodeURIComponent(location)}`);
           }}
           onSelectCareType={(careType) => {
-            router.push(`/zorenta/matches?q=${encodeURIComponent(careType)}`);
+            router.push(`/matches?q=${encodeURIComponent(careType)}`);
           }}
           onSelectCaregiver={(caregiverId) => {
-            router.push(`/zorenta/profielen/${caregiverId}`);
+            router.push(`/profielen/${caregiverId}`);
           }}
         />
       </div>
       <div className="flex items-center gap-2">
         {isAdmin && (
           <Link
-            href="/zorenta/admin"
+            href="/admin"
             className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:border-[#40ADA8]/30 hover:text-[#40ADA8]"
           >
             <Shield className="inline h-3.5 w-3.5" /> Admin
           </Link>
         )}
         <Link
-          href="/zorenta/notifications"
+          href="/notifications"
           className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-[#40ADA8]/30 hover:text-[#40ADA8]"
           aria-label="Notificaties"
         >
@@ -106,7 +106,7 @@ export function ZorentaTopbar({
           )}
         </Link>
         <Link
-          href="/zorenta/profile"
+          href="/profile"
           className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-[#40ADA8] text-sm font-semibold text-white shadow-sm"
           aria-label="Profiel"
         >
@@ -117,7 +117,7 @@ export function ZorentaTopbar({
             initials
           )}
         </Link>
-        <Link href="/zorenta/zorgvraag-nieuw">
+        <Link href="/zorgvraag-nieuw">
           <button className="ml-1 hidden h-11 rounded-2xl bg-[#40ADA8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#369590] md:inline-flex">
             + Plaats opdracht
           </button>

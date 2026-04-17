@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     const result = scoreCaregiverForJob(caregiver, jobForScoring, rating);
     return {
       caregiver: {
-        /** Public `/zorenta/caregivers/[id]` segment: prefer linked `profiles.id` over marketplace listing id. */
+        /** Public `/caregivers/[id]` segment: prefer linked `profiles.id` over marketplace listing id. */
         id: c.profile_id,
         profile_id: c.profile_id,
         caregiver_profile_id: c.id,

@@ -1,7 +1,7 @@
 import { resolveCaregiverPagePayload } from "@/lib/zorenta/normalize-caregiver-profile-display";
 
 /**
- * True when a GET /api/zorenta/caregivers/[id] JSON body can drive `/zorenta/caregivers/[id]`
+ * True when a GET /api/zorenta/caregivers/[id] JSON body can drive `/caregivers/[id]`
  * (normalized `caregiver_profiles` shape on caregiver/pageCaregiver).
  *
  * Organisation + marketplace listings return 200 but fail this check — contact flows may still

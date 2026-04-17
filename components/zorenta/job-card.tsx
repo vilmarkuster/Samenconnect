@@ -42,7 +42,7 @@ export function ZorentaJobCard({
         : null;
 
   return (
-    <Link href={`/zorenta/jobs/${job.id}`}>
+    <Link href={`/jobs/${job.id}`}>
       <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
         <JobListingCover
           imageUrls={job.image_urls}

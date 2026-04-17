@@ -17,7 +17,7 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/zorenta", label: "SamenConnect", icon: Heart },
+  { href: "/", label: "SamenConnect", icon: Heart },
   { href: "/chat", label: "AI Chat", icon: MessageSquare },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/workflows", label: "Workflows", icon: GitBranch },
@@ -49,7 +49,7 @@ export function SidebarNav() {
               ? "bg-primary-50 text-primary-700"
               : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
           );
-          return item.href === "/zorenta" ? (
+          return item.href === "/" ? (
             <a key={item.href} href={item.href} className={className}>
               <Icon className="h-4 w-4 shrink-0" />
               {item.label}

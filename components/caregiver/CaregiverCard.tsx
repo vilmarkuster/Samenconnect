@@ -129,7 +129,7 @@ export function CaregiverCard({
         )}
         {showActions && (
           <div className="flex flex-wrap gap-2 pt-1">
-            <Link href={`/zorenta/caregivers/${publicProfilePathId}`}>
+            <Link href={`/caregivers/${publicProfilePathId}`}>
               <Button variant="outline" size="sm">
                 Bekijk profiel
               </Button>

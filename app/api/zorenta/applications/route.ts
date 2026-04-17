@@ -7,7 +7,7 @@ import {
   ensureConversationForJobApplication,
 } from "@/lib/zorenta/application-conversation";
 
-/** Same rule as inbox / public profile page: only `caregiver_profiles` ⇒ renderbare `/zorenta/caregivers/[id]`. */
+/** Same rule as inbox / public profile page: only `caregiver_profiles` ⇒ renderbare `/caregivers/[id]`. */
 async function withApplicantRenderablePublicProfile(
   supabase: SupabaseClient,
   applications: Record<string, unknown>[]

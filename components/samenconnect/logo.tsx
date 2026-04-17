@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export function SamenConnectLogo() {
   return (
-    <a href="/zorenta/dashboard" className="flex items-center gap-2" aria-label="SamenConnect">
+    <a href="/dashboard" className="flex items-center gap-2" aria-label="SamenConnect">
       <Image
         src="/samenconnect-icon.png"
         alt=""

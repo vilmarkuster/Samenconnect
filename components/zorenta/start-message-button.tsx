@@ -61,7 +61,7 @@ export function StartMessageButton({
       if (prefill && prefill.trim()) {
         q.set("prefill", prefill.trim());
       }
-      router.push(`/zorenta/berichten?${q.toString()}`);
+      router.push(`/berichten?${q.toString()}`);
     } catch {
       setError("Er ging iets mis bij het starten van een gesprek.");
     } finally {

@@ -137,7 +137,7 @@ async function main() {
   // eslint-disable-next-line no-console
   console.log(
     "\nLokaal testen: npm run dev → http://localhost:3002/api/locations/search?q=ams\n" +
-      "  (stad/regio-autocomplete: o.a. /zorenta/jobs/new, /zorenta/search, /early-access)"
+      "  (stad/regio-autocomplete: o.a. /jobs/new, /search, /early-access)"
   );
 }
 

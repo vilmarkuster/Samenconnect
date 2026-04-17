@@ -37,7 +37,7 @@ export function JobMatchCard({ match }: JobMatchCardProps) {
     budget_max: job.budget_max,
   });
   return (
-    <Link href={`/zorenta/jobs/${job.id}`} className="block">
+    <Link href={`/jobs/${job.id}`} className="block">
       <Card className="overflow-hidden transition-all hover:shadow-md hover:border-slate-300">
         <JobListingCover
           imageUrls={job.image_urls}

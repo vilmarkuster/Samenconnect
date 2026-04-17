@@ -373,14 +373,14 @@ export default function AgentsPage() {
                         <p className="text-xs leading-relaxed text-slate-600">
                           No job postings on your account.{" "}
                           <Link
-                            href="/zorenta/jobs/new"
+                            href="/jobs/new"
                             className="font-medium text-slate-900 underline underline-offset-2 hover:text-slate-700"
                           >
                             Create a job
                           </Link>{" "}
                           or use{" "}
                           <Link
-                            href="/zorenta/jobs"
+                            href="/jobs"
                             className="font-medium text-slate-900 underline underline-offset-2 hover:text-slate-700"
                           >
                             an existing job page
@@ -522,7 +522,7 @@ export default function AgentsPage() {
                                           unknown
                                         >;
                                         if (res.ok && hasRenderablePublicCaregiverPagePayload(data)) {
-                                          router.push(`/zorenta/caregivers/${caregiverId}`);
+                                          router.push(`/caregivers/${caregiverId}`);
                                         }
                                       })();
                                     }}

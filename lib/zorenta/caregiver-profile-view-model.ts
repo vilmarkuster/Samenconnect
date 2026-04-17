@@ -48,7 +48,7 @@ export type CaregiverViewModel = {
   hasLicense: boolean;
 };
 
-/** Same experience line as /zorenta/profile (n+ jaar …). */
+/** Same experience line as /profile (n+ jaar …). */
 export function formatCaregiverExperienceLine(years: number | null | undefined): string | null {
   if (years == null || !Number.isFinite(years) || years <= 0) return null;
   const n = Math.floor(years);

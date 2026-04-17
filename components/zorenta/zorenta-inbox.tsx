@@ -56,7 +56,7 @@ type OtherParticipantProfile = {
   /** When API includes avatar URLs, ConversationThreadAvatar shows them */
   avatar_url?: string | null;
   /**
-   * Canonical id for `/zorenta/caregivers/[id]`: `profiles.id` when `caregiver_profiles` exists; else marketplace id.
+   * Canonical id for `/caregivers/[id]`: `profiles.id` when `caregiver_profiles` exists; else marketplace id.
    */
   caregiver_route_id?: string | null;
   caregiver_route_source?: "marketplace" | "caregiver_profile" | null;
@@ -78,7 +78,7 @@ type ApiConversation = {
   updated_at?: string;
 };
 
-/** Non-empty canonical caregiver profile path id for `/zorenta/caregivers/[id]`, or null (no link). */
+/** Non-empty canonical caregiver profile path id for `/caregivers/[id]`, or null (no link). */
 function caregiverProfileRouteId(other: OtherParticipantProfile | null | undefined): string | null {
   const raw = other?.caregiver_route_id?.trim();
   if (!raw) return null;
@@ -89,10 +89,10 @@ function caregiverProfileRouteId(other: OtherParticipantProfile | null | undefin
 /** Link naar publiek zorgverlener-profiel; valt terug op `profiles.id` als de API geen route-id gaf. */
 function caregiverProfileHref(other: OtherParticipantProfile | null | undefined): string | null {
   const fromApi = caregiverProfileRouteId(other);
-  if (fromApi) return `/zorenta/caregivers/${fromApi}`;
+  if (fromApi) return `/caregivers/${fromApi}`;
   const role = (other?.role ?? "").trim().toLowerCase();
   const pid = other?.id?.trim();
-  if (role === "caregiver" && pid) return `/zorenta/caregivers/${pid}`;
+  if (role === "caregiver" && pid) return `/caregivers/${pid}`;
   return null;
 }
 
@@ -462,7 +462,7 @@ function ConversationThreadAvatar({
 type ZorentaInboxProps = {
   /** Selected conversation UUID from URL (`?conversation=` of legacy `?c=`) — kept in sync on refresh */
   urlConversationId: string | null;
-  /** Update browser URL when user picks a thread (e.g. `/zorenta/berichten?conversation=…`) */
+  /** Update browser URL when user picks a thread (e.g. `/berichten?conversation=…`) */
   onUrlConversationChange: (id: string | null) => void;
 };
 
@@ -1397,7 +1397,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
 
       if (searchParams.has("prefill")) {
         router.replace(
-          `/zorenta/berichten?conversation=${encodeURIComponent(convId)}`,
+          `/berichten?conversation=${encodeURIComponent(convId)}`,
           { scroll: false }
         );
       }
@@ -1440,14 +1440,14 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         <ZorentaPageHeader
           title="Berichten"
           description="Log in om je gesprekken te bekijken."
-          backHref="/zorenta/dashboard"
+          backHref="/dashboard"
           backLabel="Dashboard"
         />
         <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardContent className="p-6 text-center text-sm text-slate-600">
             <p className="mb-4">Je moet ingelogd zijn om berichten te gebruiken.</p>
             <Link
-              href="/zorenta/login?next=/zorenta/berichten"
+              href="/login?next=/berichten"
               className={cn(
                 "inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-medium text-white",
                 "bg-[#40ada8] hover:bg-[#369e9a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#40ada8]/40"
@@ -1466,7 +1466,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
 
   /**
    * Mobiel + actieve chat: vaste hoogte binnen AppLayout (topbar h-16 + main p-8) zodat alleen
-   * het berichtenpaneel scrollt — niet de hele /zorenta main.
+   * het berichtenpaneel scrollt — niet de hele app main.
    */
   const mobileChatViewportLock =
     isMobile && mobileView === "chat"
@@ -1492,7 +1492,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
           <ZorentaPageHeader
             title="Berichten"
             description="Bekijk en beheer je gesprekken met zorgverleners en organisaties."
-            backHref="/zorenta/dashboard"
+            backHref="/dashboard"
             backLabel="Dashboard"
           />
         </div>
@@ -1532,7 +1532,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                   variant="outline"
                   size="sm"
                   className="mt-3 border-slate-200 text-xs"
-                  onClick={() => router.push("/zorenta/matches")}
+                  onClick={() => router.push("/matches")}
                 >
                   Naar matches
                 </Button>
@@ -1810,7 +1810,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                             {selectedJobTitle ? (
                               selectedConvo.job?.id || selectedConvo.application?.job_id ? (
                                 <Link
-                                  href={`/zorenta/jobs/${selectedConvo.job?.id ?? selectedConvo.application?.job_id}`}
+                                  href={`/jobs/${selectedConvo.job?.id ?? selectedConvo.application?.job_id}`}
                                   className="block text-sm font-semibold leading-snug text-[#2d7f7b] hover:underline"
                                 >
                                   {selectedJobTitle}
@@ -2045,7 +2045,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         size="sm"
                         variant="outline"
                         className="gap-1.5 border-slate-200 text-xs"
-                        onClick={() => router.push("/zorenta/matches")}
+                        onClick={() => router.push("/matches")}
                       >
                         Nieuw bericht
                       </Button>

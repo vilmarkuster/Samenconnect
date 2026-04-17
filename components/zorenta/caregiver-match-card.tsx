@@ -178,7 +178,7 @@ export function CaregiverMatchCard({
 
   const goToProfile = () => {
     if (!canOpenPublicProfile) return;
-    router.push(`/zorenta/caregivers/${publicProfilePathId}`);
+    router.push(`/caregivers/${publicProfilePathId}`);
   };
 
   if (presentationMode === "ai" && aiPresentation) {
@@ -279,7 +279,7 @@ export function CaregiverMatchCard({
           <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end sm:gap-3">
             {canOpenPublicProfile ? (
               <Link
-                href={`/zorenta/caregivers/${publicProfilePathId}`}
+                href={`/caregivers/${publicProfilePathId}`}
                 className="w-full sm:w-auto sm:min-w-[8.5rem]"
               >
                 <Button
@@ -411,7 +411,7 @@ export function CaregiverMatchCard({
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1.5" onClick={(e) => e.stopPropagation()}>
             {canOpenPublicProfile ? (
-              <Link href={`/zorenta/caregivers/${publicProfilePathId}`}>
+              <Link href={`/caregivers/${publicProfilePathId}`}>
                 <Button type="button" variant="outline" size="sm" className="border-slate-200 text-slate-700">
                   Bekijk profiel
                 </Button>

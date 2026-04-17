@@ -19,17 +19,17 @@ import {
 } from "lucide-react";
 
 export const ZORENTA_NAV_ITEMS = [
-  { href: "/zorenta/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/zorenta/jobs", label: "Vacatures", icon: Briefcase },
-  { href: "/zorenta/intake", label: "Zorgvraag intake", icon: ClipboardList },
-  { href: "/zorenta/applications", label: "Sollicitaties", icon: FileText },
-  { href: "/zorenta/favorites", label: "Favorieten", icon: Heart },
-  { href: "/zorenta/opgeslagen", label: "Opgeslagen", icon: Bookmark },
-  { href: "/zorenta/berichten", label: "Berichten", icon: MessageSquare },
-  { href: "/zorenta/reviews", label: "Reviews", icon: Star },
-  { href: "/zorenta/notifications", label: "Notificaties", icon: Bell },
-  { href: "/zorenta/search", label: "Zorgverleners zoeken", icon: Search },
-  { href: "/zorenta/profile", label: "Mijn profiel", icon: User },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/jobs", label: "Vacatures", icon: Briefcase },
+  { href: "/intake", label: "Zorgvraag intake", icon: ClipboardList },
+  { href: "/applications", label: "Sollicitaties", icon: FileText },
+  { href: "/favorites", label: "Favorieten", icon: Heart },
+  { href: "/opgeslagen", label: "Opgeslagen", icon: Bookmark },
+  { href: "/berichten", label: "Berichten", icon: MessageSquare },
+  { href: "/reviews", label: "Reviews", icon: Star },
+  { href: "/notifications", label: "Notificaties", icon: Bell },
+  { href: "/search", label: "Zorgverleners zoeken", icon: Search },
+  { href: "/profile", label: "Mijn profiel", icon: User },
 ] as const;
 
 type SidebarProps = {
@@ -41,7 +41,7 @@ type SidebarProps = {
 export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
   const pathname = usePathname();
   const navItems = isAdmin
-    ? [...ZORENTA_NAV_ITEMS, { href: "/zorenta/admin", label: "Admin", icon: Shield }]
+    ? [...ZORENTA_NAV_ITEMS, { href: "/admin", label: "Admin", icon: Shield }]
     : ZORENTA_NAV_ITEMS;
 
   return (
@@ -54,7 +54,7 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
         {navItems.map((item) => {
           const active =
             pathname === item.href ||
-            (item.href !== "/zorenta/dashboard" && pathname?.startsWith(item.href));
+            (item.href !== "/dashboard" && pathname?.startsWith(item.href));
           const Icon = item.icon;
           return (
             <a

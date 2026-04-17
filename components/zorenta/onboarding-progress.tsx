@@ -29,10 +29,10 @@ export function OnboardingProgress({
 }: OnboardingProgressProps) {
   const profileEditHref =
     role === "caregiver"
-      ? "/zorenta/caregivers/me/edit"
+      ? "/caregivers/me/edit"
       : role === "client"
-        ? "/zorenta/clients/me/edit"
-        : "/zorenta/organizations/me/edit";
+        ? "/clients/me/edit"
+        : "/organizations/me/edit";
 
   const steps =
     role === "caregiver"
@@ -57,21 +57,21 @@ export function OnboardingProgress({
       ? !hasRoleProfile
         ? { label: "Vul je profiel in", href: profileEditHref }
         : jobMatchesCount === 0
-          ? { label: "Bekijk opdrachten", href: "/zorenta/jobs" }
+          ? { label: "Bekijk opdrachten", href: "/jobs" }
           : applicationsCount === 0
-            ? { label: "Solliciteer nu", href: "/zorenta/jobs" }
+            ? { label: "Solliciteer nu", href: "/jobs" }
             : conversationsCount === 0
-              ? { label: "Stuur je eerste bericht", href: "/zorenta/applications" }
+              ? { label: "Stuur je eerste bericht", href: "/applications" }
               : null
       : role === "client" || role === "organization"
         ? !hasRoleProfile
           ? { label: "Vul je zorgprofiel in", href: profileEditHref }
           : intakesCount === 0 && myJobsCount === 0
-            ? { label: "Start intake", href: "/zorenta/intake" }
+            ? { label: "Start intake", href: "/intake" }
             : myJobsCount === 0
-              ? { label: "Plaats je eerste opdracht", href: "/zorenta/jobs/new" }
+              ? { label: "Plaats je eerste opdracht", href: "/jobs/new" }
               : conversationsCount === 0
-                ? { label: "Bekijk matches", href: "/zorenta/applications" }
+                ? { label: "Bekijk matches", href: "/applications" }
                 : null
         : null;
 

@@ -13,10 +13,10 @@ import { REGISTRATION_OPEN } from "@/lib/registration-open";
 type ZorentaLayoutMode = "public" | "app";
 
 const PUBLIC_PATHS = new Set<string>([
-  "/zorenta",
-  "/zorenta/login",
-  "/zorenta/register",
-  "/zorenta/registration-closed",
+  "/",
+  "/login",
+  "/register",
+  "/registration-closed",
 ]);
 
 function isPublicPath(path: string | null): boolean {
@@ -24,7 +24,7 @@ function isPublicPath(path: string | null): boolean {
   return PUBLIC_PATHS.has(path);
 }
 
-const isAdminPath = (path: string | null) => path?.startsWith("/zorenta/admin");
+const isAdminPath = (path: string | null) => path?.startsWith("/admin");
 
 type Props = {
   children: React.ReactNode;
@@ -53,10 +53,10 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   }, [pathname, currentMode]);
 
   const isPublic = currentMode === "public";
-  const isAdminRoute = pathname?.startsWith("/zorenta/admin") ?? false;
+  const isAdminRoute = pathname?.startsWith("/admin") ?? false;
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isPublic) router.replace("/zorenta/login");
+    if (!isLoading && !isAuthenticated && !isPublic) router.replace("/login");
   }, [isLoading, isAuthenticated, isPublic, router]);
 
   useEffect(() => {
@@ -105,11 +105,11 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 md:px-6">
             <SamenConnectLogo />
             <nav className="flex items-center gap-6 text-sm font-medium">
-              <Link href="/zorenta/login" className="text-slate-600 hover:text-slate-900">
+              <Link href="/login" className="text-slate-600 hover:text-slate-900">
                 Inloggen
               </Link>
               {REGISTRATION_OPEN ? (
-                <Link href="/zorenta/register" className="text-slate-600 hover:text-slate-900">
+                <Link href="/register" className="text-slate-600 hover:text-slate-900">
                   Registreren
                 </Link>
               ) : (
@@ -117,7 +117,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
                   Registreren binnenkort
                 </span>
               )}
-              <Link href="/zorenta/dashboard" className="text-slate-500 hover:text-slate-700">
+              <Link href="/dashboard" className="text-slate-500 hover:text-slate-700">
                 Back to App
               </Link>
             </nav>
@@ -149,7 +149,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
 
   async function handleLogout() {
     await logout();
-    router.push("/zorenta/login");
+    router.push("/login");
   }
 
   if (isAdminRoute) {
