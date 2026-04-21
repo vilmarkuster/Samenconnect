@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Euro, ArrowLeft, MessageCircle, Bookmark } from "lucide-react";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
+import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import {
   isMarketplaceCardCaregiverPayload,
   isNormalizedCaregiverProfilePayload,
@@ -68,6 +69,23 @@ export default function CaregiverProfilePage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolved, setResolved] = useState<ResolvedCaregiverResponse | null>(null);
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = await getZorentaAccessToken();
+      if (!token || cancelled) return;
+      const res = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      const r = typeof data?.profile?.role === "string" ? data.profile.role : null;
+      setViewerRole(r);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,18 +158,25 @@ export default function CaregiverProfilePage({ params }: PageProps) {
 
   const caregiver = useMemo(() => resolved?.caregiver ?? null, [resolved]);
 
+  const profileBackHref = viewerRole === "caregiver" ? "/search" : "/matches";
+  const profileBackLabel = viewerRole === "caregiver" ? "Terug naar zoeken" : "Terug naar matches";
+
   if (!loading && (!resolved || error)) {
     return (
       <PageContainer maxWidth="narrow" className="space-y-6 sm:space-y-8">
         <ZorentaPageHeader
           title="Profiel niet gevonden"
           description="Dit profiel bestaat niet (meer) of is niet beschikbaar."
-          backHref="/matches"
-          backLabel="Terug naar matches"
+          backHref={profileBackHref}
+          backLabel={profileBackLabel}
         />
         <Card className="border-dashed border-slate-200 bg-slate-50/50">
           <CardContent className="py-6 text-sm text-slate-600">
-            <p>We konden dit profiel niet vinden. Ga terug naar de matches en kies een andere zorgverlener of organisatie.</p>
+            <p>
+              We konden dit profiel niet vinden. Ga terug naar{" "}
+              {viewerRole === "caregiver" ? "het zoekoverzicht" : "de matches"} en kies een andere zorgverlener of
+              organisatie.
+            </p>
           </CardContent>
         </Card>
       </PageContainer>
@@ -182,8 +207,8 @@ export default function CaregiverProfilePage({ params }: PageProps) {
               ? "Organisatie / aanbieder op SamenConnect"
               : "Profiel van zorgverlener op SamenConnect"
           }
-          backHref="/matches"
-          backLabel="Terug naar matches"
+          backHref={profileBackHref}
+          backLabel={profileBackLabel}
         />
 
         {/* Premium profile header */}
@@ -270,10 +295,10 @@ export default function CaregiverProfilePage({ params }: PageProps) {
                   variant="outline"
                   size="sm"
                   className="gap-1 border-slate-200 text-xs text-slate-600"
-                  onClick={() => router.push("/matches")}
+                  onClick={() => router.push(profileBackHref)}
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Terug naar matches
+                  {profileBackLabel}
                 </Button>
               </div>
             </div>

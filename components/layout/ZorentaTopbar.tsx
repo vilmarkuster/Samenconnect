@@ -12,6 +12,7 @@ type ZorentaTopbarProps = {
   onMenuClick?: () => void;
   onLogout?: () => void;
   isAdmin?: boolean;
+  userRole?: string | null;
 };
 
 export function ZorentaTopbar({
@@ -21,11 +22,14 @@ export function ZorentaTopbar({
   onMenuClick,
   onLogout,
   isAdmin,
+  userRole,
 }: ZorentaTopbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const initialQuery = searchParams?.get("q") ?? "";
+  const isCaregiver = userRole === "caregiver";
+  const searchListPath = isCaregiver ? "/jobs" : "/matches";
   const initials = userDisplayName
     ? userDisplayName
         .split(/\s+/)
@@ -58,26 +62,25 @@ export function ZorentaTopbar({
           value={initialQuery}
           placeholder="Zoek opdrachten, locatie, zorgtype..."
           onValueChange={(val) => {
-            // Only update results live when you're already on the matches page.
-            if (pathname === "/matches") {
+            if (pathname === searchListPath) {
               const trimmed = val.trim();
               if (!trimmed) {
-                router.push("/matches");
+                router.push(searchListPath);
               } else {
-                router.push(`/matches?q=${encodeURIComponent(trimmed)}`);
+                router.push(`${searchListPath}?q=${encodeURIComponent(trimmed)}`);
               }
             }
           }}
           onSubmit={(val) => {
             const trimmed = val.trim();
-            if (!trimmed) router.push("/matches");
-            else router.push(`/matches?q=${encodeURIComponent(trimmed)}`);
+            if (!trimmed) router.push(searchListPath);
+            else router.push(`${searchListPath}?q=${encodeURIComponent(trimmed)}`);
           }}
           onSelectLocation={(location) => {
-            router.push(`/matches?q=${encodeURIComponent(location)}`);
+            router.push(`${searchListPath}?q=${encodeURIComponent(location)}`);
           }}
           onSelectCareType={(careType) => {
-            router.push(`/matches?q=${encodeURIComponent(careType)}`);
+            router.push(`${searchListPath}?q=${encodeURIComponent(careType)}`);
           }}
           onSelectCaregiver={(caregiverId) => {
             router.push(`/profielen/${caregiverId}`);
@@ -117,11 +120,13 @@ export function ZorentaTopbar({
             initials
           )}
         </Link>
-        <Link href="/zorgvraag-nieuw">
-          <button className="ml-1 hidden h-11 rounded-2xl bg-[#40ADA8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#369590] md:inline-flex">
-            + Plaats opdracht
-          </button>
-        </Link>
+        {!isCaregiver && (
+          <Link href="/jobs/new">
+            <button className="ml-1 hidden h-11 rounded-2xl bg-[#40ADA8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#369590] md:inline-flex">
+              + Plaats opdracht
+            </button>
+          </Link>
+        )}
       </div>
     </div>
   );

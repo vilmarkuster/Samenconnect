@@ -21,14 +21,15 @@ import {
 export const ZORENTA_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Vacatures", icon: Briefcase },
-  { href: "/intake", label: "Zorgvraag intake", icon: ClipboardList },
+  { href: "/intake", label: "Zorgvraag intake", icon: ClipboardList, roles: ["client", "organization"] as const },
   { href: "/applications", label: "Sollicitaties", icon: FileText },
   { href: "/favorites", label: "Favorieten", icon: Heart },
-  { href: "/opgeslagen", label: "Opgeslagen", icon: Bookmark },
+  { href: "/opgeslagen", label: "Opgeslagen", icon: Bookmark, roles: ["client", "organization"] as const },
+  { href: "/matches", label: "Zoek zorgverleners", icon: Search, roles: ["client", "organization"] as const },
+  { href: "/search", label: "Zoeken", icon: Search, roles: ["caregiver"] as const },
   { href: "/berichten", label: "Berichten", icon: MessageSquare },
   { href: "/reviews", label: "Reviews", icon: Star },
   { href: "/notifications", label: "Notificaties", icon: Bell },
-  { href: "/search", label: "Zorgverleners zoeken", icon: Search },
   { href: "/profile", label: "Mijn profiel", icon: User },
 ] as const;
 
@@ -36,13 +37,21 @@ type SidebarProps = {
   onNavigate?: () => void;
   onLogout?: () => void;
   isAdmin?: boolean;
+  /** When set, hides client-only items (intake, opgeslagen, matches) for caregivers. */
+  userRole?: string | null;
 };
 
-export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
+export function Sidebar({ onNavigate, onLogout, isAdmin, userRole }: SidebarProps) {
   const pathname = usePathname();
+  const baseItems = ZORENTA_NAV_ITEMS.filter((item) => {
+    if (!("roles" in item) || !item.roles) return true;
+    if (!userRole) return true;
+    return (item.roles as readonly string[]).includes(userRole);
+  }).map(({ href, label, icon }) => ({ href, label, icon }));
+
   const navItems = isAdmin
-    ? [...ZORENTA_NAV_ITEMS, { href: "/admin", label: "Admin", icon: Shield }]
-    : ZORENTA_NAV_ITEMS;
+    ? [...baseItems, { href: "/admin", label: "Admin", icon: Shield }]
+    : baseItems;
 
   return (
     <div className="flex h-full flex-col bg-[#0f766e] text-white">
@@ -85,12 +94,6 @@ export function Sidebar({ onNavigate, onLogout, isAdmin }: SidebarProps) {
             Uitloggen
           </button>
         )}
-        <a
-          href="/chat"
-          className="mt-2 flex items-center rounded-2xl px-3 py-3 text-xs text-white/70 hover:bg-white/10 hover:text-white"
-        >
-          ← Terug naar AI App
-        </a>
       </div>
     </div>
   );

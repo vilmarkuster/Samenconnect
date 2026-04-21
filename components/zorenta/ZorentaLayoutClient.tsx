@@ -40,6 +40,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<ZorentaLayoutMode>(mode);
 
@@ -72,7 +73,9 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
             setUnreadCount(Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0);
             setUserDisplayName(meData?.profile?.display_name ?? null);
             setUserAvatarUrl(typeof meData?.profile?.avatar_url === "string" ? meData.profile.avatar_url : null);
-            setIsAdmin(meData?.profile?.role === "admin");
+            const role = typeof meData?.profile?.role === "string" ? meData.profile.role : null;
+            setIsAdmin(role === "admin");
+            setUserRole(role);
           })
           .catch(() => {});
       });
@@ -117,9 +120,6 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
                   Registreren binnenkort
                 </span>
               )}
-              <Link href="/dashboard" className="text-slate-500 hover:text-slate-700">
-                Back to App
-              </Link>
             </nav>
           </div>
         </header>
@@ -165,6 +165,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       unreadNotifications={unreadCount}
       onLogout={handleLogout}
       isAdmin={isAdmin}
+      userRole={userRole}
     >
       {children}
     </AppLayout>

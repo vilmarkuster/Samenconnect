@@ -13,6 +13,7 @@ type AppLayoutProps = {
   unreadNotifications?: number;
   onLogout?: () => void;
   isAdmin?: boolean;
+  userRole?: string | null;
 };
 
 export function AppLayout({
@@ -24,11 +25,12 @@ export function AppLayout({
   unreadNotifications = 0,
   onLogout,
   isAdmin,
+  userRole,
 }: AppLayoutProps) {
   return (
     <div className="flex min-h-screen bg-slate-50 md:min-h-0">
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
-        <Sidebar onLogout={onLogout} isAdmin={isAdmin} />
+        <Sidebar onLogout={onLogout} isAdmin={isAdmin} userRole={userRole} />
       </aside>
       {sidebarOpen && (
         <>
@@ -42,6 +44,7 @@ export function AppLayout({
               onNavigate={() => setSidebarOpen(false)}
               onLogout={onLogout}
               isAdmin={isAdmin}
+              userRole={userRole}
             />
           </div>
         </>
@@ -55,6 +58,7 @@ export function AppLayout({
             onMenuClick={() => setSidebarOpen(true)}
             onLogout={onLogout}
             isAdmin={isAdmin}
+            userRole={userRole}
           />
         </header>
         <main className="min-h-0 min-w-0 w-full flex-1 overflow-auto px-4 py-6 sm:px-6 md:flex-none md:px-8 md:py-8">

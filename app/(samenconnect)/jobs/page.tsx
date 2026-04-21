@@ -74,8 +74,15 @@ function ZorentaJobsContent() {
   // Small timeout to reset the bump animation.
   const heartBumpTimeoutRef = useRef<number | null>(null);
   const showCreatedSuccess = searchParams.get("created") === "1";
+  const qFromUrl = (searchParams.get("q") ?? "").trim();
 
   const canCreateJobs = myRole === "client" || myRole === "organization";
+
+  useEffect(() => {
+    if (!qFromUrl) return;
+    setCity(qFromUrl);
+    setFilterCity(qFromUrl);
+  }, [qFromUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,9 +346,18 @@ function ZorentaJobsContent() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/search">
-                <Button variant="outline">Zorgverleners zoeken</Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCity("");
+                  setFilterCity("");
+                  setFilterCareType("");
+                  setRadius("25");
+                }}
+              >
+                Filters wissen
+              </Button>
             )
           }
         />

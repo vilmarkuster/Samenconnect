@@ -98,12 +98,6 @@ export function ZorentaSidebar({ onNavigate, isAdmin }: ZorentaSidebarProps) {
           <LogOut className="h-4 w-4 shrink-0" />
           Uitloggen
         </button>
-        <Link
-          href="/dashboard"
-          className="mt-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
-        >
-          ← Terug naar SamenConnect
-        </Link>
       </div>
     </aside>
   );

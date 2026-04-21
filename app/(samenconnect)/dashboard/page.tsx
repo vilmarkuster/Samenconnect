@@ -154,19 +154,6 @@ export default function ZorentaDashboardPage() {
     [conversationsCount, jobMatches.length, totalJobs]
   );
 
-  const getStatHref = (label: string): string | null => {
-    switch (label) {
-      case "Nieuwe opdrachten":
-        return "/jobs";
-      case "Berichten":
-        return "/berichten";
-      case "Matches":
-        return "/matches";
-      default:
-        return null;
-    }
-  };
-
   if (loading || !me?.profile) {
     return (
       <div className="mx-auto w-full min-w-0 max-w-none space-y-8 py-6 lg:py-10">
@@ -179,6 +166,21 @@ export default function ZorentaDashboardPage() {
   }
 
   const profile = me.profile;
+  const isCaregiverUser = profile.role === "caregiver";
+
+  function getStatHref(label: string): string | null {
+    switch (label) {
+      case "Nieuwe opdrachten":
+        return "/jobs";
+      case "Berichten":
+        return "/berichten";
+      case "Matches":
+        return isCaregiverUser ? "/jobs" : "/matches";
+      default:
+        return null;
+    }
+  }
+
   const roleLabel =
     profile.role === "caregiver" ? "SamenConnect zorgverlener" : profile.role === "client" ? "SamenConnect cliënt" : "SamenConnect organisatie";
 
@@ -226,7 +228,7 @@ export default function ZorentaDashboardPage() {
           : applicationsCount === 0
             ? { label: "Reageer op een opdracht", href: "/jobs" }
             : conversationsCount === 0
-              ? { label: "Stuur je eerste bericht", href: "/applications" }
+              ? { label: "Stuur je eerste bericht", href: "/berichten" }
               : null
       : !hasRoleProfile
         ? { label: "Vul je profiel in", href: profileEditHref }
@@ -235,9 +237,9 @@ export default function ZorentaDashboardPage() {
           : totalJobs === 0
             ? { label: "Plaats je eerste opdracht", href: "/jobs/new" }
             : (dashboard?.recentApplications?.length ?? 0) === 0
-              ? { label: "Bekijk matches", href: "/jobs" }
+              ? { label: "Bekijk matches", href: "/matches" }
               : conversationsCount === 0
-                ? { label: "Stuur je eerste bericht", href: "/applications" }
+                ? { label: "Stuur je eerste bericht", href: "/berichten" }
                 : null;
 
   function buildMatchTags(match: JobMatch): string[] {
@@ -326,20 +328,25 @@ export default function ZorentaDashboardPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-[#40ADA8]">Welkom terug, {displayName}</p>
               <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                Jouw zorgopdrachten en matches in één overzicht
+                {isCaregiverUser
+                  ? "Opdrachten en gesprekken in één overzicht"
+                  : "Jouw zorgopdrachten en matches in één overzicht"}
               </h1>
               <p className="max-w-2xl text-sm sm:text-base leading-7 text-slate-600">
-                Beheer opdrachten, berichten en matches alsof je een professionele marketplace runt. Altijd overzicht, altijd
-                klaar om te reageren.
+                {isCaregiverUser
+                  ? "Vind passende opdrachten in de buurt, reageer en houd al je gesprekken met opdrachtgevers bij elkaar."
+                  : "Beheer opdrachten, berichten en matches alsof je een professionele marketplace runt. Altijd overzicht, altijd klaar om te reageren."}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Link href="/jobs/new">
-                <Button className="bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
-                  <PlusCircle className="h-4 w-4" />
-                  Plaats opdracht
-                </Button>
-              </Link>
+              {!isCaregiverUser && (
+                <Link href="/jobs/new">
+                  <Button className="bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
+                    <PlusCircle className="h-4 w-4" />
+                    Plaats opdracht
+                  </Button>
+                </Link>
+              )}
               <Link href="/jobs">
                 <Button
                   variant="outline"
@@ -531,7 +538,7 @@ export default function ZorentaDashboardPage() {
                   Snel overzicht van interessante opdrachten dicht bij jou in de buurt.
                 </p>
               </div>
-              <Link href="/search?type=jobs" className="shrink-0">
+              <Link href="/jobs" className="shrink-0">
                 <Button variant="outline" className="border-slate-200 bg-white text-sm">
                   Meer in jouw regio
                 </Button>
@@ -636,7 +643,7 @@ export default function ZorentaDashboardPage() {
                 </div>
               </Link>
               <Link
-                href="/search"
+                href={isCaregiverUser ? "/jobs" : "/matches"}
                 className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-[#40ADA8]/30 hover:bg-[#40ADA8]/5"
               >
                 <div className="mt-0.5 rounded-full bg-[#40ADA8]/10 p-2 text-[#40ADA8]">
@@ -645,7 +652,9 @@ export default function ZorentaDashboardPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-slate-900">Nieuwe matches</p>
                   <p className="truncate text-xs text-slate-500">
-                    Ontdek zorgverleners of opdrachten die goed aansluiten bij jouw profiel.
+                    {isCaregiverUser
+                      ? "Ontdek opdrachten die goed aansluiten bij jouw profiel."
+                      : "Ontdek zorgverleners die goed aansluiten bij jouw zorgvraag."}
                   </p>
                 </div>
               </Link>
