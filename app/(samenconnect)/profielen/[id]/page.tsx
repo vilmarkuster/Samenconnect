@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Euro, ArrowLeft, MessageCircle, Bookmark } from "lucide-react";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
@@ -15,10 +16,16 @@ import {
   isMarketplaceCardCaregiverPayload,
   isNormalizedCaregiverProfilePayload,
 } from "@/lib/zorenta/normalize-caregiver-profile-display";
+import { cn } from "@/lib/utils";
 
 type PageProps = {
   params: { id: string };
 };
+
+/** Accepts thread or profile UUIDs from `?conversation=` (from berichten). */
+function isLikelyConversationOrProfileUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+}
 
 type Review = {
   id: string;
@@ -32,7 +39,7 @@ type ResolvedCaregiver = {
   id: string;
   linkedProfileId: string | null;
   name: string;
-  role: "ZZP zorgverlener" | "Mantelzorger" | "Vrijwilliger" | "Organisatie";
+  role: "ZZP zorgverlener" | "Mantelzorger" | "Vrijwilliger" | "Organisatie" | "Cliënt" | "Beheerder";
   city: string;
   rate: number | null;
   isVolunteer: boolean;
@@ -64,12 +71,20 @@ function isOrganisation(cg: ResolvedCaregiver) {
   return cg.role === "Organisatie";
 }
 
-export default function CaregiverProfilePage({ params }: PageProps) {
+function CaregiverProfilePageContent({ params }: PageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolved, setResolved] = useState<ResolvedCaregiverResponse | null>(null);
   const [viewerRole, setViewerRole] = useState<string | null>(null);
+  const [existingConversationId, setExistingConversationId] = useState<string | null>(null);
+
+  const conversationFromUrlRaw = searchParams.get("conversation");
+  const conversationFromUrl =
+    conversationFromUrlRaw && isLikelyConversationOrProfileUuid(conversationFromUrlRaw)
+      ? conversationFromUrlRaw.trim()
+      : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -156,7 +171,44 @@ export default function CaregiverProfilePage({ params }: PageProps) {
     };
   }, [params.id]);
 
+  useEffect(() => {
+    setExistingConversationId(null);
+  }, [params.id]);
+
   const caregiver = useMemo(() => resolved?.caregiver ?? null, [resolved]);
+
+  const messageTargetProfileId = useMemo(() => {
+    if (!resolved?.caregiver) return null;
+    const linked =
+      typeof resolved.caregiver.linkedProfileId === "string" ? resolved.caregiver.linkedProfileId.trim() : "";
+    const pid = typeof resolved.profile?.id === "string" ? resolved.profile.id.trim() : "";
+    const combined = linked || pid;
+    return combined.length > 0 ? combined : null;
+  }, [resolved]);
+
+  const canMessage = Boolean(messageTargetProfileId);
+
+  useEffect(() => {
+    if (!messageTargetProfileId || conversationFromUrl) return;
+    let cancelled = false;
+    (async () => {
+      const token = await getZorentaAccessToken();
+      if (!token || cancelled) return;
+      const res = await fetch("/api/zorenta/conversations", { headers: zorentaHeaders(token) });
+      const d = (await res.json().catch(() => ({}))) as { conversations?: Array<{ id: string; other?: { id?: string | null } | null }> };
+      if (cancelled) return;
+      const list = Array.isArray(d.conversations) ? d.conversations : [];
+      const target = messageTargetProfileId.trim().toLowerCase();
+      const found = list.find((c) => {
+        const oid = (c.other?.id ?? "").trim().toLowerCase();
+        return oid.length > 0 && oid === target;
+      });
+      setExistingConversationId(found?.id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [messageTargetProfileId, conversationFromUrl, params.id]);
 
   const profileBackHref = viewerRole === "caregiver" ? "/search" : "/matches";
   const profileBackLabel = viewerRole === "caregiver" ? "Terug naar zoeken" : "Terug naar matches";
@@ -196,6 +248,13 @@ export default function CaregiverProfilePage({ params }: PageProps) {
   const isLinkedCaregiver = resolved.mode === "linked-caregiver";
   const isLinked =
     (isLinkedCaregiver || isLinkedOrg) && !!caregiver.linkedProfileId;
+
+  /** Berichten-thread (query van inbox) of opgezocht via GET /conversations. */
+  const conversationForInboxCta = conversationFromUrl || existingConversationId;
+  const messagingGoHref =
+    canMessage && conversationForInboxCta
+      ? `/berichten?conversation=${encodeURIComponent(conversationForInboxCta)}`
+      : null;
 
   return (
     <>
@@ -260,13 +319,26 @@ export default function CaregiverProfilePage({ params }: PageProps) {
             </div>
 
             <div className="flex flex-1 flex-col items-stretch justify-center gap-2 sm:items-end">
-              {isLinked ? (
-                <StartMessageButton
-                  otherUserId={caregiver.linkedProfileId!}
-                  size="sm"
-                  variant="primary"
-                  label="Stuur bericht"
-                />
+              {canMessage ? (
+                messagingGoHref ? (
+                  <Link
+                    href={messagingGoHref}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "gap-1.5 border-0 bg-[#40ada8] text-white hover:bg-[#369e9a] hover:no-underline"
+                    )}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Ga naar gesprek
+                  </Link>
+                ) : (
+                  <StartMessageButton
+                    otherUserId={messageTargetProfileId!}
+                    size="sm"
+                    variant="primary"
+                    label="Stuur bericht"
+                  />
+                )
               ) : (
                 <div className="space-y-1.5">
                   <Button
@@ -492,20 +564,33 @@ export default function CaregiverProfilePage({ params }: PageProps) {
                   </p>
                   <p>
                     <span className="font-medium">Beoordelingen: </span>
-                    {isLinked
+                    {isLinked || canMessage
                       ? resolved.averageRating != null
                         ? `${resolved.averageRating} / 5`
                         : "Nog geen beoordelingen"
                       : "Nog niet gekoppeld aan een SamenConnect account."}
                   </p>
                 </div>
-                {isLinked ? (
-                  <StartMessageButton
-                    otherUserId={caregiver.linkedProfileId!}
-                    size="sm"
-                    variant="primary"
-                    label="Stuur een bericht"
-                  />
+                {canMessage ? (
+                  messagingGoHref ? (
+                    <Link
+                      href={messagingGoHref}
+                      className={cn(
+                        buttonVariants({ size: "sm" }),
+                        "mt-1 flex w-full justify-center gap-1.5 border-0 bg-[#40ada8] text-xs text-white hover:bg-[#369e9a] hover:no-underline"
+                      )}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Ga naar gesprek
+                    </Link>
+                  ) : (
+                    <StartMessageButton
+                      otherUserId={messageTargetProfileId!}
+                      size="sm"
+                      variant="primary"
+                      label="Stuur een bericht"
+                    />
+                  )
                 ) : (
                   <Button
                     size="sm"
@@ -525,3 +610,16 @@ export default function CaregiverProfilePage({ params }: PageProps) {
   );
 }
 
+export default function CaregiverProfilePage(props: PageProps) {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer maxWidth="default">
+          <ZorentaPageSkeleton className="space-y-6 sm:space-y-8" />
+        </PageContainer>
+      }
+    >
+      <CaregiverProfilePageContent {...props} />
+    </Suspense>
+  );
+}

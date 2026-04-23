@@ -483,6 +483,48 @@ export async function GET(
     return jsonResponse(orgBody);
   }
 
+  /**
+   * Cliënt / admin: geen marketplace-rij nodig; minimale `marketplaceCard` zodat `/profielen/[id]`
+   * (o.a. vanuit berichten) een consistente publieke samenvatting kan tonen.
+   */
+  if (legacyProfile.role === "client" || legacyProfile.role === "admin") {
+    const rev = await fetchReviewsForProfile(supabase, profileIdResolved);
+    if ("error" in rev) return jsonResponse({ error: rev.error }, rev.status);
+    const isAdmin = legacyProfile.role === "admin";
+    const displayName =
+      (legacyProfile.display_name ?? "").trim() || (isAdmin ? "Beheerder" : "Opdrachtgever");
+    const marketplaceCard: Record<string, unknown> = {
+      id: profileIdResolved,
+      linkedProfileId: profileIdResolved,
+      name: displayName,
+      role: isAdmin ? "Beheerder" : "Cliënt",
+      city: "",
+      rate: null,
+      isVolunteer: false,
+      tags: ["SamenConnect"],
+      skills: [],
+      certifications: [],
+      arrangement: "ZZP",
+      bio: isAdmin
+        ? "Platformbeheerder op SamenConnect."
+        : "Geregistreerde opdrachtgever op SamenConnect.",
+    };
+    const body: Record<string, unknown> = {
+      mode: "marketplace",
+      profile: {
+        id: legacyProfile.id,
+        display_name: legacyProfile.display_name,
+        avatar_url: legacyProfile.avatar_url ?? null,
+      },
+      marketplaceCard,
+      reviews: rev.reviews,
+      averageRating: rev.averageRating,
+      reviewCount: rev.reviewCount,
+    };
+    devLogCaregiverGet(routeId, "4_client_admin_summary", body, false);
+    return jsonResponse(body);
+  }
+
   devLogCaregiverGet(routeId, "fallback_not_found", null, false);
   return jsonResponse({ error: "Profile not found." }, 404);
 }

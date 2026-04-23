@@ -86,14 +86,41 @@ function caregiverProfileRouteId(other: OtherParticipantProfile | null | undefin
   return raw;
 }
 
-/** Link naar publiek zorgverlener-profiel; valt terug op `profiles.id` als de API geen route-id gaf. */
-function caregiverProfileHref(other: OtherParticipantProfile | null | undefined): string | null {
-  const fromApi = caregiverProfileRouteId(other);
-  if (fromApi) return `/caregivers/${fromApi}`;
-  const role = (other?.role ?? "").trim().toLowerCase();
-  const pid = other?.id?.trim();
-  if (role === "caregiver" && pid) return `/caregivers/${pid}`;
-  return null;
+/**
+ * Public profile / summary link for the other conversation participant.
+ * - Caregiver (linked, renderable): `/caregivers/[caregiver_route_id]` (full caregiver page).
+ * - Caregiver (marketplace-only): `/profielen/[marketplace id]` (same as matches/opgeslagen).
+ * - Organization / client / admin: `/profielen/[profiles.id]` (GET /caregivers/[id] resolves org + client/admin summary).
+ * - Caregiver fallback (legacy): `/caregivers/[profiles.id]` when no API route hints.
+ * When `conversationId` is set, appends `?conversation=` so the profile page can show “Ga naar gesprek” without guessing.
+ */
+function conversationOtherProfileHref(
+  other: OtherParticipantProfile | null | undefined,
+  opts?: { conversationId?: string | null }
+): string | null {
+  if (!other) return null;
+  const role = (other.role ?? "").trim().toLowerCase();
+  const profileId = other.id?.trim() ?? null;
+  const mpRoute = other.caregiver_route_id?.trim() ?? null;
+  const renderableFalse = other.has_renderable_caregiver_profile === false;
+
+  let base: string | null = null;
+
+  if (role === "organization" && profileId) {
+    base = `/profielen/${profileId}`;
+  } else if ((role === "client" || role === "admin") && profileId) {
+    base = `/profielen/${profileId}`;
+  } else if (role === "caregiver") {
+    const linkedPathId = caregiverProfileRouteId(other);
+    if (linkedPathId) base = `/caregivers/${linkedPathId}`;
+    else if (mpRoute && renderableFalse) base = `/profielen/${mpRoute}`;
+    else if (profileId) base = `/caregivers/${profileId}`;
+  }
+
+  const cid = opts?.conversationId?.trim();
+  if (!base || !cid) return base;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}conversation=${encodeURIComponent(cid)}`;
 }
 
 type ApiMessage = {
@@ -1412,7 +1439,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const displayName =
     getPresentableOtherName(selectedConvo, meId, resolvedOtherNames)?.trim() || "Contact";
   threadOtherDisplayNameRef.current = displayName;
-  const headerProfileHref = caregiverProfileHref(selectedConvo?.other);
+  const headerProfileHref = conversationOtherProfileHref(selectedConvo?.other, {
+    conversationId: selectedId,
+  });
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
   const selectedApplicationStatus = applicationStatusLabelNl(selectedConvo?.application?.status);
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
@@ -1566,7 +1595,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                     : hasUnread
                       ? "unread"
                       : "default";
-                  const profileHref = caregiverProfileHref(conv.other);
+                  const profileHref = conversationOtherProfileHref(conv.other, {
+                    conversationId: conv.id,
+                  });
                   return (
                     <div
                       key={conv.id}
