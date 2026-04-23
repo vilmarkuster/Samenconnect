@@ -22,22 +22,33 @@ export default function AdminBillingPage() {
   const [byPlan, setByPlan] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDataError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setDataError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
       fetch("/api/zorenta/admin/billing?limit=50", { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            setUsers(d.users ?? []);
-            setByPlan(d.byPlan ?? {});
-            setTotal(d.total ?? 0);
+        .then(async (r) => {
+          const d = await r.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!r.ok || d.error) {
+            setDataError(typeof d.error === "string" ? d.error : `Fout (${r.status})`);
+            return;
           }
+          setUsers(d.users ?? []);
+          setByPlan(d.byPlan ?? {});
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setDataError("Kon facturatie niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -54,6 +65,12 @@ export default function AdminBillingPage() {
       <p className="text-sm text-slate-500">
         Plan en abonnementsstatus per gebruiker. Alleen zichtbaarheid, geen wijzigingen.
       </p>
+
+      {dataError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {dataError}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {["free", "pro", "team", "featured"].map((plan) => (
@@ -94,27 +111,35 @@ export default function AdminBillingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
-                    <tr key={u.userId} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{u.displayName ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">{u.role}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{u.planSlug}</td>
-                      <td className="px-4 py-3 text-slate-600">{u.subscriptionStatus ?? "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                        {u.stripeCustomerId ? `${u.stripeCustomerId.slice(0, 20)}…` : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/users/${u.userId}`}
-                          className="text-slate-600 hover:text-slate-900"
-                        >
-                          Gebruiker
-                        </Link>
+                  {!dataError && users.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                        Geen gebruikers in dit overzicht (eerste pagina).
                       </td>
                     </tr>
-                  ))}
+                  ) : dataError ? null : (
+                    users.map((u) => (
+                      <tr key={u.userId} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-medium text-slate-900">{u.displayName ?? "—"}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-xs">{u.role}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{u.planSlug}</td>
+                        <td className="px-4 py-3 text-slate-600">{u.subscriptionStatus ?? "—"}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          {u.stripeCustomerId ? `${u.stripeCustomerId.slice(0, 20)}…` : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/admin/users/${u.userId}`}
+                            className="text-slate-600 hover:text-slate-900"
+                          >
+                            Gebruiker
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

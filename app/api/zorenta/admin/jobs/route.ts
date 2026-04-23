@@ -12,12 +12,46 @@ export async function GET(req: NextRequest) {
 
   const { supabase } = auth;
   const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id")?.trim() || "";
   const status = searchParams.get("status") || "";
   const q = searchParams.get("q") || "";
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
   const offset = Number(searchParams.get("offset")) || 0;
 
   try {
+    if (id) {
+      const { data: job, error } = await supabase
+        .from("care_jobs")
+        .select("id, poster_id, poster_type, title, city, care_type, status, created_at, featured_until")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (!job) {
+        return new Response(JSON.stringify({ jobs: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const { data: poster } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .eq("id", job.poster_id)
+        .maybeSingle();
+      const row = {
+        ...job,
+        poster: poster ? { display_name: poster.display_name } : null,
+      };
+      return new Response(JSON.stringify({ jobs: [row], total: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     let query = supabase
       .from("care_jobs")
       .select("id, poster_id, poster_type, title, city, care_type, status, created_at, featured_until", { count: "exact" })

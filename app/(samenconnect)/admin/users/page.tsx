@@ -32,6 +32,11 @@ export default function AdminUsersPage() {
   const [q, setQ] = useState(searchParams.get("q") || "");
 
   useEffect(() => {
+    setRole(searchParams.get("role") || "");
+    setQ(searchParams.get("q") || "");
+  }, [searchParams]);
+
+  useEffect(() => {
     let cancelled = false;
     setDataError(null);
     getZorentaAccessToken()

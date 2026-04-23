@@ -32,12 +32,17 @@ export default function AdminJobsPage() {
   const [title, setTitle] = useState("");
   const [city, setCity] = useState("");
   const [careType, setCareType] = useState("");
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDataError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setDataError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
       const params = new URLSearchParams();
@@ -47,12 +52,20 @@ export default function AdminJobsPage() {
       if (careType) params.set("care_type", careType);
       params.set("limit", "50");
       fetch(`/api/zorenta/admin/jobs?${params}`, { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            setJobs(d.jobs ?? []);
-            setTotal(d.total ?? 0);
+        .then(async (res) => {
+          const d = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!res.ok || d.error) {
+            setDataError(typeof d.error === "string" ? d.error : `Fout (${res.status})`);
+            setJobs([]);
+            setTotal(0);
+            return;
           }
+          setJobs(d.jobs ?? []);
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setDataError("Kon opdrachten niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -63,6 +76,12 @@ export default function AdminJobsPage() {
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Opdrachten</h1>
+
+      {dataError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {dataError}
+        </div>
+      )}
 
       <Card className="border-slate-200">
         <CardHeader className="pb-3">
@@ -127,25 +146,33 @@ export default function AdminJobsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {jobs.map((j) => (
-                    <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{j.title}</td>
-                      <td className="px-4 py-3 text-slate-600">{j.city ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{j.care_type ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={j.status === "open" ? "default" : "outline"} className="text-xs">
-                          {j.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{j.poster?.display_name ?? j.poster_id.slice(0, 8)}</td>
-                      <td className="px-4 py-3 text-slate-600">{j.featured_until ? "Ja" : "—"}</td>
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/jobs/${j.id}`}>
-                          <Button variant="ghost" size="sm">Details</Button>
-                        </Link>
+                  {!dataError && jobs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                        Geen opdrachten met deze filters.
                       </td>
                     </tr>
-                  ))}
+                  ) : dataError ? null : (
+                    jobs.map((j) => (
+                      <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-medium text-slate-900">{j.title}</td>
+                        <td className="px-4 py-3 text-slate-600">{j.city ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{j.care_type ?? "—"}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={j.status === "open" ? "default" : "outline"} className="text-xs">
+                            {j.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{j.poster?.display_name ?? j.poster_id.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-slate-600">{j.featured_until ? "Ja" : "—"}</td>
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/jobs/${j.id}`}>
+                            <Button variant="ghost" size="sm">Details</Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -26,24 +26,37 @@ export default function AdminReviewsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState("");
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDataError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setDataError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
       const params = new URLSearchParams();
       if (rating) params.set("rating", rating);
       params.set("limit", "50");
       fetch(`/api/zorenta/admin/reviews?${params}`, { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            setReviews(d.reviews ?? []);
-            setTotal(d.total ?? 0);
+        .then(async (res) => {
+          const d = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!res.ok || d.error) {
+            setDataError(typeof d.error === "string" ? d.error : `Fout (${res.status})`);
+            setReviews([]);
+            setTotal(0);
+            return;
           }
+          setReviews(d.reviews ?? []);
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setDataError("Kon reviews niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -54,6 +67,12 @@ export default function AdminReviewsPage() {
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reviews</h1>
+
+      {dataError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {dataError}
+        </div>
+      )}
 
       <Card className="border-slate-200">
         <CardHeader className="pb-3">
@@ -94,34 +113,42 @@ export default function AdminReviewsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reviews.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-0.5">
-                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                          {r.rating}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/users/${r.reviewer_id}`} className="text-slate-700 hover:underline">
-                          {r.reviewer?.display_name ?? r.reviewer_id.slice(0, 8)}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/users/${r.reviewee_id}`} className="text-slate-700 hover:underline">
-                          {r.reviewee?.display_name ?? r.reviewee_id.slice(0, 8)}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {new Date(r.created_at).toLocaleDateString("nl-NL")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Button variant="ghost" size="sm" disabled className="text-xs">
-                          Flag/verwijder (binnenkort)
-                        </Button>
+                  {!dataError && reviews.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                        Geen reviews in dit overzicht.
                       </td>
                     </tr>
-                  ))}
+                  ) : dataError ? null : (
+                    reviews.map((row) => (
+                      <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-0.5">
+                            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                            {row.rating}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/users/${row.reviewer_id}`} className="text-slate-700 hover:underline">
+                            {row.reviewer?.display_name ?? row.reviewer_id.slice(0, 8)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/users/${row.reviewee_id}`} className="text-slate-700 hover:underline">
+                            {row.reviewee?.display_name ?? row.reviewee_id.slice(0, 8)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {new Date(row.created_at).toLocaleDateString("nl-NL")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Button variant="ghost" size="sm" disabled className="text-xs">
+                            Flag/verwijder (binnenkort)
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

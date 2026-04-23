@@ -48,17 +48,16 @@ export default function AdminDashboardPage() {
         }
         return fetch("/api/zorenta/admin/dashboard", { headers: zorentaHeaders(token) });
       })
-      .then((res) => {
+      .then(async (res) => {
         if (res === null || cancelled) return null;
-        return res.json();
-      })
-      .then((d) => {
-        if (cancelled || !d) return;
-        if (d.error) {
-          setError(typeof d.error === "string" ? d.error : "Kon admin-statistieken niet laden.");
-        } else {
-          setStats(d);
+        const d = await res.json().catch(() => ({}));
+        if (cancelled) return null;
+        if (!res.ok || d.error) {
+          setError(typeof d.error === "string" ? d.error : `Kon admin-statistieken niet laden (${res.status}).`);
+          return null;
         }
+        setStats(d);
+        return null;
       })
       .catch(() => {
         if (!cancelled) setError("Kon admin-statistieken niet laden.");
@@ -86,7 +85,13 @@ export default function AdminDashboardPage() {
     unreadNotifications: 0,
   };
 
-  const cards = [
+  const cards: Array<{
+    title: string;
+    value: number;
+    icon: typeof Users;
+    href?: string;
+    subtitle?: string;
+  }> = [
     { title: "Gebruikers", value: s.totalUsers, icon: Users, href: "/admin/users" },
     { title: "Zorgverleners", value: s.caregivers, icon: UserCircle, href: "/admin/users?role=caregiver" },
     { title: "Opdrachtgevers", value: s.clients, icon: UserCircle, href: "/admin/users?role=client" },
@@ -101,7 +106,12 @@ export default function AdminDashboardPage() {
       subtitle: `${s.totalMessages} berichten`,
     },
     { title: "Reviews", value: s.totalReviews, icon: Star, href: "/admin/reviews" },
-    { title: "Ongelezen notificaties", value: s.unreadNotifications, icon: Bell, subtitle: "Placeholder" },
+    {
+      title: "Ongelezen notificaties",
+      value: s.unreadNotifications,
+      icon: Bell,
+      subtitle: "Totaal in platform (alle gebruikers)",
+    },
   ];
 
   return (
@@ -133,9 +143,11 @@ export default function AdminDashboardPage() {
       {!loading && !error && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map(({ title, value, icon: Icon, href, subtitle }) => (
-              <Link key={title} href={href ?? "#"}>
-                <Card className="h-full border-slate-200 transition-shadow hover:shadow-md">
+            {cards.map(({ title, value, icon: Icon, href, subtitle }) => {
+              const inner = (
+                <Card
+                  className={`h-full border-slate-200 ${href ? "transition-shadow hover:shadow-md" : ""}`}
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <span className="text-sm font-medium text-slate-500">{title}</span>
                     <Icon className="h-4 w-4 text-slate-400" />
@@ -145,8 +157,15 @@ export default function AdminDashboardPage() {
                     {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
                   </CardContent>
                 </Card>
-              </Link>
-            ))}
+              );
+              return href ? (
+                <Link key={title} href={href}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={title}>{inner}</div>
+              );
+            })}
           </div>
 
           <Card className="border-slate-200">

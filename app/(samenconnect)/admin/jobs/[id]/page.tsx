@@ -27,22 +27,33 @@ export default function AdminJobDetailPage() {
   const id = params.id as string;
   const [job, setJob] = useState<AdminJobRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
-      fetch(`/api/zorenta/admin/jobs?limit=100`, { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            const jobs = (d.jobs ?? []) as AdminJobRow[];
-            const found = jobs.find((row) => row.id === id);
-            setJob(found ?? null);
+      fetch(`/api/zorenta/admin/jobs?id=${encodeURIComponent(id)}`, { headers: zorentaHeaders(token) })
+        .then(async (r) => {
+          const d = await r.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!r.ok || d.error) {
+            setLoadError(typeof d.error === "string" ? d.error : `Fout (${r.status})`);
+            setJob(null);
+            return;
           }
+          const jobs = (d.jobs ?? []) as AdminJobRow[];
+          setJob(jobs[0] ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setLoadError("Kon opdracht niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -122,7 +133,7 @@ export default function AdminJobDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-amber-800">
             <AlertCircle className="h-4 w-4" />
-            Moderatie (placeholders)
+            Moderatie (nog niet geactiveerd)
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">

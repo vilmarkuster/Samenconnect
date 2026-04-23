@@ -25,24 +25,37 @@ export default function AdminApplicationsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDataError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setDataError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
       const params = new URLSearchParams();
       if (status) params.set("status", status);
       params.set("limit", "50");
       fetch(`/api/zorenta/admin/applications?${params}`, { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            setApplications(d.applications ?? []);
-            setTotal(d.total ?? 0);
+        .then(async (res) => {
+          const d = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!res.ok || d.error) {
+            setDataError(typeof d.error === "string" ? d.error : `Fout (${res.status})`);
+            setApplications([]);
+            setTotal(0);
+            return;
           }
+          setApplications(d.applications ?? []);
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setDataError("Kon sollicitaties niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -53,6 +66,12 @@ export default function AdminApplicationsPage() {
   return (
     <ZorentaPageContainer maxWidth="wide" className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Sollicitaties</h1>
+
+      {dataError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {dataError}
+        </div>
+      )}
 
       <Card className="border-slate-200">
         <CardHeader className="pb-3">
@@ -91,26 +110,34 @@ export default function AdminApplicationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {applications.map((a) => (
-                    <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/jobs/${a.job_id}`} className="font-medium text-slate-900 hover:underline">
-                          {a.job?.title ?? a.job_id.slice(0, 8)}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/users/${a.applicant_id}`} className="text-slate-700 hover:underline">
-                          {a.applicant?.display_name ?? a.applicant_id.slice(0, 8)}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">{a.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {new Date(a.created_at).toLocaleDateString("nl-NL")}
+                  {!dataError && applications.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500">
+                        Geen sollicitaties in dit overzicht.
                       </td>
                     </tr>
-                  ))}
+                  ) : dataError ? null : (
+                    applications.map((a) => (
+                      <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/jobs/${a.job_id}`} className="font-medium text-slate-900 hover:underline">
+                            {a.job?.title ?? a.job_id.slice(0, 8)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link href={`/admin/users/${a.applicant_id}`} className="text-slate-700 hover:underline">
+                            {a.applicant?.display_name ?? a.applicant_id.slice(0, 8)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-xs">{a.status}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {new Date(a.created_at).toLocaleDateString("nl-NL")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

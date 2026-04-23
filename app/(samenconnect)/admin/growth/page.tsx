@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { ZorentaPageContainer } from "@/components/zorenta/page-container";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { TrendingUp, Activity, Target } from "lucide-react";
 
 export default function ZorentaGrowthPage() {
@@ -14,8 +17,22 @@ export default function ZorentaGrowthPage() {
         </h1>
         <p className="text-sm text-slate-600">
           Interne overzichtspagina voor groei, activatie en marktplaats‑gezondheid. Alleen zichtbaar
-          voor admins.
+          voor admins. Uitbreidingen volgen; hieronder vind je vast werkende admin-secties.
         </p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link href="/admin" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Admin-overzicht
+          </Link>
+          <Link href="/admin/users" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Gebruikers
+          </Link>
+          <Link href="/admin/jobs" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Opdrachten
+          </Link>
+          <Link href="/admin/billing" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Facturatie
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

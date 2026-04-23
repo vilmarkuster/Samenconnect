@@ -22,21 +22,34 @@ export default function AdminConversationsPage() {
   const [conversations, setConversations] = useState<ConvoRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setDataError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setDataError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
       fetch("/api/zorenta/admin/conversations?limit=50", { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) {
-            setConversations(d.conversations ?? []);
-            setTotal(d.total ?? 0);
+        .then(async (r) => {
+          const d = await r.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!r.ok || d.error) {
+            setDataError(typeof d.error === "string" ? d.error : `Fout (${r.status})`);
+            setConversations([]);
+            setTotal(0);
+            return;
           }
+          setConversations(d.conversations ?? []);
+          setTotal(d.total ?? 0);
+        })
+        .catch(() => {
+          if (!cancelled) setDataError("Kon gesprekken niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -53,6 +66,12 @@ export default function AdminConversationsPage() {
       <p className="text-sm text-slate-500">
         Overzicht van gesprekken en aantal berichten. Geen inhoud van berichten voor privacy.
       </p>
+
+      {dataError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          {dataError}
+        </div>
+      )}
 
       <Card className="border-slate-200 overflow-hidden">
         <CardContent className="p-0">
@@ -73,17 +92,25 @@ export default function AdminConversationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {conversations.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="px-4 py-3 text-slate-700">{c.participant_1_name ?? c.participant_1.slice(0, 8)}</td>
-                      <td className="px-4 py-3 text-slate-700">{c.participant_2_name ?? c.participant_2.slice(0, 8)}</td>
-                      <td className="px-4 py-3 text-slate-600">{c.job_title ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{c.message_count}</td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {new Date(c.created_at).toLocaleDateString("nl-NL")}
+                  {!dataError && conversations.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                        Geen gesprekken in dit overzicht.
                       </td>
                     </tr>
-                  ))}
+                  ) : dataError ? null : (
+                    conversations.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="px-4 py-3 text-slate-700">{c.participant_1_name ?? c.participant_1.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-slate-700">{c.participant_2_name ?? c.participant_2.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-slate-600">{c.job_title ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{c.message_count}</td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {new Date(c.created_at).toLocaleDateString("nl-NL")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

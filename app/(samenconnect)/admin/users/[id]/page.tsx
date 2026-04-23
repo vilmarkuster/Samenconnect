@@ -15,18 +15,32 @@ export default function AdminUserDetailPage() {
   const id = params.id as string;
   const [billing, setBilling] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     getZorentaAccessToken().then((token) => {
       if (!token) {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadError("Geen sessie.");
+          setLoading(false);
+        }
         return;
       }
-      fetch(`/api/zorenta/admin/users/${id}/billing`, { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && !d.error) setBilling(d);
+      fetch(`/api/zorenta/admin/users/${encodeURIComponent(id)}/billing`, { headers: zorentaHeaders(token) })
+        .then(async (r) => {
+          const d = await r.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!r.ok || d.error) {
+            setLoadError(typeof d.error === "string" ? d.error : `Fout (${r.status})`);
+            setBilling(null);
+            return;
+          }
+          setBilling(d);
+        })
+        .catch(() => {
+          if (!cancelled) setLoadError("Kon gebruikersgegevens niet laden.");
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -58,6 +72,10 @@ export default function AdminUserDetailPage() {
         Gebruikers
       </Link>
 
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</div>
+      )}
+
       <Card className="border-slate-200">
         <CardHeader>
           <CardTitle className="text-lg">Profiel</CardTitle>
@@ -78,7 +96,7 @@ export default function AdminUserDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-amber-800">
             <AlertCircle className="h-4 w-4" />
-            Moderatie (placeholders)
+            Moderatie (nog niet geactiveerd)
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
