@@ -9,25 +9,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { AdminShell } from "@/components/zorenta/admin-shell";
 import { SamenConnectLogo } from "@/components/samenconnect/logo";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { isZorentaPublicPathname } from "@/lib/zorenta/public-paths";
 
 type ZorentaLayoutMode = "public" | "app";
 
-const PUBLIC_PATHS = new Set<string>([
-  "/",
-  "/login",
-  "/register",
-  "/registration-closed",
-]);
-
-function normalizePathname(path: string | null): string {
-  if (!path) return "";
-  const t = path.trim();
-  if (!t) return "";
-  return t.replace(/\/+$/, "") || "/";
-}
-
 function isPublicPath(path: string | null): boolean {
-  return PUBLIC_PATHS.has(normalizePathname(path));
+  return isZorentaPublicPathname(path);
 }
 
 const isAdminPath = (path: string | null) => path?.startsWith("/admin");
@@ -65,8 +52,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<ZorentaLayoutMode>(mode);
 
-  // Keep shell mode in sync with the actual pathname during client navigation,
-  // using only explicit public paths (no window.location or fuzzy matching).
+  // Keep shell mode in sync with the actual pathname during client navigation.
   useEffect(() => {
     const nextMode: ZorentaLayoutMode = isPublicPath(pathname) ? "public" : "app";
     if (nextMode !== currentMode) {
@@ -75,11 +61,15 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   }, [pathname, currentMode]);
 
   const isPublic = currentMode === "public";
+  /** Path-based check avoids a redirect race when server mode lags or x-pathname was missing but URL is public. */
+  const pathnameIsPublic = isPublicPath(pathname);
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isPublic) router.replace("/login");
-  }, [isLoading, isAuthenticated, isPublic, router]);
+    if (!isLoading && !isAuthenticated && !isPublic && !pathnameIsPublic) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, isPublic, pathnameIsPublic, router]);
 
   useEffect(() => {
     if (isPublic || !isAuthenticated) {

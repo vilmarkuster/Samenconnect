@@ -2,13 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { isZorentaPublicPathname } from "@/lib/zorenta/public-paths";
 
-const ZORENTA_PUBLIC = [
-  "/",
-  "/login",
-  "/register",
-  "/registration-closed",
-];
 const ZORENTA_PROTECTED = [
   "/dashboard",
   "/matches",
@@ -39,7 +34,7 @@ const apiCounts = new Map<string, { count: number; resetAt: number }>();
 
 function isZorentaPublic(pathname: string): boolean {
   if (!pathname.startsWith("/")) return true;
-  return ZORENTA_PUBLIC.includes(pathname);
+  return isZorentaPublicPathname(pathname);
 }
 
 function getClientId(req: NextRequest): string {

@@ -1216,9 +1216,17 @@ export function SamenConnectHomeLanding({
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Juridisch
                 </p>
-                <ul className="mt-3 space-y-2.5 text-sm text-slate-500 sm:mt-4 sm:space-y-3">
-                  <li>Privacybeleid (binnenkort)</li>
-                  <li>Algemene voorwaarden (binnenkort)</li>
+                <ul className="mt-3 space-y-2.5 text-sm text-slate-600 sm:mt-4 sm:space-y-3">
+                  <li>
+                    <Link href="/privacy" className="transition-colors hover:text-brand-dark">
+                      Privacybeleid
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/terms" className="transition-colors hover:text-brand-dark">
+                      Algemene voorwaarden
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

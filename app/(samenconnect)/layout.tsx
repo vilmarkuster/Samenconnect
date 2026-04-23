@@ -1,19 +1,11 @@
 import { headers } from "next/headers";
 import { ZorentaLayoutClient } from "@/components/zorenta/ZorentaLayoutClient";
+import { isZorentaPublicPathname } from "@/lib/zorenta/public-paths";
 
 type ZorentaLayoutMode = "public" | "app";
 
-const PUBLIC_ROUTES = ["/", "/login", "/register", "/registration-closed"];
-
-function normalizePathname(pathname: string): string {
-  const t = pathname.trim();
-  if (!t) return "";
-  return t.replace(/\/+$/, "") || "/";
-}
-
 function resolveMode(pathname: string): ZorentaLayoutMode {
-  const p = normalizePathname(pathname);
-  return PUBLIC_ROUTES.includes(p) ? "public" : "app";
+  return isZorentaPublicPathname(pathname) ? "public" : "app";
 }
 
 export default async function ZorentaLayout({ children }: { children: React.ReactNode }) {

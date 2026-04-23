@@ -333,6 +333,8 @@ export function ZorentaLandingPage() {
           </Link>
           <nav className="flex flex-wrap justify-center gap-6 text-sm text-slate-600">
             <Link href="/" className="hover:text-slate-900">Home</Link>
+            <Link href="/privacy" className="hover:text-slate-900">Privacy</Link>
+            <Link href="/terms" className="hover:text-slate-900">Voorwaarden</Link>
             <Link href="/login" className="hover:text-slate-900">Inloggen</Link>
             {REGISTRATION_OPEN ? (
               <>
