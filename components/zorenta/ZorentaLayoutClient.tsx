@@ -41,6 +41,8 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  /** False until /api/zorenta/me has finished (success or error), so the sidebar never flashes wrong role-gated links. */
+  const [userRoleReady, setUserRoleReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<ZorentaLayoutMode>(mode);
 
@@ -61,15 +63,32 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
   }, [isLoading, isAuthenticated, isPublic, router]);
 
   useEffect(() => {
-    if (!isPublic && isAuthenticated) {
-      getZorentaAccessToken().then((token) => {
-        if (!token) return;
-        Promise.all([
+    if (isPublic || !isAuthenticated) {
+      setUserRoleReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    setUserRoleReady(false);
+
+    getZorentaAccessToken()
+      .then((token) => {
+        if (cancelled) return;
+        if (!token) {
+          setUserRole(null);
+          setIsAdmin(false);
+          setUnreadCount(0);
+          setUserDisplayName(null);
+          setUserAvatarUrl(null);
+          return;
+        }
+        return Promise.all([
           fetch("/api/zorenta/notifications?unread=true", { headers: zorentaHeaders(token) }),
           fetch("/api/zorenta/me", { headers: zorentaHeaders(token) }),
         ])
           .then(([notifRes, meRes]) => Promise.all([notifRes.json(), meRes.json()]))
           .then(([notifData, meData]) => {
+            if (cancelled) return;
             setUnreadCount(Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0);
             setUserDisplayName(meData?.profile?.display_name ?? null);
             setUserAvatarUrl(typeof meData?.profile?.avatar_url === "string" ? meData.profile.avatar_url : null);
@@ -77,9 +96,20 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
             setIsAdmin(role === "admin");
             setUserRole(role);
           })
-          .catch(() => {});
+          .catch(() => {
+            if (!cancelled) {
+              setUserRole(null);
+              setIsAdmin(false);
+            }
+          });
+      })
+      .finally(() => {
+        if (!cancelled) setUserRoleReady(true);
       });
-    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [isPublic, isAuthenticated]);
 
   // Allow child pages (e.g. notifications) to adjust the unread bell count optimistically.
@@ -166,6 +196,7 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       onLogout={handleLogout}
       isAdmin={isAdmin}
       userRole={userRole}
+      userRoleReady={userRoleReady}
     >
       {children}
     </AppLayout>

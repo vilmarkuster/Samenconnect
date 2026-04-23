@@ -37,16 +37,18 @@ type SidebarProps = {
   onNavigate?: () => void;
   onLogout?: () => void;
   isAdmin?: boolean;
-  /** When set, hides client-only items (intake, opgeslagen, matches) for caregivers. */
+  /** When set, filters client-only vs caregiver-only items. Ignored until userRoleReady is true. */
   userRole?: string | null;
+  /** Must be true before role-gated links render, so caregivers never briefly see client-only items. */
+  userRoleReady?: boolean;
 };
 
-export function Sidebar({ onNavigate, onLogout, isAdmin, userRole }: SidebarProps) {
+export function Sidebar({ onNavigate, onLogout, isAdmin, userRole, userRoleReady = false }: SidebarProps) {
   const pathname = usePathname();
   const baseItems = ZORENTA_NAV_ITEMS.filter((item) => {
     if (!("roles" in item) || !item.roles) return true;
-    if (!userRole) return true;
-    return (item.roles as readonly string[]).includes(userRole);
+    if (!userRoleReady) return false;
+    return (item.roles as readonly string[]).includes(userRole ?? "");
   }).map(({ href, label, icon }) => ({ href, label, icon }));
 
   const navItems = isAdmin

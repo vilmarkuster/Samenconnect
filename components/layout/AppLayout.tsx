@@ -14,6 +14,8 @@ type AppLayoutProps = {
   onLogout?: () => void;
   isAdmin?: boolean;
   userRole?: string | null;
+  /** When false, Sidebar omits role-restricted links until /api/zorenta/me has resolved. */
+  userRoleReady?: boolean;
 };
 
 export function AppLayout({
@@ -26,11 +28,12 @@ export function AppLayout({
   onLogout,
   isAdmin,
   userRole,
+  userRoleReady = false,
 }: AppLayoutProps) {
   return (
     <div className="flex min-h-screen bg-slate-50 md:min-h-0">
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white">
-        <Sidebar onLogout={onLogout} isAdmin={isAdmin} userRole={userRole} />
+        <Sidebar onLogout={onLogout} isAdmin={isAdmin} userRole={userRole} userRoleReady={userRoleReady} />
       </aside>
       {sidebarOpen && (
         <>
@@ -45,6 +48,7 @@ export function AppLayout({
               onLogout={onLogout}
               isAdmin={isAdmin}
               userRole={userRole}
+              userRoleReady={userRoleReady}
             />
           </div>
         </>
