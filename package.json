@@ -11,7 +11,8 @@
     "import:woonplaatsen:csv": "node scripts/import-woonplaatsen-from-csv.mjs",
     "validate:locations": "node scripts/validate-locations.mjs",
     "seed:locations": "node scripts/seed-locations.mjs",
-    "verify:locations": "npm run compose:locations && npm run validate:locations && npm run seed:locations"
+    "verify:locations": "npm run compose:locations && npm run validate:locations && npm run seed:locations",
+    "dev:repair-org-test-user": "node scripts/dev-only/repair-organization-test-user.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

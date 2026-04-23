@@ -31,6 +31,7 @@ import {
   VAARDIGHEDEN_ERVARING_OPTIONS,
 } from "@/lib/zorenta/intake-taxonomy";
 import { cn } from "@/lib/utils";
+import { adminPrefersMainAppSession } from "@/lib/samenconnect/admin-main-app-nav";
 
 const SELECT_CLASS =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100";
@@ -81,13 +82,39 @@ export default function NewJobPage() {
         return;
       }
       fetch("/api/zorenta/me", { headers: zorentaHeaders(token) })
-        .then((r) => r.json())
-        .then((d) => {
-          if (!cancelled && d.profile?.role === "caregiver") {
+        .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+        .then(({ ok, data: d }) => {
+          if (cancelled) return;
+          if (!ok || !d?.profile) {
+            setRoleCheckDone(true);
+            return;
+          }
+          const role = typeof d.profile.role === "string" ? d.profile.role : "";
+          if (role === "caregiver") {
             router.replace("/jobs");
             return;
           }
-          if (!cancelled) setRoleCheckDone(true);
+          if (role === "admin" && !adminPrefersMainAppSession()) {
+            router.replace("/admin");
+            return;
+          }
+          if (role === "admin") {
+            router.replace("/dashboard");
+            return;
+          }
+          if (role === "client" && !d.client) {
+            router.replace("/clients/me/edit");
+            return;
+          }
+          if (role === "organization" && !d.organization) {
+            router.replace("/organizations/me/edit");
+            return;
+          }
+          if (role !== "client" && role !== "organization") {
+            router.replace("/jobs");
+            return;
+          }
+          setRoleCheckDone(true);
         })
         .catch(() => {
           if (!cancelled) setRoleCheckDone(true);

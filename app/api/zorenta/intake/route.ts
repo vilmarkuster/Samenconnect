@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   const { supabase, userId, profile } = auth;
   const posterTypeResolved = await resolveJobPosterType(supabase, userId, profile.role);
   if (!posterTypeResolved) {
-    return jsonResponse({ error: "Alleen cliënten kunnen een intake invullen." }, 403);
+    return jsonResponse({ error: "Alleen cliënten en organisaties kunnen een intake invullen." }, 403);
   }
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
