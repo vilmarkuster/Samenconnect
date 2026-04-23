@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
@@ -90,6 +90,7 @@ function editRouteForRole(role: string | null | undefined): { href: string | nul
   if (role === "caregiver") return { href: "/caregivers/me/edit", label: "Profiel bewerken" };
   if (role === "client") return { href: "/clients/me/edit", label: "Profiel bewerken" };
   if (role === "organization") return { href: "/organizations/me/edit", label: "Profiel bewerken" };
+  if (role === "admin") return { href: "/admin", label: "Admin-portaal" };
   return { href: null, label: "Profiel bewerken" };
 }
 
@@ -223,7 +224,16 @@ export default function ProfilePage() {
                     ]
                   : [Boolean(data.profile?.avatar_url?.trim())];
           const completeness = Math.round((completenessFields.filter(Boolean).length / completenessFields.length) * 100);
-          const roleLabel = role === "caregiver" ? "Zorgverlener" : role === "organization" ? "Organisatie" : role === "client" ? "Cliënt" : "Gebruiker";
+          const roleLabel =
+            role === "caregiver"
+              ? "Zorgverlener"
+              : role === "organization"
+                ? "Organisatie"
+                : role === "client"
+                  ? "Cliënt"
+                  : role === "admin"
+                    ? "Admin"
+                    : "Gebruiker";
           const editRoute = editRouteForRole(role);
 
           return (

@@ -63,6 +63,7 @@ export function AppLayout({
             onLogout={onLogout}
             isAdmin={isAdmin}
             userRole={userRole}
+            userRoleReady={userRoleReady}
           />
         </header>
         <main className="min-h-0 min-w-0 w-full flex-1 overflow-auto px-4 py-6 sm:px-6 md:flex-none md:px-8 md:py-8">

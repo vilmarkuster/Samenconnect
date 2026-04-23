@@ -13,6 +13,8 @@ type ZorentaTopbarProps = {
   onLogout?: () => void;
   isAdmin?: boolean;
   userRole?: string | null;
+  /** When false, do not infer caregiver vs client from a null role (avoids wrong CTAs / search targets). */
+  userRoleReady?: boolean;
 };
 
 export function ZorentaTopbar({
@@ -23,13 +25,23 @@ export function ZorentaTopbar({
   onLogout,
   isAdmin,
   userRole,
+  userRoleReady = false,
 }: ZorentaTopbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const initialQuery = searchParams?.get("q") ?? "";
-  const isCaregiver = userRole === "caregiver";
-  const searchListPath = isCaregiver ? "/jobs" : "/matches";
+  const roleKnown = userRoleReady === true;
+  const isCaregiver = roleKnown && userRole === "caregiver";
+  const isDemandSide =
+    roleKnown && (userRole === "client" || userRole === "organization");
+  const searchListPath = !roleKnown
+    ? "/search"
+    : userRole === "caregiver"
+      ? "/jobs"
+      : userRole === "client" || userRole === "organization"
+        ? "/matches"
+        : "/search";
   const initials = userDisplayName
     ? userDisplayName
         .split(/\s+/)
@@ -60,7 +72,13 @@ export function ZorentaTopbar({
       <div className="hidden flex-1 px-4 md:block">
         <GlobalSearchAutocomplete
           value={initialQuery}
-          placeholder="Zoek opdrachten, locatie, zorgtype..."
+          placeholder={
+            roleKnown
+              ? isCaregiver
+                ? "Zoek opdrachten, locatie, zorgtype..."
+                : "Zoek zorgverleners, locatie, zorgtype..."
+              : "Zoeken laden…"
+          }
           onValueChange={(val) => {
             if (pathname === searchListPath) {
               const trimmed = val.trim();
@@ -120,7 +138,7 @@ export function ZorentaTopbar({
             initials
           )}
         </Link>
-        {!isCaregiver && (
+        {isDemandSide && (
           <Link href="/jobs/new">
             <button className="ml-1 hidden h-11 rounded-2xl bg-[#40ADA8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#369590] md:inline-flex">
               + Plaats opdracht

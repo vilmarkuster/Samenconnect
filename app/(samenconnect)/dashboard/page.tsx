@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
 import { JobListingCover } from "@/components/zorenta/job-listing-cover";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { adminPrefersMainAppSession } from "@/lib/samenconnect/admin-main-app-nav";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import {
   Briefcase,
@@ -99,6 +100,11 @@ export default function ZorentaDashboardPage() {
         }
         if (meRes.ok && meData.profile) {
           const role = meData.profile.role;
+          if (role === "admin" && !adminPrefersMainAppSession()) {
+            router.replace("/admin");
+            if (!cancelled) setLoading(false);
+            return;
+          }
           if (role === "caregiver" && !meData.caregiver) {
             router.replace("/caregivers/me/edit");
             return;
@@ -219,16 +225,29 @@ export default function ZorentaDashboardPage() {
   }
 
   const roleLabel =
-    profile.role === "caregiver" ? "SamenConnect zorgverlener" : profile.role === "client" ? "SamenConnect cliënt" : "SamenConnect organisatie";
+    profile.role === "caregiver"
+      ? "SamenConnect zorgverlener"
+      : profile.role === "client"
+        ? "SamenConnect cliënt"
+        : profile.role === "organization"
+          ? "SamenConnect organisatie"
+          : profile.role === "admin"
+            ? "SamenConnect admin"
+            : "SamenConnect";
 
   const profileEditHref =
     profile.role === "caregiver"
       ? "/caregivers/me/edit"
       : profile.role === "client"
         ? "/clients/me/edit"
-        : "/organizations/me/edit";
+        : profile.role === "organization"
+          ? "/organizations/me/edit"
+          : profile.role === "admin"
+            ? "/admin"
+            : "/profile";
 
   const hasRoleProfile =
+    profile.role === "admin" ||
     (profile.role === "caregiver" && me.caregiver) ||
     (profile.role === "client" && me.client) ||
     (profile.role === "organization" && me.organization);
@@ -237,27 +256,31 @@ export default function ZorentaDashboardPage() {
   const activeJobs = (dashboard?.myJobs ?? []).filter((j) => j.status === "open").length;
 
   const progressSteps =
-    profile.role === "caregiver"
-      ? [
-          { done: !!hasRoleProfile, label: "Profiel compleet" },
-          { done: jobMatches.length > 0, label: "Beste matches bekeken" },
-          { done: applicationsCount > 0, label: "Gesolliciteerd" },
-          { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
-        ]
-      : [
-          { done: !!hasRoleProfile, label: "Profiel compleet" },
-          { done: intakesCount > 0, label: "Intake gestart" },
-          { done: totalJobs > 0, label: "Eerste opdracht geplaatst" },
-          { done: (dashboard?.recentApplications?.length ?? 0) > 0, label: "Eerste match" },
-          { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
-        ];
+    profile.role === "admin"
+      ? [{ done: true, label: "Admin-portaal" }]
+      : profile.role === "caregiver"
+        ? [
+            { done: !!hasRoleProfile, label: "Profiel compleet" },
+            { done: jobMatches.length > 0, label: "Beste matches bekeken" },
+            { done: applicationsCount > 0, label: "Gesolliciteerd" },
+            { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
+          ]
+        : [
+            { done: !!hasRoleProfile, label: "Profiel compleet" },
+            { done: intakesCount > 0, label: "Intake gestart" },
+            { done: totalJobs > 0, label: "Eerste opdracht geplaatst" },
+            { done: (dashboard?.recentApplications?.length ?? 0) > 0, label: "Eerste match" },
+            { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
+          ];
   const progressPct =
     progressSteps.length > 0
       ? Math.round((progressSteps.filter((s) => s.done).length / progressSteps.length) * 100)
       : 100;
 
   const nextBestAction =
-    profile.role === "caregiver"
+    profile.role === "admin"
+      ? { label: "Open admin-portaal", href: "/admin" }
+      : profile.role === "caregiver"
       ? !hasRoleProfile
         ? { label: "Vul je profiel in", href: profileEditHref }
         : jobMatches.length === 0

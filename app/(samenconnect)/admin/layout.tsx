@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
+import { clearAdminMainAppSession } from "@/lib/samenconnect/admin-main-app-nav";
 
 type AdminGuardState = "loading" | "allowed" | "forbidden" | "error";
 
@@ -14,6 +15,11 @@ export default function ZorentaAdminLayout({
   const router = useRouter();
   const [state, setState] = useState<AdminGuardState>("loading");
   const [message, setMessage] = useState<string | null>(null);
+
+  // Reset "main app" opt-in so /dashboard again defaults to redirecting admins into the admin portal.
+  useEffect(() => {
+    clearAdminMainAppSession();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
