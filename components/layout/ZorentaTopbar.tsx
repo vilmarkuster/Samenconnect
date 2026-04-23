@@ -112,7 +112,13 @@ export function ZorentaTopbar({
         />
       </div>
       <div className="flex items-center gap-2">
-        {aiFinderHref && (
+        {/* Reserve AI control width while role loads so the right cluster does not shift when it appears */}
+        {!roleKnown ? (
+          <span
+            className="hidden h-10 w-[3.25rem] shrink-0 rounded-2xl border border-transparent sm:inline-block"
+            aria-hidden
+          />
+        ) : aiFinderHref ? (
           <Link
             href={aiFinderHref}
             className="hidden h-10 items-center gap-1.5 rounded-2xl border border-[#40ADA8]/35 bg-[#40ADA8]/10 px-3 text-xs font-semibold text-[#2f7f7a] shadow-sm hover:bg-[#40ADA8]/20 sm:inline-flex"
@@ -121,7 +127,7 @@ export function ZorentaTopbar({
             <Sparkles className="h-3.5 w-3.5 shrink-0" />
             AI
           </Link>
-        )}
+        ) : null}
         {isAdmin && (
           <Link
             href="/admin"

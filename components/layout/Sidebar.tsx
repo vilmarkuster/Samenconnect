@@ -58,6 +58,29 @@ type SidebarProps = {
   userRoleReady?: boolean;
 };
 
+/** Max nav rows (demand-side + admin has the longest menu) — skeleton + post-load padding share this count. */
+const SIDEBAR_NAV_SLOT_COUNT = 14;
+
+function SidebarNavSkeleton() {
+  return (
+    <>
+      {Array.from({ length: SIDEBAR_NAV_SLOT_COUNT }).map((_, i) => (
+        <div
+          key={`nav-skel-${i}`}
+          className="flex animate-pulse items-center gap-3 rounded-2xl px-3 py-3"
+          aria-hidden
+        >
+          <span className="h-4 w-4 shrink-0 rounded bg-white/10" />
+          <span
+            className="h-3.5 max-w-[11rem] flex-1 rounded bg-white/10"
+            style={{ width: `${68 + (i % 5) * 12}px` }}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
 function navItemIsActive(pathname: string | null, itemHref: string, searchParams: URLSearchParams | null): boolean {
   if (!pathname) return false;
   if (itemHref.includes("?")) {
@@ -96,27 +119,50 @@ export function Sidebar({ onNavigate, onLogout, isAdmin, userRole, userRoleReady
           <div className="mt-1 truncate text-xl font-semibold leading-tight">Care Workspace</div>
         </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
-        {navItems.map((item) => {
-          const active = navItemIsActive(pathname ?? null, item.href, searchParams);
-          const Icon = item.icon;
-          return (
-            <a
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
-                active
-                  ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10"
-                  : "text-white/75 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </a>
-          );
-        })}
+      <nav
+        className="flex flex-1 flex-col gap-1 overflow-y-auto p-4"
+        aria-busy={!userRoleReady}
+        aria-label="Hoofdmenu"
+      >
+        {!userRoleReady ? (
+          <>
+            <span className="sr-only">Menu laden…</span>
+            <SidebarNavSkeleton />
+          </>
+        ) : (
+          <>
+            {navItems.map((item) => {
+              const active = navItemIsActive(pathname ?? null, item.href, searchParams);
+              const Icon = item.icon;
+              return (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10"
+                      : "text-white/75 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </a>
+              );
+            })}
+            {Array.from({ length: Math.max(0, SIDEBAR_NAV_SLOT_COUNT - navItems.length) }).map((_, i) => (
+              <div
+                key={`nav-pad-${i}`}
+                className="invisible pointer-events-none flex select-none items-center gap-3 rounded-2xl px-3 py-3 text-sm"
+                aria-hidden
+              >
+                <span className="h-4 w-4 shrink-0" />
+                <span className="h-4 w-24 shrink-0" />
+              </div>
+            ))}
+          </>
+        )}
       </nav>
       <div className="border-t border-white/10 p-4">
         {onLogout && (
