@@ -1,22 +1,33 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { normalizeMatchScore } from "@/lib/zorenta/match-score-display";
 
 type MatchBadgeProps = {
-  /** Score 0–100 */
-  score: number;
+  /** Score 0–100, or null/undefined when unknown */
+  score: number | null | undefined;
   className?: string;
 };
 
 /**
- * Match % badge: Green > 70, Orange > 40, Grey <= 40
+ * Match % badge: Green > 70, Orange > 40, Grey <= 40. Unknown scores show a neutral label (not 0%).
  */
 export function MatchBadge({ score, className }: MatchBadgeProps) {
-  const safeScore = Number.isFinite(score)
-    ? Math.round(Math.min(100, Math.max(0, score)))
-    : 0;
+  const normalized = normalizeMatchScore(score);
+  if (normalized === null) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500",
+          className
+        )}
+      >
+        Match —
+      </span>
+    );
+  }
   const variant =
-    safeScore > 70 ? "green" : safeScore > 40 ? "orange" : "grey";
+    normalized > 70 ? "green" : normalized > 40 ? "orange" : "grey";
 
   return (
     <span
@@ -28,7 +39,7 @@ export function MatchBadge({ score, className }: MatchBadgeProps) {
         className
       )}
     >
-      Match {safeScore}%
+      Match {normalized}%
     </span>
   );
 }

@@ -32,6 +32,19 @@ function isPublicPath(path: string | null): boolean {
 
 const isAdminPath = (path: string | null) => path?.startsWith("/admin");
 
+/** Shared unread count for shell + navigation refresh; returns null on fetch errors (caller may keep prior count). */
+async function fetchZorentaUnreadNotificationCount(token: string): Promise<number | null> {
+  try {
+    const notifRes = await fetch("/api/zorenta/notifications?unread=true", {
+      headers: zorentaHeaders(token),
+    });
+    const notifData = await notifRes.json().catch(() => ({}));
+    return Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0;
+  } catch {
+    return null;
+  }
+}
+
 type Props = {
   children: React.ReactNode;
   mode: ZorentaLayoutMode;
@@ -89,13 +102,11 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
           return;
         }
         return Promise.all([
-          fetch("/api/zorenta/notifications?unread=true", { headers: zorentaHeaders(token) }),
-          fetch("/api/zorenta/me", { headers: zorentaHeaders(token) }),
-        ])
-          .then(([notifRes, meRes]) => Promise.all([notifRes.json(), meRes.json()]))
-          .then(([notifData, meData]) => {
+          fetchZorentaUnreadNotificationCount(token),
+          fetch("/api/zorenta/me", { headers: zorentaHeaders(token) }).then((r) => r.json()),
+        ]).then(([unreadCountResult, meData]) => {
             if (cancelled) return;
-            setUnreadCount(Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0);
+            if (typeof unreadCountResult === "number") setUnreadCount(unreadCountResult);
             setUserDisplayName(meData?.profile?.display_name ?? null);
             setUserAvatarUrl(typeof meData?.profile?.avatar_url === "string" ? meData.profile.avatar_url : null);
             const role = typeof meData?.profile?.role === "string" ? meData.profile.role : null;
@@ -117,6 +128,49 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
       cancelled = true;
     };
   }, [isPublic, isAuthenticated]);
+
+  // Re-fetch unread when navigating so the bell stays in sync after inbox / read flows (P1).
+  useEffect(() => {
+    if (isLoading || isPublic || !isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getZorentaAccessToken();
+        if (!token || cancelled) return;
+        const notifRes = await fetch("/api/zorenta/notifications?unread=true", {
+          headers: zorentaHeaders(token),
+        });
+        const notifData = await notifRes.json().catch(() => ({}));
+        if (cancelled) return;
+        setUnreadCount(Array.isArray(notifData?.notifications) ? notifData.notifications.length : 0);
+      } catch {
+        // keep existing count on transient errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, isLoading, isPublic, isAuthenticated]);
+
+  useEffect(() => {
+    if (isLoading || isPublic || !isAuthenticated) return;
+    let cancelled = false;
+    function onVisibility() {
+      if (document.visibilityState !== "visible") return;
+      (async () => {
+        const token = await getZorentaAccessToken();
+        if (!token || cancelled) return;
+        const n = await fetchZorentaUnreadNotificationCount(token);
+        if (cancelled || n === null) return;
+        setUnreadCount(n);
+      })();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isLoading, isPublic, isAuthenticated]);
 
   // Allow child pages (e.g. notifications) to adjust the unread bell count optimistically.
   useEffect(() => {

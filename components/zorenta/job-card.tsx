@@ -25,7 +25,7 @@ export type ZorentaJobCardJob = {
 
 type ZorentaJobCardProps = {
   job: ZorentaJobCardJob;
-  match?: { score: number; summary?: string; narrativeSummary?: string } | null;
+  match?: { score: number | null; summary?: string; narrativeSummary?: string } | null;
   applicationsCount?: number;
 };
 

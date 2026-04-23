@@ -46,6 +46,21 @@ type Job = {
 
 type Me = { profile: { role: string } | null };
 
+type JobMatchEntry = { score: number; summary: string; narrativeSummary?: string };
+
+/** Same `score` as `/api/zorenta/matching/jobs-for-me` and the job card badge — order list by it (desc), stable on ties. */
+function sortJobsByDisplayedMatchScore(jobsList: Job[], matchMap: Record<string, JobMatchEntry>): Job[] {
+  if (!jobsList.length || !Object.keys(matchMap).length) return jobsList;
+  return [...jobsList].sort((a, b) => {
+    const sa = matchMap[a.id]?.score;
+    const sb = matchMap[b.id]?.score;
+    const na = typeof sa === "number" && Number.isFinite(sa) ? sa : Number.NEGATIVE_INFINITY;
+    const nb = typeof sb === "number" && Number.isFinite(sb) ? sb : Number.NEGATIVE_INFINITY;
+    if (nb !== na) return nb - na;
+    return (b.created_at || "").localeCompare(a.created_at || "");
+  });
+}
+
 function readableLocation(city: string | null | undefined): string {
   const val = (city ?? "").trim();
   return val || "Locatie in overleg";
@@ -63,7 +78,7 @@ function ZorentaJobsContent() {
   const [filterCity, setFilterCity] = useState("");
   const [filterCareType, setFilterCareType] = useState("");
   const [radius, setRadius] = useState<string>("25");
-  const [jobMatchMap, setJobMatchMap] = useState<Record<string, { score: number; summary: string; narrativeSummary?: string }>>({});
+  const [jobMatchMap, setJobMatchMap] = useState<Record<string, JobMatchEntry>>({});
   const [favoriteJobIds, setFavoriteJobIds] = useState<Set<string>>(() => new Set());
   const [togglingFavoriteJobId, setTogglingFavoriteJobId] = useState<string | null>(null);
   const [heartBumpJobId, setHeartBumpJobId] = useState<string | null>(null);
@@ -119,7 +134,7 @@ function ZorentaJobsContent() {
       });
       const jobsData = await jobsRes.json().catch(() => ({}));
       let role: string | null = null;
-      let matchMap: Record<string, { score: number; summary: string; narrativeSummary?: string }> = {};
+      let matchMap: Record<string, JobMatchEntry> = {};
       let linkedFromIntake = new Set<string>();
       if (token) {
         const meRes = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
@@ -175,7 +190,12 @@ function ZorentaJobsContent() {
         favSet = new Set((favRows ?? []).map((r: { job_id: string }) => String(r.job_id)));
       }
       if (!cancelled) {
-        if (jobsData.jobs) setJobs(jobsData.jobs);
+        const rawJobs: Job[] = Array.isArray(jobsData.jobs) ? jobsData.jobs : [];
+        const orderedJobs =
+          role === "caregiver" && Object.keys(matchMap).length > 0
+            ? sortJobsByDisplayedMatchScore(rawJobs, matchMap)
+            : rawJobs;
+        setJobs(orderedJobs);
         setMyRole(role);
         setJobMatchMap(matchMap);
         setMyUserId(userId);

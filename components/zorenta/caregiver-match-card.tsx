@@ -18,6 +18,7 @@ import {
   extractTopReasons,
   normalizeMatchSummary,
 } from "@/lib/zorenta/ai-match-card-copy";
+import { normalizeMatchScore } from "@/lib/zorenta/match-score-display";
 
 type CaregiverMatch = {
   caregiver: {
@@ -133,7 +134,9 @@ export function CaregiverMatchCard({
   const name = rawName ? formatDisplayName(rawName) : "Zorgverlener";
   const top3 = rank != null && rank <= 3;
   const top1 = rank === 1;
-  const visual = scoreColor(score);
+  const scoreResolved = normalizeMatchScore(score);
+  const scoreForBar = scoreResolved ?? 0;
+  const visual = scoreColor(scoreForBar);
   const reasons = (match.reasons ?? []).filter(Boolean).slice(0, 4);
 
   const publicProfilePathId = useMemo(() => {
@@ -230,10 +233,10 @@ export function CaregiverMatchCard({
               <p
                 className={cn(
                   "text-[1.85rem] font-bold tabular-nums leading-none tracking-tight sm:text-[2.25rem]",
-                  visual.text
+                  scoreResolved === null ? "text-slate-400" : visual.text
                 )}
               >
-                {Math.round(score)}%
+                {scoreResolved === null ? "—" : `${scoreResolved}%`}
               </p>
               <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Match
@@ -245,7 +248,7 @@ export function CaregiverMatchCard({
             <div className={cn("h-2 w-full overflow-hidden rounded-full", visual.track)}>
               <div
                 className={cn("h-full rounded-full transition-all duration-500 ease-out", visual.bar)}
-                style={{ width: `${Math.max(0, Math.min(100, Math.round(score)))}%` }}
+                style={{ width: `${Math.max(0, Math.min(100, scoreForBar))}%` }}
               />
             </div>
             <p className="min-w-0 break-normal text-sm font-medium leading-snug text-slate-800 line-clamp-2">
@@ -373,14 +376,16 @@ export function CaregiverMatchCard({
               </div>
             </div>
             <div className="shrink-0 text-right">
-              <p className={cn("text-sm font-semibold", visual.text)}>{Math.round(score)}%</p>
+              <p className={cn("text-sm font-semibold", scoreResolved === null ? "text-slate-400" : visual.text)}>
+                {scoreResolved === null ? "—" : `${scoreResolved}%`}
+              </p>
               <p className="text-[11px] text-slate-500">match</p>
             </div>
           </div>
           <div className={cn("mt-3.5 h-2.5 w-full overflow-hidden rounded-full", visual.track)}>
             <div
               className={cn("h-full rounded-full transition-all duration-300", visual.bar)}
-              style={{ width: `${Math.max(0, Math.min(100, Math.round(score)))}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, scoreForBar))}%` }}
             />
           </div>
           {(narrativeSummary || summary) && (

@@ -29,6 +29,12 @@ import { ZorentaMessageModal } from "@/components/zorenta/message-modal";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
 import { LocationAutocomplete } from "@/components/zorenta/location-autocomplete";
 import { estimateDistanceKm } from "@/lib/zorenta/distance";
+import {
+  scoreCaregiverForIntake,
+  type CaregiverForScoring,
+  type IntakeForScoring,
+} from "@/lib/zorenta/matching";
+import { intakeTaxonomyFromRow } from "@/lib/zorenta/intake-taxonomy";
 const ZORGVRAGEN_DRAFT_KEY = "samenconnect_zorgvraag_draft";
 const MESSAGES_KEY = "samenconnect_messages";
 const SELECTED_CONVERSATION_KEY = "samenconnect_selected_conversation";
@@ -41,10 +47,17 @@ type Intake = {
   preferred_schedule?: string | null;
   preferred_city?: string | null;
   preferred_region?: string | null;
+  preferred_country?: string | null;
   skills_required?: string[] | null;
   budget_min?: number | null;
   budget_max?: number | null;
   urgency?: string | null;
+  language_preference?: string | null;
+  financiering_regeling?: string[] | null;
+  soort_hulp_zorg?: string[] | null;
+  zorgniveau?: string[] | null;
+  type_inzet?: string[] | null;
+  vaardigheden_ervaring?: string[] | null;
 };
 
 type ScoredMatch = {
@@ -157,144 +170,72 @@ let CAREGIVER_META: Record<string, CaregiverMeta> = {};
 // "Nieuw" (MVP): use fetch order as deterministic proxy.
 let CAREGIVER_NEW_INDEX: Record<string, number> = {};
 
-function computeMatchScore(intake: Intake, caregiver: CaregiverProfile): ScoredMatch {
-  const reasons: string[] = [];
+function experienceRangeToYears(
+  range: CaregiverProfile["experienceRange"]
+): number | null {
+  if (!range) return null;
+  if (range.startsWith("Starter")) return 1;
+  if (range.startsWith("Ervaren")) return 2;
+  if (range.startsWith("Senior")) return 4;
+  if (range.startsWith("Specialist")) return 6;
+  return null;
+}
 
-  const weights = {
-    careType: 35,
-    location: 25,
-    availability: 20,
-    budget: 10,
-    providerType: 10,
-  } as const;
-
-  let score = 0;
-
-  // --- 1. Zorgtype match (35%) ---
-  const intakeCare = intake.care_type?.toLowerCase().trim() ?? "";
-  const careTagsLower = caregiver.tags.map((t) => t.toLowerCase());
-  if (intakeCare) {
-    const exactCareMatch = careTagsLower.includes(intakeCare);
-    const partialCareMatch = !exactCareMatch && careTagsLower.some((t) => t.includes(intakeCare));
-    if (exactCareMatch) {
-      score += weights.careType;
-      reasons.push("Sterke match op zorgtype");
-    } else if (partialCareMatch) {
-      score += Math.round(weights.careType * 0.6);
-      reasons.push("Deels passend zorgtype");
-    }
-  }
-
-  // --- 2. Locatie match (25%) based on estimated distance ---
-  const preferredLocation = intake.preferred_city ?? null;
-  if (preferredLocation) {
-    const dist = estimateDistanceKm(preferredLocation, caregiver.city);
-    if (dist === 0) {
-      score += weights.location;
-      reasons.push(`Beschikbaar in ${formatLocation(caregiver.city)}`);
-    } else if (dist <= 5) {
-      score += weights.location;
-      reasons.push("Binnen 5 km van je locatie");
-    } else if (dist <= 10) {
-      score += Math.round(weights.location * 0.8);
-      reasons.push("Binnen 10 km van je locatie");
-    } else if (dist <= 25) {
-      score += Math.round(weights.location * 0.6);
-      reasons.push("In dezelfde regio");
-    } else if (dist <= 50) {
-      score += Math.round(weights.location * 0.3);
-      reasons.push("Ligt wat verder van je voorkeurslocatie");
-    } else {
-      score += Math.round(weights.location * 0.1);
-      reasons.push("Ligt buiten je directe regio");
-    }
-  }
-
-  // --- 3. Beschikbaarheid / frequentie (20%) ---
-  const meta = CAREGIVER_META[caregiver.id];
-  if (meta && intake.care_frequency) {
-    const freq = intake.care_frequency.toLowerCase();
-    const hasOverdag = meta.availability.includes("Overdag");
-    const hasAvond = meta.availability.includes("Avond");
-    const hasWeekend = meta.availability.includes("Weekend");
-    const hasFlexibel = meta.availability.includes("Flexibel");
-
-    let availabilityScore = 0;
-    if (freq.includes("dag") || freq.includes("week")) {
-      if (hasOverdag) availabilityScore = weights.availability;
-    } else if (freq.includes("avond")) {
-      if (hasAvond || hasFlexibel) availabilityScore = weights.availability;
-    } else if (freq.includes("weekend")) {
-      if (hasWeekend || hasFlexibel) availabilityScore = weights.availability;
-    } else if (freq.includes("flex")) {
-      if (hasFlexibel || hasOverdag || hasAvond || hasWeekend) {
-        availabilityScore = Math.round(weights.availability * 0.8);
-      }
-    } else {
-      if (hasOverdag || hasAvond || hasWeekend || hasFlexibel) {
-        availabilityScore = Math.round(weights.availability * 0.6);
-      }
-    }
-
-    if (availabilityScore > 0) {
-      score += availabilityScore;
-      reasons.push("Beschikbaarheid sluit aan op je zorgvraag");
-    }
-  }
-
-  // --- 4. Budget fit (10%) ---
-  if (intake.budget_min != null || intake.budget_max != null) {
-    const rate = caregiver.rate ?? (caregiver.isVolunteer ? 0 : undefined);
-    const min = intake.budget_min ?? 0;
-    const max = intake.budget_max ?? 999;
-    if (rate == null) {
-      // onbekend tarief: neutraal
-      score += Math.round(weights.budget * 0.4);
-    } else if (rate === 0 && caregiver.isVolunteer) {
-      // Vrijwillig
-      score += weights.budget;
-      reasons.push("Vrijwillige inzet past goed bij je budget");
-    } else if (rate >= min && rate <= max) {
-      score += weights.budget;
-      reasons.push("Tarief past binnen je budget");
-    } else if (rate > 0 && (rate < min * 0.8 || rate > max * 1.2)) {
-      // duidelijk buiten range: geen budgetscore
-    } else {
-      score += Math.round(weights.budget * 0.5);
-      reasons.push("Tarief ligt in de buurt van je budget");
-    }
-  }
-
-  // --- 5. Provider type fit (10%) ---
-  const engagementPreferences = (intake.skills_required ?? []).map((s) =>
-    s.toLowerCase()
+function caregiverProfileToCaregiverForScoring(cg: CaregiverProfile): CaregiverForScoring {
+  const availabilityArr = CAREGIVER_META[cg.id]?.availability ?? [];
+  const availability = availabilityArr.length ? availabilityArr.join(", ") : null;
+  const skills = Array.from(
+    new Set(
+      [...(cg.skills ?? []), ...(cg.tags ?? [])]
+        .map((s) => String(s).trim())
+        .filter(Boolean)
+    )
   );
-  const wantsZZP = engagementPreferences.some((s) => s.includes("zzp"));
-  const wantsMantelzorg = engagementPreferences.some((s) => s.includes("mantel"));
-  const wantsVrijwillig = engagementPreferences.some((s) => s.includes("vrijwillig"));
-
-  let providerScore = 0;
-  if (
-    (wantsZZP && caregiver.arrangement === "ZZP") ||
-    (wantsMantelzorg && caregiver.arrangement === "Mantelzorg") ||
-    (wantsVrijwillig && caregiver.arrangement === "Vrijwillig")
-  ) {
-    providerScore = weights.providerType;
-    reasons.push("Type inzet sluit aan bij je voorkeur");
-  } else if (engagementPreferences.length > 0) {
-    providerScore = Math.round(weights.providerType * 0.4);
-    reasons.push("Type inzet sluit deels aan bij je voorkeur");
-  }
-  score += providerScore;
-
-  // Clamp 0–100 and round
-  const percentage = Math.max(0, Math.min(100, Math.round(score)));
-
+  const certifications =
+    cg.certifications && cg.certifications.length > 0 ? cg.certifications.join(", ") : null;
   return {
-    caregiver,
-    score: percentage,
-    reasons,
+    id: cg.id,
+    profile_id: (cg.linkedProfileId && cg.linkedProfileId.trim()) || cg.id,
+    headline: cg.bio?.trim() || cg.name,
+    skills,
+    experience_years: experienceRangeToYears(cg.experienceRange),
+    availability,
+    city: cg.city?.trim() || null,
+    region: null,
+    country: null,
+    hourly_rate: cg.rate ?? null,
+    certifications,
   };
+}
+
+function intakeToIntakeForScoring(intake: Intake): IntakeForScoring {
+  return {
+    care_type: intake.care_type,
+    preferred_city: intake.preferred_city,
+    preferred_region: intake.preferred_region,
+    preferred_country: intake.preferred_country ?? undefined,
+    preferred_schedule: intake.preferred_schedule,
+    care_frequency: intake.care_frequency,
+    skills_required: intake.skills_required,
+    financiering_regeling: intake.financiering_regeling,
+    soort_hulp_zorg: intake.soort_hulp_zorg,
+    zorgniveau: intake.zorgniveau,
+    type_inzet: intake.type_inzet,
+    vaardigheden_ervaring: intake.vaardigheden_ervaring,
+    budget_min: intake.budget_min,
+    budget_max: intake.budget_max,
+    language_preference: intake.language_preference,
+    urgency: intake.urgency,
+  };
+}
+
+function scoreIntakeAgainstCaregiverProfile(intake: Intake, cg: CaregiverProfile): ScoredMatch {
+  const result = scoreCaregiverForIntake(
+    caregiverProfileToCaregiverForScoring(cg),
+    intakeToIntakeForScoring(intake),
+    null
+  );
+  return { caregiver: cg, score: result.score, reasons: result.reasons };
 }
 
 function MatchesContent() {
@@ -420,21 +361,29 @@ function MatchesContent() {
 
         if (!cancelled) {
           if (chosen) {
-            const row = chosen as any;
+            const row = chosen as Record<string, unknown>;
+            const tax = intakeTaxonomyFromRow(row);
             const mapped: Intake = {
               id: String(row.id),
               job_id: row.job_id ? String(row.job_id) : null,
-              care_type: row.care_type ?? null,
-              care_frequency: row.care_frequency ?? null,
-              preferred_schedule: row.preferred_schedule ?? null,
-              preferred_city: row.preferred_city ?? null,
-              preferred_region: row.preferred_region ?? null,
+              care_type: (row.care_type as string | null) ?? null,
+              care_frequency: (row.care_frequency as string | null) ?? null,
+              preferred_schedule: (row.preferred_schedule as string | null) ?? null,
+              preferred_city: (row.preferred_city as string | null) ?? null,
+              preferred_region: (row.preferred_region as string | null) ?? null,
+              preferred_country: (row.preferred_country as string | null) ?? null,
+              language_preference: (row.language_preference as string | null) ?? null,
               skills_required: Array.isArray(row.skills_required)
-                ? row.skills_required
+                ? (row.skills_required as string[])
                 : [],
-              budget_min: row.budget_min ?? null,
-              budget_max: row.budget_max ?? null,
-              urgency: row.urgency ?? null,
+              budget_min: (row.budget_min as number | null) ?? null,
+              budget_max: (row.budget_max as number | null) ?? null,
+              urgency: (row.urgency as string | null) ?? null,
+              financiering_regeling: tax.financiering_regeling,
+              soort_hulp_zorg: tax.soort_hulp_zorg,
+              zorgniveau: tax.zorgniveau,
+              type_inzet: tax.type_inzet,
+              vaardigheden_ervaring: tax.vaardigheden_ervaring,
             };
             setIntake(mapped);
           } else {
@@ -647,7 +596,7 @@ function MatchesContent() {
     if (!intake) return [] as ScoredMatch[];
     if (!caregivers.length) return [] as ScoredMatch[];
     return caregivers
-      .map((cg) => computeMatchScore(intake, cg))
+      .map((cg) => scoreIntakeAgainstCaregiverProfile(intake, cg))
       .sort((a, b) => b.score - a.score);
   }, [intake, caregivers]);
 
