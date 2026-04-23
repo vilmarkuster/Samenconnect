@@ -37,6 +37,9 @@ export async function GET(req: NextRequest) {
     ]);
     const myJobs = myJobsRes.data ?? [];
     const jobIds = myJobs.map((j: { id: string }) => j.id);
+    const { count: applicationsCount } = jobIds.length
+      ? await supabase.from("job_applications").select("id", { count: "exact", head: true }).in("job_id", jobIds)
+      : { count: 0 };
     const { data: appList } = jobIds.length
       ? await supabase.from("job_applications").select("id, job_id, applicant_id, status, message, created_at").in("job_id", jobIds).order("created_at", { ascending: false }).limit(20)
       : { data: [] };
@@ -62,6 +65,7 @@ export async function GET(req: NextRequest) {
     return jsonResponse({
       role: profile.role,
       myJobs,
+      applicationsCount: applicationsCount ?? 0,
       applicationsByJob,
       recentApplications,
       unreadNotifications: unread ?? [],

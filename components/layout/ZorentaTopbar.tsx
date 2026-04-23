@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bell, Menu, Shield } from "lucide-react";
+import { Bell, Menu, Shield, Sparkles } from "lucide-react";
 import { GlobalSearchAutocomplete } from "@/components/zorenta/global-search-autocomplete";
+import { aiFinderListHref } from "@/lib/zorenta/ai-finder-routes";
 
 type ZorentaTopbarProps = {
   userDisplayName?: string | null;
@@ -42,6 +43,7 @@ export function ZorentaTopbar({
       : userRole === "client" || userRole === "organization"
         ? "/matches"
         : "/search";
+  const aiFinderHref = roleKnown ? aiFinderListHref(userRole) : null;
   const initials = userDisplayName
     ? userDisplayName
         .split(/\s+/)
@@ -64,10 +66,14 @@ export function ZorentaTopbar({
             <Menu className="h-5 w-5" />
           </button>
         )}
-        <div>
+        <Link
+          href="/dashboard"
+          className="min-w-0 rounded-xl px-1 py-0.5 outline-none ring-offset-2 ring-offset-white transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#40ADA8]/40"
+          aria-label="Naar dashboard"
+        >
           <p className="text-xs uppercase tracking-[0.22em] text-slate-500">SamenConnect</p>
           <p className="truncate text-lg font-semibold text-slate-900">Dashboard</p>
-        </div>
+        </Link>
       </div>
       <div className="hidden flex-1 px-4 md:block">
         <GlobalSearchAutocomplete
@@ -106,6 +112,16 @@ export function ZorentaTopbar({
         />
       </div>
       <div className="flex items-center gap-2">
+        {aiFinderHref && (
+          <Link
+            href={aiFinderHref}
+            className="hidden h-10 items-center gap-1.5 rounded-2xl border border-[#40ADA8]/35 bg-[#40ADA8]/10 px-3 text-xs font-semibold text-[#2f7f7a] shadow-sm hover:bg-[#40ADA8]/20 sm:inline-flex"
+            title="AI-gestuurde zoekopdracht"
+          >
+            <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            AI
+          </Link>
+        )}
         {isAdmin && (
           <Link
             href="/admin"

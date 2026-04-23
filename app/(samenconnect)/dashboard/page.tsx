@@ -11,21 +11,21 @@ import { JobListingCover } from "@/components/zorenta/job-listing-cover";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
 import { adminPrefersMainAppSession } from "@/lib/samenconnect/admin-main-app-nav";
 import { StartMessageButton } from "@/components/zorenta/start-message-button";
+import { aiFinderListHref } from "@/lib/zorenta/ai-finder-routes";
 import {
   Briefcase,
   FileText,
   MessageSquare,
-  Search,
   ClipboardList,
   PlusCircle,
   Bell,
   ChevronRight,
   TrendingUp,
-  Wallet,
   Star,
   Users,
   ChevronRightCircle,
   Sparkles,
+  Shield,
 } from "lucide-react";
 
 type JobMatch = {
@@ -65,6 +65,7 @@ type Me = {
 type DashboardData = {
   role: string;
   openJobsCount?: number;
+  /** Caregiver: own applications; client/org: applications on poster's jobs */
   applicationsCount?: number;
   recentApplications?: (
     | { id: string; status: string; care_jobs?: { title: string } }
@@ -150,22 +151,103 @@ export default function ZorentaDashboardPage() {
   const intakesCount = dashboard?.intakesCount ?? 0;
   const conversationsCount = dashboard?.conversationsCount ?? 0;
   const unreadNotifCount = dashboard?.unreadNotifications?.length ?? 0;
-  const stats = useMemo(
-    () => [
-      { label: "Nieuwe opdrachten", value: `${totalJobs || 24} opdrachten`, icon: Briefcase },
-      { label: "Berichten", value: `${conversationsCount || 5} berichten`, icon: MessageSquare },
-      { label: "Matches", value: `${jobMatches.length || 12} matches`, icon: Users },
-      { label: "Verdiensten", value: "€1240 deze maand", icon: Wallet },
-    ],
-    [conversationsCount, jobMatches.length, totalJobs]
-  );
+  const openMarketJobs = dashboard?.openJobsCount ?? 0;
+
+  type DashboardStat = {
+    label: string;
+    value: string;
+    icon: typeof Briefcase;
+    href: string | null;
+  };
+
+  const stats = useMemo((): DashboardStat[] => {
+    const r = me?.profile?.role;
+    if (r === "caregiver") {
+      const aiJobs = aiFinderListHref("caregiver") ?? "/jobs";
+      return [
+        {
+          label: "Open opdrachten (markt)",
+          value: String(openMarketJobs),
+          icon: Briefcase,
+          href: "/jobs",
+        },
+        {
+          label: "Berichten",
+          value: String(conversationsCount),
+          icon: MessageSquare,
+          href: "/berichten",
+        },
+        {
+          label: "AI-passende opdrachten",
+          value: String(jobMatches.length),
+          icon: TrendingUp,
+          href: aiJobs,
+        },
+        {
+          label: "Sollicitaties",
+          value: String(applicationsCount),
+          icon: FileText,
+          href: "/applications",
+        },
+      ];
+    }
+    if (r === "client" || r === "organization") {
+      const posterApps = dashboard?.applicationsCount ?? 0;
+      return [
+        {
+          label: "Geplaatste opdrachten",
+          value: String(totalJobs),
+          icon: Briefcase,
+          href: totalJobs > 0 ? "/applications" : "/jobs/new",
+        },
+        {
+          label: "Zorgvragen (intakes)",
+          value: String(intakesCount),
+          icon: ClipboardList,
+          href: "/intake",
+        },
+        {
+          label: "Berichten",
+          value: String(conversationsCount),
+          icon: MessageSquare,
+          href: "/berichten",
+        },
+        {
+          label: "Sollicitaties",
+          value: String(posterApps),
+          icon: FileText,
+          href: "/applications",
+        },
+      ];
+    }
+    if (r === "admin") {
+      return [
+        { label: "Admin-portaal", value: "Beheer", icon: Shield, href: "/admin" },
+        { label: "Opdrachten (admin)", value: "Lijst", icon: Briefcase, href: "/admin/jobs" },
+        { label: "Berichten", value: String(conversationsCount), icon: MessageSquare, href: "/berichten" },
+        { label: "Notificaties", value: String(unreadNotifCount), icon: Bell, href: "/notifications" },
+      ];
+    }
+    return [];
+  }, [
+    me?.profile?.role,
+    openMarketJobs,
+    conversationsCount,
+    jobMatches.length,
+    applicationsCount,
+    totalJobs,
+    intakesCount,
+    dashboard?.applicationsCount,
+    unreadNotifCount,
+  ]);
 
   // Must run on every render (before any early return) — same rules of hooks as all useMemo.
   const aiOpdrachtFinder = useMemo(() => {
     const r = me?.profile?.role;
+    const listHref = aiFinderListHref(r);
     if (r === "caregiver") {
       return {
-        href: "/jobs?source=ai-finder",
+        href: listHref ?? "/jobs",
         title: "Laat AI automatisch passende opdrachten vinden",
         description:
           "Onze AI zoekt op dit moment binnen SamenConnect en stelt een persoonlijke lijst met passende opdrachten voor je samen. In een volgende stap worden ook externe bronnen toegevoegd.",
@@ -174,7 +256,7 @@ export default function ZorentaDashboardPage() {
     }
     if (r === "client" || r === "organization") {
       return {
-        href: "/matches?source=ai-finder",
+        href: listHref ?? "/matches",
         title: "AI: vind de beste zorg voor jouw vraag",
         description:
           "Op basis van je intake en profiel zie je gepersonaliseerde matches met zorgverleners. Gebruik filters om verder te verfijnen.",
@@ -200,9 +282,6 @@ export default function ZorentaDashboardPage() {
   if (loading || !me?.profile) {
     return (
       <div className="mx-auto w-full min-w-0 max-w-none space-y-8 py-6 lg:py-10">
-        <div className="mb-4 inline-flex rounded-md bg-black px-3 py-1 text-sm font-bold uppercase tracking-wide text-white">
-          DASHBOARD PAGE
-        </div>
         <ZorentaPageSkeleton />
       </div>
     );
@@ -210,19 +289,7 @@ export default function ZorentaDashboardPage() {
 
   const profile = me.profile;
   const isCaregiverUser = profile.role === "caregiver";
-
-  function getStatHref(label: string): string | null {
-    switch (label) {
-      case "Nieuwe opdrachten":
-        return "/jobs";
-      case "Berichten":
-        return "/berichten";
-      case "Matches":
-        return isCaregiverUser ? "/jobs" : "/matches";
-      default:
-        return null;
-    }
-  }
+  const isDemandSide = profile.role === "client" || profile.role === "organization";
 
   const roleLabel =
     profile.role === "caregiver"
@@ -261,7 +328,7 @@ export default function ZorentaDashboardPage() {
       : profile.role === "caregiver"
         ? [
             { done: !!hasRoleProfile, label: "Profiel compleet" },
-            { done: jobMatches.length > 0, label: "Beste matches bekeken" },
+            { done: jobMatches.length > 0, label: "AI-opdrachten bekeken" },
             { done: applicationsCount > 0, label: "Gesolliciteerd" },
             { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
           ]
@@ -269,7 +336,7 @@ export default function ZorentaDashboardPage() {
             { done: !!hasRoleProfile, label: "Profiel compleet" },
             { done: intakesCount > 0, label: "Intake gestart" },
             { done: totalJobs > 0, label: "Eerste opdracht geplaatst" },
-            { done: (dashboard?.recentApplications?.length ?? 0) > 0, label: "Eerste match" },
+            { done: (dashboard?.recentApplications?.length ?? 0) > 0, label: "Eerste sollicitatie" },
             { done: conversationsCount > 0, label: "Eerste bericht gestuurd" },
           ];
   const progressPct =
@@ -297,7 +364,7 @@ export default function ZorentaDashboardPage() {
           : totalJobs === 0
             ? { label: "Plaats je eerste opdracht", href: "/jobs/new" }
             : (dashboard?.recentApplications?.length ?? 0) === 0
-              ? { label: "Bekijk matches", href: "/matches" }
+              ? { label: "Zoek zorgverleners", href: "/matches" }
               : conversationsCount === 0
                 ? { label: "Stuur je eerste bericht", href: "/berichten" }
                 : null;
@@ -426,7 +493,7 @@ export default function ZorentaDashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             {stats.map((item) => {
               const Icon = item.icon;
-              const href = getStatHref(item.label);
+              const href = item.href;
               const card = (
                 <div
                   className={`flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
@@ -461,6 +528,47 @@ export default function ZorentaDashboardPage() {
       <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-6 min-[1720px]:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] min-[1720px]:items-start min-[1720px]:gap-8">
         {/* Left column */}
         <div className="min-w-0 space-y-6 lg:space-y-7 min-[1720px]:space-y-8">
+          {isDemandSide && profile.role !== "admin" && (
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+              <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Jouw volgende stappen</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Opdrachten plaatsen, zorgverleners vinden en sollicitaties opvolgen — alles op één plek.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <Link
+                  href={aiFinderListHref(profile.role) ?? "/matches"}
+                  className="rounded-2xl border border-[#40ADA8]/30 bg-[#40ADA8]/5 p-4 transition hover:border-[#40ADA8]/50 hover:bg-[#40ADA8]/10"
+                >
+                  <p className="text-sm font-semibold text-[#2f7f7a]">AI zorgverleners zoeken</p>
+                  <p className="mt-1 text-xs text-slate-600">Persoonlijke matches op basis van je intake.</p>
+                </Link>
+                <Link
+                  href="/applications"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-[#40ADA8]/30 hover:bg-white"
+                >
+                  <p className="text-sm font-semibold text-slate-900">Sollicitaties bekijken</p>
+                  <p className="mt-1 text-xs text-slate-600">Reacties van zorgverleners op jouw opdrachten.</p>
+                </Link>
+                <Link
+                  href="/intake"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-[#40ADA8]/30 hover:bg-white"
+                >
+                  <p className="text-sm font-semibold text-slate-900">Zorgvraag intake</p>
+                  <p className="mt-1 text-xs text-slate-600">Vul of werk je zorgvraag bij voor betere matches.</p>
+                </Link>
+                <Link
+                  href="/jobs/new"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-[#40ADA8]/30 hover:bg-white"
+                >
+                  <p className="text-sm font-semibold text-slate-900">Nieuwe opdracht</p>
+                  <p className="mt-1 text-xs text-slate-600">Plaats een opdracht op de marktplaats.</p>
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {isCaregiverUser && (
+            <>
           {/* AI recommended jobs */}
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <div className="mb-5 flex min-w-0 items-center justify-between gap-3 sm:mb-6">
@@ -572,7 +680,7 @@ export default function ZorentaDashboardPage() {
           {jobMatches.length > 0 && (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-900">Waarom deze matches?</p>
+                <p className="text-sm font-semibold text-slate-900">Waarom deze opdrachten?</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {buildGlobalMatchInsights(jobMatches).map((insight) => (
@@ -675,6 +783,8 @@ export default function ZorentaDashboardPage() {
               ))}
             </div>
           </section>
+            </>
+          )}
         </div>
 
         {/* Right column */}
@@ -703,18 +813,20 @@ export default function ZorentaDashboardPage() {
                 </div>
               </Link>
               <Link
-                href={isCaregiverUser ? "/jobs" : "/matches"}
+                href={aiFinderListHref(profile.role) ?? (isCaregiverUser ? "/jobs" : "/matches")}
                 className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-[#40ADA8]/30 hover:bg-[#40ADA8]/5"
               >
                 <div className="mt-0.5 rounded-full bg-[#40ADA8]/10 p-2 text-[#40ADA8]">
                   <Users className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">Nieuwe matches</p>
+                  <p className="font-medium text-slate-900">
+                    {isCaregiverUser ? "AI opdrachten" : "AI zorgverleners"}
+                  </p>
                   <p className="truncate text-xs text-slate-500">
                     {isCaregiverUser
-                      ? "Ontdek opdrachten die goed aansluiten bij jouw profiel."
-                      : "Ontdek zorgverleners die goed aansluiten bij jouw zorgvraag."}
+                      ? "Persoonlijke opdrachtenlijst op basis van je profiel."
+                      : "Persoonlijke matches op basis van je intake."}
                   </p>
                 </div>
               </Link>
@@ -726,9 +838,11 @@ export default function ZorentaDashboardPage() {
                   <FileText className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">Recente matches</p>
+                  <p className="font-medium text-slate-900">Sollicitaties</p>
                   <p className="truncate text-xs text-slate-500">
-                    Volg de status van je nieuwste matches.
+                    {isCaregiverUser
+                      ? "Status van je reacties op opdrachten."
+                      : "Reacties van zorgverleners op jouw opdrachten."}
                   </p>
                 </div>
               </Link>
@@ -768,7 +882,7 @@ export default function ZorentaDashboardPage() {
             <div className="relative space-y-3">
               <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#40ADA8] ring-1 ring-[#40ADA8]/30">
                 <Sparkles className="h-3.5 w-3.5" />
-                AI Opdracht Finder
+                {isCaregiverUser ? "AI Opdracht Finder" : "AI Zoeker"}
               </p>
               <h3 className="text-lg font-semibold text-slate-900">{aiOpdrachtFinder.title}</h3>
               <p className="text-sm text-slate-600">{aiOpdrachtFinder.description}</p>

@@ -1,8 +1,10 @@
 import Image from "next/image";
+import Link from "next/link";
 
+/** Public/marketing: logo → homepage. (In-app home is the top bar → `/dashboard`.) */
 export function SamenConnectLogo() {
   return (
-    <a href="/dashboard" className="flex items-center gap-2" aria-label="SamenConnect">
+    <Link href="/" className="flex items-center gap-2" aria-label="SamenConnect">
       <Image
         src="/samenconnect-icon.png"
         alt=""
@@ -14,7 +16,7 @@ export function SamenConnectLogo() {
       <span className="text-lg font-semibold leading-none tracking-tight text-slate-800">
         SamenConnect
       </span>
-    </a>
+    </Link>
   );
 }
 

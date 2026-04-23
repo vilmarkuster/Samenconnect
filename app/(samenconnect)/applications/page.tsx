@@ -70,22 +70,30 @@ export default function ApplicationsPage() {
   return (
     <ZorentaPageContainer maxWidth="default" className="space-y-6">
       <ZorentaPageHeader
-        title="Matches"
-        description="Bekijk en beheer matches op opdrachten."
+        title={myRole === "caregiver" ? "Mijn sollicitaties" : "Sollicitaties op jouw opdrachten"}
+        description={
+          myRole === "caregiver"
+            ? "Overzicht van je reacties op opdrachten en de status daarvan."
+            : "Zorgverleners die op jouw opdrachten hebben gereageerd — berichten en vervolgstappen."
+        }
       />
       {applications.length === 0 ? (
         <ZorentaEmptyState
           icon={FileText}
-          title="Nog geen matches"
-          description={myRole === "caregiver" ? "Bekijk geschikte opdrachten en reageer om hier te verschijnen." : "Nodig zorgverleners uit of wacht op matches."}
+          title="Nog geen sollicitaties"
+          description={
+            myRole === "caregiver"
+              ? "Bekijk opdrachten en reageer om hier je sollicitaties te zien."
+              : "Plaats een opdracht of gebruik AI-zoeken om zorgverleners te vinden."
+          }
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Link href="/jobs">
-                <Button>Bekijk opdrachten</Button>
+                <Button>{myRole === "caregiver" ? "Bekijk opdrachten" : "Opdrachtenmarkt"}</Button>
               </Link>
               {myRole !== "caregiver" && (
-                <Link href="/search">
-                  <Button variant="outline">Zorgverleners zoeken</Button>
+                <Link href="/matches?source=ai-finder">
+                  <Button variant="outline">AI zorgverleners zoeken</Button>
                 </Link>
               )}
             </div>

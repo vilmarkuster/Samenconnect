@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -17,17 +17,30 @@ import {
   Heart,
   Bookmark,
   Lock,
+  Sparkles,
 } from "lucide-react";
 
 export const ZORENTA_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jobs", label: "Vacatures", icon: Briefcase },
+  { href: "/jobs", label: "Opdrachten", icon: Briefcase },
+  {
+    href: "/jobs?source=ai-finder",
+    label: "AI opdrachten zoeken",
+    icon: Sparkles,
+    roles: ["caregiver"] as const,
+  },
+  {
+    href: "/matches?source=ai-finder",
+    label: "AI zorgverleners zoeken",
+    icon: Sparkles,
+    roles: ["client", "organization"] as const,
+  },
   { href: "/intake", label: "Zorgvraag intake", icon: ClipboardList, roles: ["client", "organization"] as const },
   { href: "/applications", label: "Sollicitaties", icon: FileText },
   { href: "/favorites", label: "Favorieten", icon: Heart },
   { href: "/opgeslagen", label: "Opgeslagen", icon: Bookmark, roles: ["client", "organization"] as const },
   { href: "/matches", label: "Zoek zorgverleners", icon: Search, roles: ["client", "organization"] as const },
-  { href: "/search", label: "Zoeken", icon: Search, roles: ["caregiver"] as const },
+  { href: "/search", label: "Zoeken (filters)", icon: Search, roles: ["caregiver"] as const },
   { href: "/berichten", label: "Berichten", icon: MessageSquare },
   { href: "/reviews", label: "Reviews", icon: Star },
   { href: "/notifications", label: "Notificaties", icon: Bell },
@@ -45,8 +58,26 @@ type SidebarProps = {
   userRoleReady?: boolean;
 };
 
+function navItemIsActive(pathname: string | null, itemHref: string, searchParams: URLSearchParams | null): boolean {
+  if (!pathname) return false;
+  if (itemHref.includes("?")) {
+    const [path, query] = itemHref.split("?");
+    if (pathname !== path) return false;
+    const want = new URLSearchParams(query);
+    if (!searchParams) return false;
+    for (const [k, v] of want.entries()) {
+      if (searchParams.get(k) !== v) return false;
+    }
+    return true;
+  }
+  if (pathname === itemHref) return true;
+  if (itemHref !== "/dashboard" && pathname.startsWith(itemHref)) return true;
+  return false;
+}
+
 export function Sidebar({ onNavigate, onLogout, isAdmin, userRole, userRoleReady = false }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const baseItems = ZORENTA_NAV_ITEMS.filter((item) => {
     if (!("roles" in item) || !item.roles) return true;
     if (!userRoleReady) return false;
@@ -60,14 +91,14 @@ export function Sidebar({ onNavigate, onLogout, isAdmin, userRole, userRoleReady
   return (
     <div className="flex h-full flex-col bg-[#0f766e] text-white">
       <div className="border-b border-white/10 px-6 py-6">
-        <div className="text-xs uppercase tracking-[0.22em] text-white/60">SamenConnect</div>
-        <div className="mt-1 text-xl font-semibold">Care Workspace</div>
+        <div className="select-none">
+          <div className="text-xs uppercase tracking-[0.22em] text-white/60">SamenConnect</div>
+          <div className="mt-1 truncate text-xl font-semibold leading-tight">Care Workspace</div>
+        </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
         {navItems.map((item) => {
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname?.startsWith(item.href));
+          const active = navItemIsActive(pathname ?? null, item.href, searchParams);
           const Icon = item.icon;
           return (
             <a
