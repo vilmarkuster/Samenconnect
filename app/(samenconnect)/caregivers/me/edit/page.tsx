@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -497,6 +499,25 @@ export default function CaregiverProfileEditPage() {
                 placeholder="optioneel"
                 className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
               />
+            </ZorentaFormField>
+          </div>
+        </ZorentaFormSection>
+
+        <ZorentaFormSection title="Account" description="Accountinstellingen voor je login.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ZorentaFormField label="E-mail">
+              <Input value={email} readOnly className="rounded-lg border-slate-200 bg-slate-50 text-slate-600" />
+            </ZorentaFormField>
+            <ZorentaFormField label="Wachtwoord">
+              <Link
+                href="/settings/security"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "md" }),
+                  "w-full justify-start border-slate-200 text-slate-700"
+                )}
+              >
+                Wachtwoord wijzigen
+              </Link>
             </ZorentaFormField>
           </div>
         </ZorentaFormSection>

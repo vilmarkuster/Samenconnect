@@ -19,9 +19,15 @@ const PUBLIC_PATHS = new Set<string>([
   "/registration-closed",
 ]);
 
+function normalizePathname(path: string | null): string {
+  if (!path) return "";
+  const t = path.trim();
+  if (!t) return "";
+  return t.replace(/\/+$/, "") || "/";
+}
+
 function isPublicPath(path: string | null): boolean {
-  if (!path) return false;
-  return PUBLIC_PATHS.has(path);
+  return PUBLIC_PATHS.has(normalizePathname(path));
 }
 
 const isAdminPath = (path: string | null) => path?.startsWith("/admin");
@@ -133,27 +139,34 @@ export function ZorentaLayoutClient({ children, mode, initialPathname }: Props) 
 
   if (isPublic) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="border-b border-slate-200/80 bg-white">
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 md:px-6">
-            <SamenConnectLogo />
-            <nav className="flex items-center gap-6 text-sm font-medium">
-              <Link href="/login" className="text-slate-600 hover:text-slate-900">
+      <div className="flex min-h-screen flex-col bg-slate-50">
+        <header className="shrink-0 border-b border-slate-200/80 bg-white pt-[env(safe-area-inset-top,0px)]">
+          <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:gap-y-2 md:flex-nowrap md:px-6 md:py-2.5">
+            <div className="min-w-0 shrink-0">
+              <SamenConnectLogo />
+            </div>
+            <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs font-medium sm:text-sm md:gap-x-6">
+              <Link href="/login" className="whitespace-nowrap text-slate-600 hover:text-slate-900">
                 Inloggen
               </Link>
               {REGISTRATION_OPEN ? (
-                <Link href="/register" className="text-slate-600 hover:text-slate-900">
+                <Link href="/register" className="whitespace-nowrap text-slate-600 hover:text-slate-900">
                   Registreren
                 </Link>
               ) : (
-                <span className="cursor-not-allowed text-sm text-slate-400" title="Registratie tijdelijk gesloten">
+                <span
+                  className="max-w-[11rem] cursor-not-allowed leading-snug text-slate-400 sm:max-w-none"
+                  title="Registratie tijdelijk gesloten"
+                >
                   Registreren binnenkort
                 </span>
               )}
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 pt-6 sm:px-6 sm:pb-12 sm:pt-8 md:px-6 md:pb-12 md:pt-10">
+          {children}
+        </main>
       </div>
     );
   }

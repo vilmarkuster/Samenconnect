@@ -16,6 +16,7 @@ import {
   Heart,
   Shield,
   Activity,
+  Lock,
 } from "lucide-react";
 
 const ADMIN_NAV_ITEMS = [
@@ -27,6 +28,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/admin/conversations", label: "Gesprekken", icon: MessageSquare },
   { href: "/admin/billing", label: "Facturatie", icon: CreditCard },
   { href: "/admin/growth", label: "Growth", icon: Activity },
+  { href: "/settings/security", label: "Wachtwoord", icon: Lock },
 ] as const;
 
 type AdminSidebarProps = {

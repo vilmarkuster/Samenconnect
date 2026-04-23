@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -342,9 +344,15 @@ export default function ClientProfileEditPage() {
               <Input value={email} readOnly className="rounded-lg border-slate-200 bg-slate-50 text-slate-600" />
             </ZorentaFormField>
             <ZorentaFormField label="Wachtwoord">
-              <Button type="button" variant="outline" className="w-full justify-start border-slate-200 text-slate-700">
-                Wachtwoord wijzigen (binnenkort)
-              </Button>
+              <Link
+                href="/settings/security"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "md" }),
+                  "w-full justify-start border-slate-200 text-slate-700"
+                )}
+              >
+                Wachtwoord wijzigen
+              </Link>
             </ZorentaFormField>
           </div>
         </ZorentaFormSection>

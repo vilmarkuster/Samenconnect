@@ -16,6 +16,7 @@ import {
   Shield,
   Heart,
   Bookmark,
+  Lock,
 } from "lucide-react";
 
 export const ZORENTA_NAV_ITEMS = [
@@ -31,6 +32,7 @@ export const ZORENTA_NAV_ITEMS = [
   { href: "/reviews", label: "Reviews", icon: Star },
   { href: "/notifications", label: "Notificaties", icon: Bell },
   { href: "/profile", label: "Mijn profiel", icon: User },
+  { href: "/settings/security", label: "Wachtwoord", icon: Lock },
 ] as const;
 
 type SidebarProps = {
