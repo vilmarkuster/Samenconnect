@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
 import { ZorentaPageSkeleton } from "@/components/zorenta/loading-skeleton";
@@ -299,6 +299,7 @@ function computeMatchScore(intake: Intake, caregiver: CaregiverProfile): ScoredM
 
 function MatchesContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [intake, setIntake] = useState<Intake | null>(null);
@@ -342,6 +343,18 @@ function MatchesContent() {
   const cameFromCareRequest =
     searchParams?.get("from") === "zorgvraag" || searchParams?.get("saved") === "1";
   const linkedJobIdFromQuery = searchParams?.get("job_id") ?? null;
+  const isAiFinderSource = searchParams?.get("source") === "ai-finder";
+  const [aiFinderBannerDismissed, setAiFinderBannerDismissed] = useState(false);
+  const showAiFinderBanner = isAiFinderSource && !aiFinderBannerDismissed;
+
+  function dismissAiFinderBanner() {
+    setAiFinderBannerDismissed(true);
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    params.delete("source");
+    const qs = params.toString();
+    const base = pathname || "/matches";
+    router.replace(qs ? `${base}?${qs}` : base, { scroll: false });
+  }
 
   type SortOption = "best" | "closest" | "lowPrice" | "highPrice" | "rating" | "new";
   const [sortOption, setSortOption] = useState<SortOption>("best");
@@ -1132,6 +1145,28 @@ function MatchesContent() {
             <p className="mt-1 text-xs text-emerald-700">
               Hieronder zie je matches die op basis van jouw ingevulde gegevens zijn geselecteerd.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {showAiFinderBanner && (
+        <Card className="border-[#40ADA8]/25 bg-gradient-to-r from-[#40ADA8]/10 to-white">
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#2f7f7a]">AI Opdracht Finder</p>
+              <p className="mt-1 text-xs text-slate-600">
+                Je matches zijn gerangschikt op basis van je intake en profiel. Gebruik filters om verder te verfijnen.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-[#40ADA8]/40 text-[#2f7f7a]"
+              onClick={dismissAiFinderBanner}
+            >
+              Sluiten
+            </Button>
           </CardContent>
         </Card>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,7 @@ function readableLocation(city: string | null | undefined): string {
 function ZorentaJobsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [myRole, setMyRole] = useState<string | null>(null);
@@ -75,6 +76,18 @@ function ZorentaJobsContent() {
   const heartBumpTimeoutRef = useRef<number | null>(null);
   const showCreatedSuccess = searchParams.get("created") === "1";
   const qFromUrl = (searchParams.get("q") ?? "").trim();
+  const isAiFinderSource = searchParams.get("source") === "ai-finder";
+  const [aiFinderBannerDismissed, setAiFinderBannerDismissed] = useState(false);
+  const showAiFinderBanner = isAiFinderSource && !aiFinderBannerDismissed;
+
+  function dismissAiFinderBanner() {
+    setAiFinderBannerDismissed(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("source");
+    const qs = params.toString();
+    const base = pathname || "/jobs";
+    router.replace(qs ? `${base}?${qs}` : base, { scroll: false });
+  }
 
   const canCreateJobs = myRole === "client" || myRole === "organization";
 
@@ -271,6 +284,26 @@ function ZorentaJobsContent() {
           role="status"
         >
           Opdracht is geplaatst.
+        </div>
+      )}
+      {showAiFinderBanner && (
+        <div
+          className="flex flex-col gap-2 rounded-2xl border border-[#40ADA8]/25 bg-gradient-to-r from-[#40ADA8]/10 to-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <p className="text-sm text-slate-800">
+            <span className="font-semibold text-[#2f7f7a]">AI Opdracht Finder.</span>{" "}
+            Deze lijst is gepersonaliseerd op basis van je profiel en (indien van toepassing) je intake.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-[#40ADA8]/40 text-[#2f7f7a]"
+            onClick={dismissAiFinderBanner}
+          >
+            Sluiten
+          </Button>
         </div>
       )}
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">

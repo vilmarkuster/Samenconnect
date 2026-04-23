@@ -154,6 +154,43 @@ export default function ZorentaDashboardPage() {
     [conversationsCount, jobMatches.length, totalJobs]
   );
 
+  // Must run on every render (before any early return) — same rules of hooks as all useMemo.
+  const aiOpdrachtFinder = useMemo(() => {
+    const r = me?.profile?.role;
+    if (r === "caregiver") {
+      return {
+        href: "/jobs?source=ai-finder",
+        title: "Laat AI automatisch passende opdrachten vinden",
+        description:
+          "Onze AI zoekt op dit moment binnen SamenConnect en stelt een persoonlijke lijst met passende opdrachten voor je samen. In een volgende stap worden ook externe bronnen toegevoegd.",
+        cta: "Start AI zoeken",
+      };
+    }
+    if (r === "client" || r === "organization") {
+      return {
+        href: "/matches?source=ai-finder",
+        title: "AI: vind de beste zorg voor jouw vraag",
+        description:
+          "Op basis van je intake en profiel zie je gepersonaliseerde matches met zorgverleners. Gebruik filters om verder te verfijnen.",
+        cta: "Open AI-matches",
+      };
+    }
+    if (r === "admin") {
+      return {
+        href: "/admin/jobs",
+        title: "Opdrachtenoverzicht (admin)",
+        description: "Bekijk en beheer alle opdrachten in het beheerdersportaal.",
+        cta: "Naar admin opdrachten",
+      };
+    }
+    return {
+      href: "/jobs",
+      title: "Opdrachten",
+      description: "Bekijk beschikbare opdrachten op SamenConnect.",
+      cta: "Naar opdrachten",
+    };
+  }, [me?.profile?.role]);
+
   if (loading || !me?.profile) {
     return (
       <div className="mx-auto w-full min-w-0 max-w-none space-y-8 py-6 lg:py-10">
@@ -701,7 +738,7 @@ export default function ZorentaDashboardPage() {
             </Link>
           </section>
 
-          {/* AI Job Finder */}
+          {/* AI Opdracht Finder — navigates to role-appropriate AI matching surface */}
           <section className="relative overflow-hidden rounded-3xl border border-[#40ADA8]/25 bg-gradient-to-br from-[#40ADA8]/12 via-slate-50 to-white p-6 shadow-md min-[1720px]:p-5">
             <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#40ADA8]/15 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-12 right-4 h-28 w-28 rounded-full bg-[#40ADA8]/10 blur-2xl" />
@@ -710,16 +747,13 @@ export default function ZorentaDashboardPage() {
                 <Sparkles className="h-3.5 w-3.5" />
                 AI Opdracht Finder
               </p>
-              <h3 className="text-lg font-semibold text-slate-900">
-                Laat AI automatisch passende opdrachten vinden
-              </h3>
-              <p className="text-sm text-slate-600">
-                Onze AI zoekt op dit moment binnen SamenConnect en stelt een persoonlijke lijst met passende opdrachten
-                voor je samen. In een volgende stap worden ook externe bronnen toegevoegd.
-              </p>
-              <Button className="mt-2 bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
-                Start AI zoeken
-              </Button>
+              <h3 className="text-lg font-semibold text-slate-900">{aiOpdrachtFinder.title}</h3>
+              <p className="text-sm text-slate-600">{aiOpdrachtFinder.description}</p>
+              <Link href={aiOpdrachtFinder.href}>
+                <Button className="mt-2 bg-[#40ADA8] text-white shadow-sm hover:bg-[#369e9a]">
+                  {aiOpdrachtFinder.cta}
+                </Button>
+              </Link>
             </div>
           </section>
         </aside>
