@@ -20,6 +20,21 @@ export function TermsConditionsNlBody(): ReactNode {
           </Link>
           . Indien u namens een rechtspersoon handelt, verklaart u bevoegd te zijn om die rechtspersoon te binden.
         </LegalP>
+        <LegalP>
+          <strong>SamenConnect wordt geëxploiteerd door:</strong>
+        </LegalP>
+        <LegalP>
+          SamenConnect
+          <br />
+          KvK-nummer: 42030396
+          <br />
+          Vestigingsadres: op aanvraag beschikbaar
+          <br />
+          E-mail:{" "}
+          <a href="mailto:info@samenconnect.nl" className="font-medium text-emerald-800 underline-offset-2 hover:underline">
+            info@samenconnect.nl
+          </a>
+        </LegalP>
       </LegalSection>
 
       <LegalSection title="2. Aard van de dienst — SamenConnect is een platform">
@@ -48,6 +63,10 @@ export function TermsConditionsNlBody(): ReactNode {
           Niets op het Platform mag worden uitgelegd als een aanbeveling, goedkeuring of certificering door SamenConnect
           van een individuele zorgverlener, tenzij dit uitdrukkelijk en feitelijk juist als zodanig is aangegeven in
           aparte, expliciete communicatie.
+        </LegalP>
+        <LegalP>
+          Gebruikers zijn zelf verantwoordelijk voor het controleren van kwalificaties, referenties en geschiktheid van
+          andere gebruikers.
         </LegalP>
       </LegalSection>
 
@@ -111,7 +130,8 @@ export function TermsConditionsNlBody(): ReactNode {
         <LegalP>
           Reviews dienen waarheidsgetrouw en zakelijk te zijn. Het plaatsen van valse of misleidende reviews is verboden.
           SamenConnect kan moderatie-instrumenten inzetten of ontwikkelen; tot die tijd kunnen beperkte moderatieopties
-          gelden zoals vermeld in de gebruikersinterface.
+          gelden zoals vermeld in de gebruikersinterface. SamenConnect behoudt zich het recht voor om reviews te
+          verwijderen die in strijd zijn met deze voorwaarden.
         </LegalP>
       </LegalSection>
 
@@ -162,6 +182,10 @@ export function TermsConditionsNlBody(): ReactNode {
       </LegalSection>
 
       <LegalSection title="12. Aansprakelijkheid en vrijwaring">
+        <LegalP>
+          SamenConnect is uitsluitend aansprakelijk voor directe schade die het rechtstreeks en aantoonbaar gevolg is van
+          een toerekenbare tekortkoming.
+        </LegalP>
         <LegalP>
           Voor zover wettelijk toegestaan, is de totale aansprakelijkheid van SamenConnect jegens u voor directe schade
           voortvloeiend uit of verband houdend met het Platform <strong>beperkt</strong> tot het bedrag dat u in de
