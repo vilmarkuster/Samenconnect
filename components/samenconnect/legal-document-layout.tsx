@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-const LAST_UPDATED = "31 maart 2026";
+const LAST_UPDATED = "23 april 2026";
 
 export function LegalDocumentLayout({
   title,

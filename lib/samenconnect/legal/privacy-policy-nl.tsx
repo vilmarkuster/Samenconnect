@@ -24,12 +24,27 @@ export function PrivacyPolicyNlBody(): ReactNode {
       <LegalSection title="2. Verwerkingsverantwoordelijke">
         <LegalP>
           Voor de verwerking van persoonsgegevens in het kader van het platform is de beslissende partij (de
-          verwerkingsverantwoordelijke in de zin van de AVG) de rechtspersoon achter SamenConnect, zoals vermeld op de
-          website en in gebruikerscommunicatie. Voor privacyvragen kunt u contact opnemen via{" "}
+          verwerkingsverantwoordelijke in de zin van de AVG) de onderneming die SamenConnect exploiteert, zoals hieronder
+          nader aangeduid.
+        </LegalP>
+        <LegalP>
+          <strong>SamenConnect wordt geëxploiteerd door:</strong>
+        </LegalP>
+        <LegalP>
+          SamenConnect
+          <br />
+          KvK-nummer: 42030396
+          <br />
+          Vestigingsadres: op aanvraag beschikbaar
+          <br />
+          E-mail:{" "}
           <a href="mailto:info@samenconnect.nl" className="font-medium text-emerald-800 underline-offset-2 hover:underline">
             info@samenconnect.nl
           </a>
-          .
+        </LegalP>
+        <LegalP>
+          Voor privacyvragen en het uitoefenen van uw rechten kunt u contact met ons opnemen via het hiervoor vermelde
+          e-mailadres.
         </LegalP>
       </LegalSection>
 
