@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
+import { normalizeNotificationLink } from "@/lib/zorenta/normalize-notification-link";
 
 export async function GET(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
@@ -15,7 +16,13 @@ export async function GET(req: NextRequest) {
   if (unreadOnly) q = q.is("read_at", null);
   const { data, error } = await q;
   if (error) return jsonResponse({ error: error.message }, 500);
-  return jsonResponse({ notifications: data ?? [] });
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const notifications = rows.map((row) => {
+    const link = typeof row.link === "string" ? row.link : null;
+    const normalized = normalizeNotificationLink(link);
+    return normalized === link ? row : { ...row, link: normalized };
+  });
+  return jsonResponse({ notifications });
 }
 
 export async function PATCH(req: NextRequest) {

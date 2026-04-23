@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
+import { normalizeNotificationLink } from "@/lib/zorenta/normalize-notification-link";
 import { Button } from "@/components/ui/button";
 import { ZorentaPageContainer } from "@/components/zorenta/page-container";
 import { ZorentaPageHeader } from "@/components/zorenta/page-header";
@@ -79,7 +80,9 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => (
+          {notifications.map((n) => {
+            const actionHref = normalizeNotificationLink(n.link);
+            return (
             <div
               key={n.id}
               className={`rounded-xl border bg-white p-4 transition-shadow ${
@@ -97,8 +100,8 @@ export default function NotificationsPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {n.link && (
-                    <Link href={n.link}>
+                  {actionHref && (
+                    <Link href={actionHref}>
                       <Button variant="outline" size="sm">
                         Bekijken
                       </Button>
@@ -116,7 +119,8 @@ export default function NotificationsPage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </ZorentaPageContainer>
