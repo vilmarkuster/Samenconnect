@@ -10,6 +10,15 @@ import {
   primaryCareLabelFromTaxonomy,
   SOORT_HULP_ZORG_OPTIONS,
 } from "@/lib/zorenta/intake-taxonomy";
+import { careJobRowsWithExistingPosters } from "@/lib/zorenta/care-jobs-poster-filter";
+
+function escapeIlike(s: string): string {
+  return s
+    .replace(/,/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,6 +28,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status") || "open";
     const city = searchParams.get("city") || "";
     const careType = searchParams.get("care_type") || "";
+    const qText = (searchParams.get("q") || "").trim();
     const limit = Math.min(Number(searchParams.get("limit")) || 20, 100);
     const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
     let q = supabase
@@ -26,11 +36,17 @@ export async function GET(req: NextRequest) {
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false });
     if (status) q = q.eq("status", status);
-    if (city) q = q.ilike("city", `%${city}%`);
-    if (careType) q = q.ilike("care_type", `%${careType}%`);
+    if (qText) {
+      const safe = escapeIlike(qText);
+      q = q.or(`title.ilike.%${safe}%,city.ilike.%${safe}%,care_type.ilike.%${safe}%`);
+    } else {
+      if (city) q = q.ilike("city", `%${city}%`);
+      if (careType) q = q.ilike("care_type", `%${careType}%`);
+    }
     const { data, error, count } = await q.range(offset, offset + limit - 1);
     if (error) return jsonResponse({ error: error.message }, 500);
-    return jsonResponse({ jobs: data ?? [], total: count ?? 0, limit, offset });
+    const rows = await careJobRowsWithExistingPosters(supabase, (data ?? []) as { poster_id: string }[]);
+    return jsonResponse({ jobs: rows, total: count ?? 0, limit, offset });
   } catch (e) {
     logger.error("Jobs GET failed", e);
     return jsonResponse({ error: e instanceof Error ? e.message : "Request failed" }, 500);

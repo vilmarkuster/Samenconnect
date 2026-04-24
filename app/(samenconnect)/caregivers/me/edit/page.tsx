@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { HourlyEuroInput } from "@/components/zorenta/hourly-euro-input";
+import { normalizeHourlyEuroFromDb, parseHourlyEuroInputString, validateHourlyMinMaxPair } from "@/lib/zorenta/hourly-euro-ux";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -125,8 +127,16 @@ export default function CaregiverProfileEditPage() {
         setTravelDistanceKm(p.travel_distance_km != null ? String(p.travel_distance_km) : "");
         setHasDriverLicense(Boolean(p.has_driver_license));
         setLanguageTags(parseStringListFromMixed(p.languages));
-        setHourlyRate(p.hourly_rate != null ? String(p.hourly_rate) : "");
-        setMinRate(p.min_rate != null ? String(p.min_rate) : "");
+        setHourlyRate(
+          p.hourly_rate != null && typeof p.hourly_rate === "number"
+            ? String(normalizeHourlyEuroFromDb(p.hourly_rate) ?? "")
+            : ""
+        );
+        setMinRate(
+          p.min_rate != null && typeof p.min_rate === "number"
+            ? String(normalizeHourlyEuroFromDb(p.min_rate) ?? "")
+            : ""
+        );
       }
       const meRes = await fetch("/api/zorenta/me", { headers: zorentaHeaders(token) });
       const meData = await meRes.json().catch(() => ({}));
@@ -174,6 +184,24 @@ export default function CaregiverProfileEditPage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const hr = parseHourlyEuroInputString(hourlyRate);
+    const mr = parseHourlyEuroInputString(minRate);
+    if (hr != null) {
+      const v = validateHourlyMinMaxPair(hr, hr);
+      if (!v.ok) {
+        setError(v.message);
+        setSaving(false);
+        return;
+      }
+    }
+    if (mr != null) {
+      const v = validateHourlyMinMaxPair(mr, mr);
+      if (!v.ok) {
+        setError(v.message);
+        setSaving(false);
+        return;
+      }
+    }
     const token = await getZorentaAccessToken();
     if (!token) {
       setError("Not authenticated.");
@@ -191,13 +219,23 @@ export default function CaregiverProfileEditPage() {
       availability_schedule: availabilitySchedule,
       city: city.trim() || null,
       certifications: certificationTags,
-      hourly_rate: hourlyRate.trim() ? parseFloat(hourlyRate) : null,
+      hourly_rate: (() => {
+        const r = parseHourlyEuroInputString(hourlyRate);
+        if (r == null) return null;
+        const v = validateHourlyMinMaxPair(r, r);
+        return v.ok ? v.min : null;
+      })(),
       region: region.trim() || null,
       country: country.trim() || null,
       travel_distance_km: travelDistanceKm.trim() ? parseInt(travelDistanceKm, 10) : null,
       has_driver_license: hasDriverLicense,
       languages: languageTags,
-      min_rate: minRate.trim() ? parseFloat(minRate) : null,
+      min_rate: (() => {
+        const r = parseHourlyEuroInputString(minRate);
+        if (r == null) return null;
+        const v = validateHourlyMinMaxPair(r, r);
+        return v.ok ? v.min : null;
+      })(),
     };
     const isUpdate = profile && profile !== "none";
     const url = "/api/zorenta/caregivers/me";
@@ -478,26 +516,22 @@ export default function CaregiverProfileEditPage() {
           </div>
         </ZorentaFormSection>
 
-        <ZorentaFormSection title="Tarief" description="Optioneel uurtarief">
+        <ZorentaFormSection title="Tarief" description="Hele euro’s, stap €5, vanaf €10 (optioneel)">
           <div className="grid gap-4 sm:grid-cols-2">
-            <ZorentaFormField label="Uurtarief (€)">
-              <Input
-                type="number"
-                step="0.01"
+            <ZorentaFormField label="Uurtarief">
+              <HourlyEuroInput
                 value={hourlyRate}
-                onChange={(e) => setHourlyRate(e.target.value)}
-                placeholder="bijv. 25"
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                onChange={setHourlyRate}
+                placeholder="Bijv. 35"
+                inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
               />
             </ZorentaFormField>
-            <ZorentaFormField label="Minimaal tarief (€)">
-              <Input
-                type="number"
-                step="0.01"
+            <ZorentaFormField label="Minimaal tarief" hint="Optioneel">
+              <HourlyEuroInput
                 value={minRate}
-                onChange={(e) => setMinRate(e.target.value)}
-                placeholder="optioneel"
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                onChange={setMinRate}
+                placeholder="Bijv. 30"
+                inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
               />
             </ZorentaFormField>
           </div>

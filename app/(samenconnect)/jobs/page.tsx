@@ -107,12 +107,6 @@ function ZorentaJobsContent() {
   const canCreateJobs = myRole === "client" || myRole === "organization";
 
   useEffect(() => {
-    if (!qFromUrl) return;
-    setCity(qFromUrl);
-    setFilterCity(qFromUrl);
-  }, [qFromUrl]);
-
-  useEffect(() => {
     let cancelled = false;
     async function load() {
       const token = await getZorentaAccessToken();
@@ -126,7 +120,11 @@ function ZorentaJobsContent() {
       }
       const params = new URLSearchParams();
       params.set("status", "open");
-      if (filterCity) params.set("city", filterCity);
+      if (qFromUrl) {
+        params.set("q", qFromUrl);
+      } else if (filterCity) {
+        params.set("city", filterCity);
+      }
       if (filterCareType) params.set("care_type", filterCareType);
       if (radius) params.set("radius", radius);
       const jobsRes = await fetch(`/api/zorenta/jobs?${params}`, {
@@ -208,7 +206,7 @@ function ZorentaJobsContent() {
     return () => {
       cancelled = true;
     };
-  }, [filterCity, filterCareType, radius]);
+  }, [filterCity, filterCareType, radius, qFromUrl]);
 
   async function toggleFavorite(jobId: string) {
     if (!myUserId) {

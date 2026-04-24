@@ -21,7 +21,10 @@ import {
   BadgeCheck,
 } from "lucide-react";
 
-import { CaregiverProfile } from "@/lib/zorenta/mock-caregivers";
+import type { CaregiverProfile } from "@/lib/zorenta/caregiver-profile-ui";
+import { experienceRangeFromYears } from "@/lib/zorenta/job-hourly-budget-presets";
+import { normalizeCaregiverProfileRow } from "@/lib/zorenta/normalize-caregiver-profile-display";
+import type { NormalizedCaregiverProfileForDisplay } from "@/lib/zorenta/normalize-caregiver-profile-display";
 import { getSupabaseClient } from "@/lib/supabase-client";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { formatLocation } from "@/lib/zorenta/formatters";
@@ -411,129 +414,96 @@ function MatchesContent() {
     }
   }, [intakeLoaded, caregiversLoaded]);
 
-  // Fetch candidate caregivers for matching (Supabase instead of MOCK_CAREGIVERS).
+  // Real caregivers only: `caregiver_profiles` + `profiles` (no legacy `caregivers` seed rows).
   useEffect(() => {
     let cancelled = false;
 
-    const normalizeAvailability = (
-      v: unknown
-    ): AvailabilityOption[] => {
+    const availabilityFromNorm = (norm: NormalizedCaregiverProfileForDisplay): AvailabilityOption[] => {
       const allowed = new Set(AVAILABILITY_OPTIONS_ALL as readonly string[]);
-      const rawList = Array.isArray(v)
-        ? v
-        : typeof v === "string"
-          ? v.split(",")
-          : [];
-
-      return (rawList as unknown[]).map((x) => String(x).trim()).filter((x) =>
-        allowed.has(x)
-      ) as AvailabilityOption[];
+      const out: AvailabilityOption[] = [];
+      if (norm.availability) {
+        norm.availability
+          .split(/[,;]+/)
+          .map((x) => x.trim())
+          .forEach((x) => {
+            if (allowed.has(x)) out.push(x as AvailabilityOption);
+          });
+      }
+      (norm.availability_days ?? []).forEach((d) => {
+        const x = String(d).trim();
+        if (allowed.has(x)) out.push(x as AvailabilityOption);
+      });
+      return [...new Set(out)];
     };
 
-      const loadCaregivers = async () => {
+    const loadCaregivers = async () => {
       try {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
-          .from("caregivers")
-          .select(
-            "id,name,location,zorgtype,specialisaties,vaardigheden,certificaten,registraties,beschikbaarheid,prijs,provider_type,profile_id,created_at"
-          )
+          .from("caregiver_profiles")
+          .select("*")
           .order("created_at", { ascending: false })
-          .limit(100);
+          .limit(150);
 
         if (error) {
-          // If fetching fails, keep the page functional (empty results).
           // eslint-disable-next-line no-console
-          console.error("Failed to load caregivers:", error.message);
+          console.error("Failed to load caregiver_profiles:", error.message);
           return;
         }
 
-        const rows = data ?? [];
-        const linkedProfileIds = [...new Set(rows.map((r: any) => String(r.profile_id ?? "")).filter(Boolean))];
+        const rows = (data ?? []) as Record<string, unknown>[];
+        const linkedProfileIds = [
+          ...new Set(rows.map((r) => String(r.profile_id ?? "")).filter(Boolean)),
+        ];
         const { data: profileRows } = linkedProfileIds.length
-          ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", linkedProfileIds)
+          ? await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url, role")
+              .in("id", linkedProfileIds)
+              .eq("role", "caregiver")
           : { data: [] };
         const profileById = Object.fromEntries((profileRows ?? []).map((p: any) => [String(p.id), p]));
         const metaById: Record<string, CaregiverMeta> = {};
         const newIndex: Record<string, number> = {};
-        const allowedCerts = new Set<string>(
-          CERTIFICATIONS_FILTER_OPTIONS as unknown as string[]
-        );
+        const allowedCerts = new Set<string>(CERTIFICATIONS_FILTER_OPTIONS as unknown as string[]);
 
-        const mapped: CaregiverProfile[] = rows.map((row: any, idx: number) => {
-          const id = String(row.id);
-          const availability = normalizeAvailability(row.beschikbaarheid);
-          metaById[id] = { availability };
+        const mapped: CaregiverProfile[] = [];
+        for (const row of rows) {
+          const pid = String(row.profile_id ?? "").trim();
+          if (!pid || !profileById[pid]) continue;
+          const norm = normalizeCaregiverProfileRow(row);
+          if (!norm) continue;
 
-          // We fetch ordered by created_at desc (newest first). The "new" sort
-          // prefers higher index values, so we invert the index.
-          newIndex[id] = rows.length - 1 - idx;
+          const availability = availabilityFromNorm(norm);
+          metaById[pid] = { availability };
 
-          const providerType = String(row.provider_type ?? "zzp")
-            .trim()
-            .toLowerCase();
-          const prijs = row.prijs;
-
-          const role: CaregiverProfile["role"] =
-            providerType === "organisatie"
-              ? "Organisatie"
-              : providerType === "vrijwilliger"
-                ? "Vrijwilliger"
-                : providerType === "mantelzorger"
-                  ? "Mantelzorger"
-                  : "ZZP zorgverlener";
-
-          const isVolunteer = providerType === "vrijwilliger";
-          const arrangement: CaregiverProfile["arrangement"] = isVolunteer
-            ? "Vrijwillig"
-            : providerType === "mantelzorger"
-              ? "Mantelzorg"
-              : "ZZP";
-
-          const zorgtype = (row.zorgtype ?? []) as string[];
-          const specialisaties = (row.specialisaties ?? []) as string[];
-          const vaardigheden = (row.vaardigheden ?? []) as string[];
-
-          const tags = [...zorgtype, ...specialisaties, ...vaardigheden]
-            .filter(Boolean)
-            .map(String);
-
-          const certs = (row.certificaten ?? []) as string[];
-          const registraties = (row.registraties ?? []) as string[];
-          const certifications = [...certs, ...registraties]
-            .filter(Boolean)
+          const prof = profileById[pid];
+          const tags = [...norm.care_types, ...norm.skills].filter(Boolean).map(String);
+          const certifications = (norm.certifications ?? [])
             .map(String)
             .filter((c): c is CertificationOption => allowedCerts.has(c));
 
-          return {
-            id,
-            name: String(
-              profileById[String(row.profile_id)]?.display_name ??
-              row.name ??
-              "Onbekende zorgverlener"
-            ),
-            role,
-            linkedProfileId: row.profile_id ? String(row.profile_id) : null,
-            avatarUrl:
-              typeof profileById[String(row.profile_id)]?.avatar_url === "string"
-                ? String(profileById[String(row.profile_id)]?.avatar_url)
-                : null,
-            provider_type: providerType,
-            city: String(row.location ?? ""),
-            rate:
-              typeof prijs === "number"
-                ? prijs
-                : prijs == null
-                  ? null
-                  : Number(prijs),
-            isVolunteer,
+          mapped.push({
+            id: pid,
+            name: String(prof?.display_name?.trim() || norm.headline?.trim() || "Zorgverlener"),
+            role: "ZZP zorgverlener",
+            linkedProfileId: pid,
+            avatarUrl: typeof prof?.avatar_url === "string" ? prof.avatar_url : null,
+            provider_type: "zzp",
+            city: String(norm.city ?? "").trim() || "—",
+            rate: norm.hourly_rate ?? null,
+            isVolunteer: false,
             tags,
-            skills: vaardigheden.filter(Boolean).map(String),
+            skills: norm.skills,
             certifications,
-            arrangement,
-            experienceRange: undefined,
-            bio: "",
-          };
+            arrangement: "ZZP",
+            experienceRange: experienceRangeFromYears(norm.experience_years),
+            bio: String(norm.bio ?? norm.headline ?? "").trim(),
+          });
+        }
+
+        mapped.forEach((cg, i) => {
+          newIndex[cg.id] = mapped.length - 1 - i;
         });
 
         CAREGIVER_META = metaById;
@@ -695,10 +665,14 @@ function MatchesContent() {
         const city = m.caregiver.city.toLowerCase();
         const tags = m.caregiver.tags.map((t) => t.toLowerCase());
         const role = m.caregiver.role.toLowerCase();
+        const bio = (m.caregiver.bio ?? "").toLowerCase();
+        const skills = (m.caregiver.skills ?? []).map((s) => String(s).toLowerCase());
         return (
           name.includes(q) ||
           city.includes(q) ||
           role.includes(q) ||
+          bio.includes(q) ||
+          skills.some((s) => s.includes(q)) ||
           tags.some((t) => t.includes(q))
         );
       });
@@ -2104,7 +2078,7 @@ function MatchesContent() {
       {messageTarget && (
         <ZorentaMessageModal
           recipientName={messageTarget.name}
-          recipientId={messageTarget.id}
+          recipientId={messageTarget.linkedProfileId ?? messageTarget.id}
           onClose={() => setMessageTarget(null)}
         />
       )}

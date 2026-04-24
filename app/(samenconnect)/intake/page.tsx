@@ -27,6 +27,13 @@ import {
   mergeIntakeSubmission,
   intakeTaxonomyFromRow,
 } from "@/lib/zorenta/intake-taxonomy";
+import { cn } from "@/lib/utils";
+import {
+  BUDGET_TARIEF_PRESETS,
+  activeBudgetPresetIdFromMinMax,
+} from "@/lib/zorenta/job-hourly-budget-presets";
+import { HourlyEuroNullableInput } from "@/components/zorenta/hourly-euro-input";
+import { normalizeHourlyEuroFromDb, validateHourlyMinMaxPair } from "@/lib/zorenta/hourly-euro-ux";
 
 const STEPS = [
   { key: "who", title: "Voor wie is de zorg" },
@@ -67,6 +74,16 @@ const URGENCY_OPTIONS = [
   "Binnen 1 maand",
   "Flexibel",
 ] as const;
+
+function budgetNums(
+  min: string | number | string[] | null | undefined,
+  max: string | number | string[] | null | undefined
+): { min: number | null; max: number | null } {
+  return {
+    min: typeof min === "number" && Number.isFinite(min) ? min : null,
+    max: typeof max === "number" && Number.isFinite(max) ? max : null,
+  };
+}
 
 function strArr(form: Record<string, unknown>, key: string): string[] {
   const v = form[key];
@@ -324,6 +341,7 @@ export default function IntakePage() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [dbLatestDraft, setDbLatestDraft] = useState<any | null>(null);
   const [dbDraftLoaded, setDbDraftLoaded] = useState(false);
+  const [budgetTariefCustom, setBudgetTariefCustom] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) trackZorentaEvent("intake_started", {});
@@ -402,12 +420,19 @@ export default function IntakePage() {
             vaardigheden_ervaring: tax.vaardigheden_ervaring,
             target_group: tax.target_group,
             skills_required: Array.isArray(row.skills_required) ? row.skills_required : [],
-            budget_min: typeof row.budget_min === "number" ? row.budget_min : null,
-            budget_max: typeof row.budget_max === "number" ? row.budget_max : null,
+            budget_min:
+              typeof row.budget_min === "number" ? normalizeHourlyEuroFromDb(row.budget_min) : null,
+            budget_max:
+              typeof row.budget_max === "number" ? normalizeHourlyEuroFromDb(row.budget_max) : null,
             notes: typeof row.notes === "string" ? row.notes : "",
           };
 
           setForm((prev) => ({ ...prev, ...nextForm }));
+          {
+            const { min: bmn, max: bmx } = budgetNums(nextForm.budget_min, nextForm.budget_max);
+            const pid = activeBudgetPresetIdFromMinMax(bmn, bmx);
+            setBudgetTariefCustom(pid === null && (bmn !== null || bmx !== null));
+          }
           setStep(inferIntakeStepFromDbRow(row));
           setIntakeId(typeof row.id === "string" ? row.id : null);
           setGeneratedTitle(null);
@@ -433,6 +458,19 @@ export default function IntakePage() {
       // eslint-disable-next-line no-console
       console.log("HYDRATE: restored draft", parsed);
       const mergedTax = mergeIntakeSubmission((parsed.form || {}) as Record<string, unknown>);
+      const mergedForm = { ...defaultForm, ...(parsed.form || {}), ...mergedTax } as Record<
+        string,
+        string | string[] | number | null
+      >;
+      if (typeof mergedForm.budget_min === "number") {
+        mergedForm.budget_min = normalizeHourlyEuroFromDb(mergedForm.budget_min) ?? mergedForm.budget_min;
+      }
+      if (typeof mergedForm.budget_max === "number") {
+        mergedForm.budget_max = normalizeHourlyEuroFromDb(mergedForm.budget_max) ?? mergedForm.budget_max;
+      }
+      const { min: bmin, max: bmax } = budgetNums(mergedForm.budget_min, mergedForm.budget_max);
+      const pidLocal = activeBudgetPresetIdFromMinMax(bmin, bmax);
+      setBudgetTariefCustom(pidLocal === null && (bmin !== null || bmax !== null));
       setForm((prev) => ({ ...prev, ...(parsed.form || {}), ...mergedTax }));
       if (typeof parsed.step === "number") {
         setStep(parsed.step);
@@ -534,6 +572,10 @@ export default function IntakePage() {
 
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
+  const budgetN = budgetNums(form.budget_min, form.budget_max);
+  const budgetPresetActiveId = activeBudgetPresetIdFromMinMax(budgetN.min, budgetN.max);
+  const budgetHourlyPair = validateHourlyMinMaxPair(budgetN.min, budgetN.max);
+  const budgetHourlyBlocked = currentStep.key === "budget" && !budgetHourlyPair.ok;
 
   const toggleArr = (key: string, value: string) => {
     const current = strArr(form, key);
@@ -607,6 +649,7 @@ export default function IntakePage() {
                   }
                 }
                 setForm(defaultForm);
+                setBudgetTariefCustom(false);
                 setStep(0);
                 setGeneratedTitle(null);
                 setGeneratedSummary(null);
@@ -877,55 +920,104 @@ export default function IntakePage() {
           )}
           {currentStep.key === "budget" && (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <ZorentaFormField label="Budget min (€/uur)">
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="20"
-                    value={form.budget_min ?? ""}
-                    onChange={(e) =>
-                      update("budget_min", e.target.value === "" ? null : Number(e.target.value))
-                    }
-                    className="mt-1"
-                  />
-                </ZorentaFormField>
-                <ZorentaFormField label="Budget max (€/uur)">
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="35"
-                    value={form.budget_max ?? ""}
-                    onChange={(e) =>
-                      update("budget_max", e.target.value === "" ? null : Number(e.target.value))
-                    }
-                    className="mt-1"
-                  />
-                </ZorentaFormField>
-              </div>
-              <p className="mt-3 text-xs text-slate-500">
-                Indicatie van het uurtarief. Dit hangt af van zorgtype, ervaring en urgentie. Later nog aanpasbaar.
+              <p className="text-xs text-slate-600">
+                <span className="font-medium text-slate-800">Uurtarief (richting)</span> — kies een gangbare range per
+                uur, of stel zelf min en max in (ook geschikt voor een vast uurtarief: zelfde bedrag bij min en max).
               </p>
+              <p className="mt-1 text-xs text-slate-500">Later nog aanpasbaar bij je zorgvraag of opdracht.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {[
-                  { label: "€20–€30", min: 20, max: 30 },
-                  { label: "€30–€40", min: 30, max: 40 },
-                  { label: "€40–€60", min: 40, max: 60 },
-                  { label: "€60+", min: 60, max: null },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      update("budget_min", preset.min);
-                      update("budget_max", preset.max);
-                    }}
-                    className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+                {BUDGET_TARIEF_PRESETS.map((preset) => {
+                  const active = budgetPresetActiveId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        if (active) {
+                          setForm((prev) => ({ ...prev, budget_min: null, budget_max: null }));
+                          setBudgetTariefCustom(false);
+                        } else {
+                          setForm((prev) => ({
+                            ...prev,
+                            budget_min: preset.min,
+                            budget_max: preset.max,
+                          }));
+                          setBudgetTariefCustom(false);
+                        }
+                      }}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                        active
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const presetId = budgetPresetActiveId;
+                    const eigenActive =
+                      budgetTariefCustom || (presetId === null && (budgetN.min !== null || budgetN.max !== null));
+                    if (eigenActive && budgetTariefCustom) {
+                      setForm((prev) => ({ ...prev, budget_min: null, budget_max: null }));
+                      setBudgetTariefCustom(false);
+                      return;
+                    }
+                    setBudgetTariefCustom(true);
+                  }}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                    budgetPresetActiveId === null &&
+                      (budgetTariefCustom || budgetN.min !== null || budgetN.max !== null)
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  )}
+                >
+                  Eigen uurtarief
+                </button>
               </div>
+              {!(budgetPresetActiveId !== null && !budgetTariefCustom) ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <ZorentaFormField label="Minimum per uur" hint="Hele euro’s, vanaf €10, stap €5.">
+                    <div className="mt-1">
+                      <HourlyEuroNullableInput
+                        value={typeof form.budget_min === "number" ? form.budget_min : null}
+                        onChange={(v) => {
+                          update("budget_min", v);
+                          setBudgetTariefCustom(true);
+                        }}
+                        placeholder="Bijv. 25"
+                        inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                      />
+                    </div>
+                  </ZorentaFormField>
+                  <ZorentaFormField label="Maximum per uur" hint="Hele euro’s. Laat leeg bij open bovengrens (preset €60+).">
+                    <div className="mt-1">
+                      <HourlyEuroNullableInput
+                        value={typeof form.budget_max === "number" ? form.budget_max : null}
+                        onChange={(v) => {
+                          update("budget_max", v);
+                          setBudgetTariefCustom(true);
+                        }}
+                        placeholder="Bijv. 40"
+                        inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                      />
+                    </div>
+                  </ZorentaFormField>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-slate-500">
+                  Preset geselecteerd. Tik opnieuw op de preset om te wissen, of kies &quot;Eigen uurtarief&quot; om zelf
+                  min/max in te vullen.
+                </p>
+              )}
+              {budgetHourlyBlocked ? (
+                <p className="mt-2 text-sm font-medium text-red-700">{budgetHourlyPair.message}</p>
+              ) : null}
             </>
           )}
           {currentStep.key === "location" && (
@@ -1228,7 +1320,20 @@ export default function IntakePage() {
               )}
               {!isLast ? (
                 <Button
-                  onClick={() => setStep(step + 1)}
+                  onClick={() => {
+                    if (currentStep.key === "budget") {
+                      const p = validateHourlyMinMaxPair(budgetN.min, budgetN.max);
+                      if (p.ok) {
+                        setForm((prev) => ({
+                          ...prev,
+                          budget_min: p.min,
+                          budget_max: p.max,
+                        }));
+                      }
+                    }
+                    setStep((s) => s + 1);
+                  }}
+                  disabled={budgetHourlyBlocked}
                   className="gap-1.5 bg-[#40ada8] text-white hover:bg-[#369e9a]"
                 >
                   Volgende

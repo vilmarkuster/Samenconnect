@@ -1,23 +1,13 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
 import { scoreJobForCaregiver, type JobForScoring, type CaregiverForScoring } from "@/lib/zorenta/matching";
+import { careJobRowsWithExistingPosters } from "@/lib/zorenta/care-jobs-poster-filter";
 
 export async function GET(req: NextRequest) {
-  // Log incoming Authorization for debugging
-  // eslint-disable-next-line no-console
-  console.log("[jobs-for-me] Incoming auth header", {
-    authHeader: req.headers.get("authorization") ?? null,
-  });
-
   const auth = await requireZorentaAuth(req);
   if (!auth.ok) return jsonResponse(auth.body, auth.status);
   const { supabase, userId, profile } = auth;
   if (profile.role !== "caregiver") {
-    // eslint-disable-next-line no-console
-    console.warn("[jobs-for-me] Forbidden for non-caregiver", {
-      userId,
-      role: profile.role,
-    });
     return jsonResponse({ error: "Alleen voor zorgverleners." }, 403);
   }
 
@@ -38,7 +28,7 @@ export async function GET(req: NextRequest) {
     .limit(1);
   const lastActivityAt = (lastApps?.[0] as { created_at?: string } | undefined)?.created_at ?? null;
 
-  const { data: jobs } = await supabase
+  const { data: jobsRaw } = await supabase
     .from("care_jobs")
     .select(
       "id, title, description, city, region, country, care_type, care_context, financiering_regeling, soort_hulp_zorg, zorgniveau, type_inzet, vaardigheden_ervaring, role_sought, experience_requirements, certificates_requirements, schedule, availability, budget_min, budget_max, hourly_rate, status, created_at, image_urls, poster_id"
@@ -46,7 +36,8 @@ export async function GET(req: NextRequest) {
     .eq("status", "open")
     .order("created_at", { ascending: false })
     .limit(100);
-  if (!jobs?.length) {
+  const jobs = await careJobRowsWithExistingPosters(supabase, jobsRaw ?? []);
+  if (!jobs.length) {
     return jsonResponse({ matches: [] });
   }
 

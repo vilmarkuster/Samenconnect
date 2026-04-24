@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getZorentaSupabaseClient, getAccessTokenFromRequest } from "@/lib/zorenta/supabase-server";
 import { jsonResponse } from "@/lib/zorenta/auth";
 import { latestMarketplaceCaregiverIdByProfileId } from "@/lib/zorenta/marketplace-caregiver-id";
+import { careJobRowsWithExistingPosters } from "@/lib/zorenta/care-jobs-poster-filter";
+import { caregiverProfileIdsForSearchQuery } from "@/lib/zorenta/search-caregivers-by-q";
 
 export async function GET(req: NextRequest) {
   const token = getAccessTokenFromRequest(req);
@@ -11,6 +13,7 @@ export async function GET(req: NextRequest) {
   const city = searchParams.get("city") || "";
   const region = searchParams.get("region") || "";
   const careType = searchParams.get("care_type") || "";
+  const qText = (searchParams.get("q") || "").trim();
   const skills = searchParams.get("skills") || "";
   const availability = searchParams.get("availability") || "";
   const minRating = searchParams.get("min_rating");
@@ -22,15 +25,28 @@ export async function GET(req: NextRequest) {
 
   if (type === "jobs") {
     let q = supabase.from("care_jobs").select("*").eq("status", "open").order("created_at", { ascending: false });
-    if (city) q = q.ilike("city", `%${city}%`);
-    if (careType) q = q.ilike("care_type", `%${careType}%`);
+    if (qText) {
+      const safe = qText.replace(/,/g, " ").replace(/%/g, "\\%").replace(/_/g, "\\_");
+      q = q.or(`title.ilike.%${safe}%,city.ilike.%${safe}%,care_type.ilike.%${safe}%`);
+    } else {
+      if (city) q = q.ilike("city", `%${city}%`);
+      if (careType) q = q.ilike("care_type", `%${careType}%`);
+    }
     const { data, error } = await q.limit(50);
     if (error) return jsonResponse({ error: error.message }, 500);
-    return jsonResponse({ jobs: data ?? [] });
+    const rows = await careJobRowsWithExistingPosters(supabase, (data ?? []) as { poster_id: string }[]);
+    return jsonResponse({ jobs: rows });
   }
 
   if (type === "caregivers" || !type) {
     let q = supabase.from("caregiver_profiles").select("*").order("created_at", { ascending: false });
+    if (qText.trim()) {
+      const ids = await caregiverProfileIdsForSearchQuery(supabase, qText);
+      if (ids.length === 0) {
+        return jsonResponse({ caregivers: [] });
+      }
+      q = q.in("profile_id", ids);
+    }
     if (city) q = q.ilike("city", `%${city}%`);
     if (region) q = q.ilike("region", `%${region}%`);
     if (availability) q = q.ilike("availability", `%${availability}%`);
@@ -49,9 +65,16 @@ export async function GET(req: NextRequest) {
       const ct = careType.trim().toLowerCase();
       list = list.filter((c) => {
         const headline = (c.headline ?? "").toLowerCase();
+        const bio = String((c as { bio?: string | null }).bio ?? "").toLowerCase();
         const skillList = (c.skills ?? []) as string[];
-        const hasSkill = skillList.some((s) => String(s).toLowerCase().includes(ct) || ct.includes(String(s).toLowerCase()));
-        return hasSkill || headline.includes(ct);
+        const careTypes = ((c as { care_types?: string[] | null }).care_types ?? []) as string[];
+        const hasSkill = skillList.some(
+          (s) => String(s).toLowerCase().includes(ct) || ct.includes(String(s).toLowerCase())
+        );
+        const hasCareType = careTypes.some(
+          (s) => String(s).toLowerCase().includes(ct) || ct.includes(String(s).toLowerCase())
+        );
+        return hasSkill || hasCareType || headline.includes(ct) || bio.includes(ct);
       });
     }
 
@@ -92,12 +115,15 @@ export async function GET(req: NextRequest) {
     });
     const avgRating: Record<string, number> = {};
     Object.entries(sumCount).forEach(([pid, v]) => { avgRating[pid] = v.count > 0 ? Math.round((v.sum / v.count) * 10) / 10 : 0; });
-    const out = list.slice(0, 50).map((c) => ({
-      ...c,
-      profile: profileMap[c.profile_id] ?? null,
-      average_rating: avgRating[c.profile_id] ?? null,
-      marketplace_caregiver_id: marketplaceByProfile.get(c.profile_id) ?? null,
-    }));
+    const out = list
+      .filter((c) => profileMap[c.profile_id])
+      .slice(0, 50)
+      .map((c) => ({
+        ...c,
+        profile: profileMap[c.profile_id] ?? null,
+        average_rating: avgRating[c.profile_id] ?? null,
+        marketplace_caregiver_id: marketplaceByProfile.get(c.profile_id) ?? null,
+      }));
     return jsonResponse({ caregivers: out });
   }
 

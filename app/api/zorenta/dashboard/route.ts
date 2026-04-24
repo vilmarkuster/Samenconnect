@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireZorentaAuth, jsonResponse } from "@/lib/zorenta/auth";
+import { careJobRowsWithExistingPosters } from "@/lib/zorenta/care-jobs-poster-filter";
 
 export async function GET(req: NextRequest) {
   const auth = await requireZorentaAuth(req);
@@ -7,8 +8,8 @@ export async function GET(req: NextRequest) {
   const { supabase, userId, profile } = auth;
 
   if (profile.role === "caregiver") {
-    const [jobsRes, appsRes, notifRes, convosRes] = await Promise.all([
-      supabase.from("care_jobs").select("id", { count: "exact", head: true }).eq("status", "open"),
+    const [openJobsRowsRes, appsRes, notifRes, convosRes] = await Promise.all([
+      supabase.from("care_jobs").select("poster_id").eq("status", "open").limit(2000),
       supabase.from("job_applications").select("id, status, created_at, job_id").eq("applicant_id", userId).order("created_at", { ascending: false }).limit(5),
       supabase.from("notifications").select("id, type, title, created_at").eq("user_id", userId).is("read_at", null).limit(5),
       supabase.from("conversations").select("id", { count: "exact", head: true }).or(`participant_1.eq.${userId},participant_2.eq.${userId}`),
@@ -19,9 +20,11 @@ export async function GET(req: NextRequest) {
     const jobMap = Object.fromEntries((jobs ?? []).map((j: { id: string; title: string }) => [j.id, j]));
     const recentApplications = apps.map((a: { job_id: string }) => ({ ...a, care_jobs: jobMap[a.job_id] }));
     const { count: appsCount } = await supabase.from("job_applications").select("id", { count: "exact", head: true }).eq("applicant_id", userId);
+    const openJobRows = (openJobsRowsRes.data ?? []) as { poster_id: string }[];
+    const openJobsValid = await careJobRowsWithExistingPosters(supabase, openJobRows);
     return jsonResponse({
       role: "caregiver",
-      openJobsCount: jobsRes.count ?? 0,
+      openJobsCount: openJobsValid.length,
       applicationsCount: appsCount ?? 0,
       recentApplications,
       unreadNotifications: notifRes.data ?? [],

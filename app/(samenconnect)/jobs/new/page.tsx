@@ -32,6 +32,15 @@ import {
 } from "@/lib/zorenta/intake-taxonomy";
 import { cn } from "@/lib/utils";
 import { adminPrefersMainAppSession } from "@/lib/samenconnect/admin-main-app-nav";
+import {
+  BUDGET_TARIEF_PRESETS,
+  activeBudgetPresetIdFromMinMax,
+} from "@/lib/zorenta/job-hourly-budget-presets";
+import { HourlyEuroInput } from "@/components/zorenta/hourly-euro-input";
+import {
+  parseHourlyEuroInputString,
+  validateHourlyMinMaxPair,
+} from "@/lib/zorenta/hourly-euro-ux";
 
 const SELECT_CLASS =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100";
@@ -64,7 +73,7 @@ export default function NewJobPage() {
   const [certificatesRequirements, setCertificatesRequirements] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
-  const [hourlyRate, setHourlyRate] = useState("");
+  const [budgetTariefCustom, setBudgetTariefCustom] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [improvingDescription, setImprovingDescription] = useState(false);
@@ -137,13 +146,10 @@ export default function NewJobPage() {
     const t = title.trim();
     if (!t) return "Titel is verplicht.";
     if (t.length > 200) return "Titel mag maximaal 200 tekens zijn.";
-    const min = budgetMin ? parseFloat(budgetMin) : null;
-    const max = budgetMax ? parseFloat(budgetMax) : null;
-    if (min != null && (Number.isNaN(min) || min < 0)) return "Budget min moet een geldig getal zijn.";
-    if (max != null && (Number.isNaN(max) || max < 0)) return "Budget max moet een geldig getal zijn.";
-    if (min != null && max != null && min > max) return "Budget min mag niet hoger zijn dan max.";
-    const rate = hourlyRate ? parseFloat(hourlyRate) : null;
-    if (rate != null && (Number.isNaN(rate) || rate < 0)) return "Uurtarief moet een geldig getal zijn.";
+    const vmin = parseHourlyEuroInputString(budgetMin);
+    const vmax = parseHourlyEuroInputString(budgetMax);
+    const pair = validateHourlyMinMaxPair(vmin, vmax);
+    if (!pair.ok) return pair.message;
     return null;
   }
 
@@ -263,6 +269,10 @@ export default function NewJobPage() {
       setSaving(false);
       return;
     }
+    const budgetPair = validateHourlyMinMaxPair(
+      parseHourlyEuroInputString(budgetMin),
+      parseHourlyEuroInputString(budgetMax)
+    );
     const res = await fetch("/api/zorenta/jobs", {
       method: "POST",
       headers: zorentaHeaders(token),
@@ -282,9 +292,9 @@ export default function NewJobPage() {
         certificates_requirements: certificatesRequirements.trim() || null,
         schedule: schedule.trim() || null,
         availability: availability.trim() || null,
-        budget_min: budgetMin ? parseFloat(budgetMin) : null,
-        budget_max: budgetMax ? parseFloat(budgetMax) : null,
-        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        budget_min: budgetPair.ok ? budgetPair.min : null,
+        budget_max: budgetPair.ok ? budgetPair.max : null,
+        hourly_rate: null,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -601,53 +611,111 @@ export default function NewJobPage() {
           className={SECTION_CARD}
           contentClassName="space-y-5"
           title="Vergoeding"
-          description="Vul in wat je wilt delen. Alles is optioneel; je kunt het later aanpassen."
+          description="Uurtarief of bandbreedte per uur (optioneel). Zelfde als bij de zorgvraag-intake; later aanpasbaar."
         >
-          <div className="rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 p-4 sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Budget (totaal)</p>
-            <p className="mt-1 text-xs text-slate-500">Totaalbedrag voor de opdracht of afgesproken periode, in euro.</p>
+          <p className="text-xs text-slate-600">
+            Kies een range of stel zelf min en max in (voor een{" "}
+            <span className="font-medium text-slate-800">vast uurtarief</span> vul je hetzelfde bedrag bij min en max).
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {BUDGET_TARIEF_PRESETS.map((preset) => {
+              const active =
+                activeBudgetPresetIdFromMinMax(
+                  budgetMin ? parseFloat(budgetMin) : null,
+                  budgetMax ? parseFloat(budgetMax) : null
+                ) === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    if (active) {
+                      setBudgetMin("");
+                      setBudgetMax("");
+                      setBudgetTariefCustom(false);
+                    } else {
+                      setBudgetMin(String(preset.min));
+                      setBudgetMax(preset.max == null ? "" : String(preset.max));
+                      setBudgetTariefCustom(false);
+                    }
+                  }}
+                  className={cn(
+                    CHIP,
+                    active
+                      ? "border-[#40ADA8] bg-[#40ADA8] text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                const minN = parseHourlyEuroInputString(budgetMin);
+                const maxN = parseHourlyEuroInputString(budgetMax);
+                const presetId = activeBudgetPresetIdFromMinMax(minN, maxN);
+                const eigenActive =
+                  budgetTariefCustom || (presetId === null && (budgetMin.trim() !== "" || budgetMax.trim() !== ""));
+                if (eigenActive && budgetTariefCustom) {
+                  setBudgetMin("");
+                  setBudgetMax("");
+                  setBudgetTariefCustom(false);
+                  return;
+                }
+                setBudgetTariefCustom(true);
+              }}
+              className={cn(
+                CHIP,
+                activeBudgetPresetIdFromMinMax(
+                  parseHourlyEuroInputString(budgetMin),
+                  parseHourlyEuroInputString(budgetMax)
+                ) === null &&
+                  (budgetTariefCustom || budgetMin.trim() !== "" || budgetMax.trim() !== "")
+                  ? "border-[#40ADA8] bg-[#40ADA8] text-white shadow-sm"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              Eigen uurtarief
+            </button>
+          </div>
+          {!(
+            activeBudgetPresetIdFromMinMax(
+              parseHourlyEuroInputString(budgetMin),
+              parseHourlyEuroInputString(budgetMax)
+            ) !== null && !budgetTariefCustom
+          ) ? (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <ZorentaFormField label="Van (€)" hint="Ondergrens">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
+              <ZorentaFormField label="Minimum per uur" hint="Hele euro’s, vanaf €10, stap €5. Optioneel.">
+                <HourlyEuroInput
                   value={budgetMin}
-                  onChange={(e) => setBudgetMin(e.target.value)}
-                  placeholder="0"
-                  className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                  onChange={(v) => {
+                    setBudgetMin(v);
+                    setBudgetTariefCustom(true);
+                  }}
+                  placeholder="Bijv. 25"
+                  inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
                 />
               </ZorentaFormField>
-              <ZorentaFormField label="Tot (€)" hint="Bovengrens">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
+              <ZorentaFormField label="Maximum per uur" hint="Hele euro’s, vanaf €10. Optioneel.">
+                <HourlyEuroInput
                   value={budgetMax}
-                  onChange={(e) => setBudgetMax(e.target.value)}
-                  placeholder="0"
-                  className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                  onChange={(v) => {
+                    setBudgetMax(v);
+                    setBudgetTariefCustom(true);
+                  }}
+                  placeholder="Bijv. 40"
+                  inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
                 />
               </ZorentaFormField>
             </div>
-          </div>
-          <div className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Uurtarief</p>
-            <p className="mt-1 text-xs text-slate-500">Indien je een vast uurtarief hanteert (€ per uur).</p>
-            <div className="mt-4">
-              <ZorentaFormField label="Uurtarief (€)" hint="Laat leeg als je alleen een totaalbudget gebruikt.">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(e.target.value)}
-                  placeholder="Bijv. 28,50"
-                  className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
-                />
-              </ZorentaFormField>
-            </div>
-          </div>
+          ) : (
+            <p className="mt-3 text-xs text-slate-500">
+              Preset geselecteerd. Tik opnieuw op de preset om te wissen, of kies &quot;Eigen uurtarief&quot; om zelf
+              min/max in te vullen.
+            </p>
+          )}
         </ZorentaFormSection>
 
         <ZorentaFormSection

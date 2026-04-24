@@ -1,41 +1,8 @@
-export type CaregiverProfile = {
-  id: string;
-  name: string;
-  role: "ZZP zorgverlener" | "Mantelzorger" | "Vrijwilliger" | "Organisatie";
-  /**
-   * Optional link to a real platform user profile (public.profiles.id).
-   * When present, messaging and full profile flows can use this id.
-   */
-  linkedProfileId?: string | null;
-  avatarUrl?: string | null;
-  provider_type?: string;
-  city: string;
-  rate?: number | null;
-  isVolunteer?: boolean;
-  tags: string[];
-  skills: string[];
-  experienceRange?:
-    | "Starter (0–1 jaar)"
-    | "Ervaren (1–3 jaar)"
-    | "Senior (3–5 jaar)"
-    | "Specialist (5+ jaar)";
-  certifications?:
-    | (
-        | "VOG"
-        | "BHV"
-        | "EHBO"
-        | "Medicatie bevoegd"
-        | "SKJ registratie"
-        | "Zorgdiploma"
-        | "BIG registratie"
-        | "AGB-code"
-        | "KIWA keurmerk"
-        | "HKZ certificering"
-      )[];
-  arrangement: "PGB" | "ZZP" | "Mantelzorg" | "Vrijwillig";
-  bio: string;
-};
+import type { CaregiverProfile } from "@/lib/zorenta/caregiver-profile-ui";
 
+export type { CaregiverProfile } from "@/lib/zorenta/caregiver-profile-ui";
+
+/** @deprecated Demo-only — do not use in production UI. Kept for scripts / agents. */
 export const MOCK_CAREGIVERS: CaregiverProfile[] = [
   {
     id: "cg-1",
@@ -85,12 +52,7 @@ export const MOCK_CAREGIVERS: CaregiverProfile[] = [
     ],
     skills: ["Dementie ervaring", "ADL ondersteuning"],
     experienceRange: "Ervaren (1–3 jaar)",
-    certifications: [
-      "VOG",
-      "Medicatie bevoegd",
-      "SKJ registratie",
-      "HKZ certificering",
-    ],
+    certifications: ["VOG", "Medicatie bevoegd", "SKJ registratie", "HKZ certificering"],
     arrangement: "PGB",
     bio: "Gespecialiseerd in dementie, palliatieve zorg en ondersteuning bij complexe thuissituaties.",
   },
@@ -177,15 +139,8 @@ export const MOCK_CAREGIVERS: CaregiverProfile[] = [
     ],
     skills: ["ADL ondersteuning"],
     experienceRange: "Ervaren (1–3 jaar)",
-    certifications: [
-      "VOG",
-      "Medicatie bevoegd",
-      "BHV",
-      "BIG registratie",
-      "HKZ certificering",
-    ],
+    certifications: ["VOG", "Medicatie bevoegd", "BHV", "BIG registratie", "HKZ certificering"],
     arrangement: "ZZP",
     bio: "Zorgbureau dat samenwerkt met een netwerk van zelfstandige zorgverleners.",
   },
 ];
-

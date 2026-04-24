@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { Search, Briefcase, User, Filter, SlidersHorizontal } from "lucide-react";
 import { JobListingCover } from "@/components/zorenta/job-listing-cover";
+import { HourlyEuroInput } from "@/components/zorenta/hourly-euro-input";
 
 type Caregiver = {
   id: string;
@@ -47,6 +49,7 @@ const RATING_OPTIONS = ["", "1", "2", "3", "4", "5"];
 const RADIUS_OPTIONS = ["5", "10", "25", "50", "100"] as const;
 
 export default function SearchPage() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<"caregivers" | "jobs">("caregivers");
   const [city, setCity] = useState("");
   const [region, setRegion] = useState("");
@@ -68,6 +71,8 @@ export default function SearchPage() {
     const token = await getZorentaAccessToken();
     const params = new URLSearchParams();
     params.set("type", "caregivers");
+    const qUrl = (searchParams.get("q") ?? "").trim();
+    if (qUrl) params.set("q", qUrl);
     if (city.trim()) params.set("city", city.trim());
     if (radius) params.set("radius", radius);
     if (region.trim()) params.set("region", region.trim());
@@ -87,7 +92,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [city, region, careType, skills, availability, minRating, minExperience, maxHourlyRate, radius]);
+  }, [city, region, careType, skills, availability, minRating, minExperience, maxHourlyRate, radius, searchParams]);
 
   const sortedCaregivers = [...caregivers].sort((a, b) => {
     if (caregiverSort === "rating") {
@@ -113,6 +118,8 @@ export default function SearchPage() {
     const token = await getZorentaAccessToken();
     const params = new URLSearchParams();
     params.set("type", "jobs");
+    const qUrl = (searchParams.get("q") ?? "").trim();
+    if (qUrl) params.set("q", qUrl);
     if (city.trim()) params.set("city", city.trim());
     if (radius) params.set("radius", radius);
     if (careType.trim()) params.set("care_type", careType.trim());
@@ -125,7 +132,16 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [city, careType, radius]);
+  }, [city, careType, radius, searchParams]);
+
+  useEffect(() => {
+    const q = (searchParams.get("q") ?? "").trim();
+    if (!q) return;
+    const qLower = q.toLowerCase();
+    const matchedCare = CARE_TYPES.find((t) => t && t.toLowerCase() === qLower);
+    if (matchedCare) setCareType(matchedCare);
+    /* Free-text q stays in the URL only — do not force it into the city field (breaks name search). */
+  }, [searchParams]);
 
   const handleSearch = () => {
     if (tab === "caregivers") searchCaregivers();
@@ -135,7 +151,15 @@ export default function SearchPage() {
   const hasSearchedCaregivers =
     caregivers.length > 0 ||
     (tab === "caregivers" &&
-      (city || region || careType || skills || availability || minRating || minExperience || maxHourlyRate));
+      (city ||
+        region ||
+        careType ||
+        skills ||
+        availability ||
+        minRating ||
+        minExperience ||
+        maxHourlyRate ||
+        (searchParams.get("q") ?? "").trim()));
   const hasSearchedJobs =
     jobs.length > 0 || (tab === "jobs" && (city || careType || radius));
   const emptyCaregivers = tab === "caregivers" && !loading && hasSearchedCaregivers && caregivers.length === 0;
@@ -286,16 +310,13 @@ export default function SearchPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Max. uurtarief (€)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="bijv. 35"
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Max. uurtarief</label>
+                  <HourlyEuroInput
                     value={maxHourlyRate}
-                    onChange={(e) => setMaxHourlyRate(e.target.value)}
+                    onChange={setMaxHourlyRate}
+                    placeholder="Bijv. 35"
+                    inputClassName="rounded-lg border-slate-200 bg-white"
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="rounded-lg border-slate-200 bg-white"
                   />
                 </div>
               </CardContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MOCK_CAREGIVERS } from "@/lib/zorenta/mock-caregivers";
+import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { formatLocation } from "@/lib/zorenta/formatters";
 import { searchNlLocations } from "@/lib/locations/search-client";
 
@@ -15,7 +15,6 @@ const CARE_TYPES = [
 
 type CaregiverSuggestion = { id: string; name: string };
 type CareTypeSuggestion = (typeof CARE_TYPES)[number];
-type OrganisationSuggestion = { id: string; name: string };
 
 function toLowerSafe(s: string) {
   return s.toLowerCase();
@@ -37,7 +36,7 @@ type Props = {
   onValueChange: (value: string) => void;
   onSubmit: (value: string) => void;
   onSelectLocation: (location: string) => void;
-  onSelectCaregiver: (caregiverId: string) => void;
+  onSelectCaregiver: (caregiverProfileId: string) => void;
   onSelectCareType: (careType: string) => void;
 };
 
@@ -54,8 +53,12 @@ export function GlobalSearchAutocomplete({
   const [open, setOpen] = useState(false);
   const [locationLabels, setLocationLabels] = useState<string[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [caregiverSuggestions, setCaregiverSuggestions] = useState<CaregiverSuggestion[]>([]);
+  const [caregiverLoading, setCaregiverLoading] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  const debounceCgRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const abortCgRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setDraft(value);
@@ -96,6 +99,59 @@ export function GlobalSearchAutocomplete({
     };
   }, [draft]);
 
+  useEffect(() => {
+    const q = draft.trim();
+    if (debounceCgRef.current != null) window.clearTimeout(debounceCgRef.current);
+    if (abortCgRef.current) abortCgRef.current.abort();
+
+    if (q.length < 2) {
+      setCaregiverSuggestions([]);
+      setCaregiverLoading(false);
+      return;
+    }
+
+    setCaregiverLoading(true);
+    debounceCgRef.current = window.setTimeout(() => {
+      abortCgRef.current = new AbortController();
+      const ac = abortCgRef.current;
+      void (async () => {
+        try {
+          const token = await getZorentaAccessToken();
+          const params = new URLSearchParams({ type: "caregivers", q });
+          const res = await fetch(`/api/zorenta/search?${params}`, {
+            headers: zorentaHeaders(token),
+            signal: ac.signal,
+          });
+          const d = await res.json().catch(() => ({}));
+          if (ac.signal.aborted) return;
+          const list: {
+            profile_id?: string;
+            headline?: string | null;
+            profile?: { display_name?: string | null };
+          }[] = Array.isArray(d.caregivers) ? d.caregivers : [];
+          const mapped: CaregiverSuggestion[] = list.slice(0, 8).map((c) => {
+            const pid = String(c.profile_id ?? "").trim();
+            const name =
+              (typeof c.profile?.display_name === "string" && c.profile.display_name.trim()) ||
+              (typeof c.headline === "string" && c.headline.trim()) ||
+              "Zorgverlener";
+            return { id: pid, name };
+          });
+          setCaregiverSuggestions(mapped.filter((x) => x.id.length > 0));
+        } catch {
+          if (!ac.signal.aborted) setCaregiverSuggestions([]);
+        } finally {
+          if (!ac.signal.aborted) setCaregiverLoading(false);
+        }
+      })();
+    }, 280);
+
+    return () => {
+      if (debounceCgRef.current != null) window.clearTimeout(debounceCgRef.current);
+      if (abortCgRef.current) abortCgRef.current.abort();
+    };
+  }, [draft]);
+
   const groupedSuggestions = useMemo(() => {
     const q = draft.trim().toLowerCase();
     if (!q) {
@@ -103,7 +159,6 @@ export function GlobalSearchAutocomplete({
         locations: [] as string[],
         careTypes: [] as CareTypeSuggestion[],
         caregivers: [] as CaregiverSuggestion[],
-        organisations: [] as OrganisationSuggestion[],
       };
     }
 
@@ -112,47 +167,18 @@ export function GlobalSearchAutocomplete({
       q
     ) as CareTypeSuggestion[];
 
-    const caregiversAll = MOCK_CAREGIVERS.filter(
-      (c) => c.role !== "Organisatie"
-    ).map((c) => ({ id: c.id, name: c.name }));
-
-    const caregiversStarts = caregiversAll.filter((c) =>
-      toLowerSafe(c.name).startsWith(q)
-    );
-    const caregiversIncludes = caregiversAll.filter(
-      (c) =>
-        !caregiversStarts.some((s) => s.id === c.id) &&
-        toLowerSafe(c.name).includes(q)
-    );
-    const caregivers = [...caregiversStarts, ...caregiversIncludes].slice(0, 8);
-
-    const organisationsAll = MOCK_CAREGIVERS.filter(
-      (c) => c.role === "Organisatie"
-    ).map((c) => ({ id: c.id, name: c.name }));
-
-    const orgStarts = organisationsAll.filter((o) =>
-      toLowerSafe(o.name).startsWith(q)
-    );
-    const orgIncludes = organisationsAll.filter(
-      (o) =>
-        !orgStarts.some((s) => s.id === o.id) &&
-        toLowerSafe(o.name).includes(q)
-    );
-    const organisations = [...orgStarts, ...orgIncludes].slice(0, 8);
-
-    return { locations: locationLabels, careTypes, caregivers, organisations };
-  }, [draft, locationLabels]);
+    return { locations: locationLabels, careTypes, caregivers: caregiverSuggestions };
+  }, [draft, locationLabels, caregiverSuggestions]);
 
   useEffect(() => {
     const q = draft.trim();
     const hasLocations = q.length >= 2 && (locationLabels.length > 0 || locationLoading);
+    const hasCaregiverHits = q.length >= 2 && (caregiverSuggestions.length > 0 || caregiverLoading);
     const hasShortQueryHits =
       q.length > 0 &&
-      (groupedSuggestions.careTypes.length > 0 ||
-        groupedSuggestions.caregivers.length > 0 ||
-        groupedSuggestions.organisations.length > 0);
-    setOpen(Boolean(q && (hasLocations || hasShortQueryHits)));
-  }, [draft, groupedSuggestions, locationLabels.length, locationLoading]);
+      (groupedSuggestions.careTypes.length > 0 || groupedSuggestions.caregivers.length > 0);
+    setOpen(Boolean(q && (hasLocations || hasCaregiverHits || hasShortQueryHits)));
+  }, [draft, groupedSuggestions, locationLabels.length, locationLoading, caregiverSuggestions.length, caregiverLoading]);
 
   return (
     <div className="relative mx-auto w-full max-w-2xl">
@@ -203,12 +229,15 @@ export function GlobalSearchAutocomplete({
             {draft.trim().length >= 2 && locationLoading && (
               <div className="px-3 py-1.5 text-xs text-slate-500">Locaties zoeken…</div>
             )}
+            {draft.trim().length >= 2 && caregiverLoading && (
+              <div className="px-3 py-1.5 text-xs text-slate-500">Zorgverleners zoeken…</div>
+            )}
             {draft.trim().length >= 2 &&
               !locationLoading &&
+              !caregiverLoading &&
               groupedSuggestions.locations.length === 0 &&
               groupedSuggestions.careTypes.length === 0 &&
-              groupedSuggestions.caregivers.length === 0 &&
-              groupedSuggestions.organisations.length === 0 && (
+              groupedSuggestions.caregivers.length === 0 && (
                 <div className="px-3 py-1.5 text-xs text-slate-500">Geen suggesties</div>
               )}
 
@@ -278,30 +307,6 @@ export function GlobalSearchAutocomplete({
                       }}
                     >
                       <span>{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {groupedSuggestions.organisations.length > 0 && (
-              <div className="px-3 py-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Organisaties
-                </p>
-                <div className="mt-1 space-y-0.5">
-                  {groupedSuggestions.organisations.map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      className="flex w-full items-center justify-between px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        onSelectCaregiver(o.id);
-                        setOpen(false);
-                      }}
-                    >
-                      <span>{o.name}</span>
                     </button>
                   ))}
                 </div>

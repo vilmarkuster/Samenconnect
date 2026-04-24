@@ -29,6 +29,12 @@ import {
   VAARDIGHEDEN_ERVARING_OPTIONS,
 } from "@/lib/zorenta/intake-taxonomy";
 import { cn } from "@/lib/utils";
+import { HourlyEuroInput } from "@/components/zorenta/hourly-euro-input";
+import {
+  normalizeHourlyEuroFromDb,
+  parseHourlyEuroInputString,
+  validateHourlyMinMaxPair,
+} from "@/lib/zorenta/hourly-euro-ux";
 
 const SELECT_CLASS =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100";
@@ -122,9 +128,21 @@ export default function JobEditPage() {
             setCertificatesRequirements(d.certificates_requirements ?? "");
             setSchedule(d.schedule ?? "");
             setAvailability(d.availability ?? "");
-            setBudgetMin(d.budget_min != null ? String(d.budget_min) : "");
-            setBudgetMax(d.budget_max != null ? String(d.budget_max) : "");
-            setHourlyRate(d.hourly_rate != null ? String(d.hourly_rate) : "");
+            setBudgetMin(
+              d.budget_min != null && typeof d.budget_min === "number"
+                ? String(normalizeHourlyEuroFromDb(d.budget_min) ?? "")
+                : ""
+            );
+            setBudgetMax(
+              d.budget_max != null && typeof d.budget_max === "number"
+                ? String(normalizeHourlyEuroFromDb(d.budget_max) ?? "")
+                : ""
+            );
+            setHourlyRate(
+              d.hourly_rate != null && typeof d.hourly_rate === "number"
+                ? String(normalizeHourlyEuroFromDb(d.hourly_rate) ?? "")
+                : ""
+            );
             setStatus(d.status ?? "open");
             setImageUrls(normalizeJobImageUrls(d.image_urls));
           }
@@ -185,9 +203,26 @@ export default function JobEditPage() {
         certificates_requirements: certificatesRequirements.trim() || null,
         schedule: schedule.trim() || null,
         availability: availability.trim() || null,
-        budget_min: budgetMin ? parseFloat(budgetMin) : null,
-        budget_max: budgetMax ? parseFloat(budgetMax) : null,
-        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        budget_min: (() => {
+          const v = validateHourlyMinMaxPair(
+            parseHourlyEuroInputString(budgetMin),
+            parseHourlyEuroInputString(budgetMax)
+          );
+          return v.ok ? v.min : null;
+        })(),
+        budget_max: (() => {
+          const v = validateHourlyMinMaxPair(
+            parseHourlyEuroInputString(budgetMin),
+            parseHourlyEuroInputString(budgetMax)
+          );
+          return v.ok ? v.max : null;
+        })(),
+        hourly_rate: (() => {
+          const r = parseHourlyEuroInputString(hourlyRate);
+          if (r == null) return null;
+          const v = validateHourlyMinMaxPair(r, r);
+          return v.ok ? v.min : null;
+        })(),
         status,
       }),
     });
@@ -493,38 +528,31 @@ export default function JobEditPage() {
           </div>
         </ZorentaFormSection>
 
-        <ZorentaFormSection title="Vergoeding" description="Budget, uurtarief en status">
+        <ZorentaFormSection title="Vergoeding" description="Uurtarief in hele euro’s (stap €5, min. €10) en status">
           <div className="grid grid-cols-2 gap-4">
-            <ZorentaFormField label="Budget min (€)">
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
+            <ZorentaFormField label="Minimum per uur" hint="Optioneel">
+              <HourlyEuroInput
                 value={budgetMin}
-                onChange={(e) => setBudgetMin(e.target.value)}
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                onChange={setBudgetMin}
+                placeholder="Bijv. 25"
+                inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
               />
             </ZorentaFormField>
-            <ZorentaFormField label="Budget max (€)">
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
+            <ZorentaFormField label="Maximum per uur" hint="Optioneel">
+              <HourlyEuroInput
                 value={budgetMax}
-                onChange={(e) => setBudgetMax(e.target.value)}
-                className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+                onChange={setBudgetMax}
+                placeholder="Bijv. 40"
+                inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
               />
             </ZorentaFormField>
           </div>
-          <ZorentaFormField label="Uurtarief (€)" hint="Optioneel">
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
+          <ZorentaFormField label="Vast uurtarief (alternatief)" hint="Optioneel; leeg laten als je min/max gebruikt.">
+            <HourlyEuroInput
               value={hourlyRate}
-              onChange={(e) => setHourlyRate(e.target.value)}
-              placeholder="bijv. 25"
-              className="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
+              onChange={setHourlyRate}
+              placeholder="Bijv. 35"
+              inputClassName="rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-100"
             />
           </ZorentaFormField>
           <ZorentaFormField label="Status">

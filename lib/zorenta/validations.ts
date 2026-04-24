@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HOURLY_EURO_MIN } from "@/lib/zorenta/hourly-euro-ux";
 
 const imageUrlsField = z
   .array(z.string().max(2048))
@@ -30,12 +31,24 @@ export const createJobSchema = z.object({
   role_sought: z.string().max(100).optional().nullable(),
   experience_requirements: z.string().max(2000).optional().nullable(),
   certificates_requirements: z.string().max(2000).optional().nullable(),
-  budget_min: z.number().min(0).optional().nullable(),
-  budget_max: z.number().min(0).optional().nullable(),
-  hourly_rate: z.number().min(0).optional().nullable(),
+  budget_min: z.number().int().min(HOURLY_EURO_MIN).max(500).optional().nullable(),
+  budget_max: z.number().int().min(HOURLY_EURO_MIN).max(500).optional().nullable(),
+  hourly_rate: z.number().int().min(HOURLY_EURO_MIN).max(500).optional().nullable(),
   schedule: z.string().max(500).optional().nullable(),
   availability: z.string().max(200).optional().nullable(),
   image_urls: imageUrlsField,
+}).superRefine((val, ctx) => {
+  if (
+    val.budget_min != null &&
+    val.budget_max != null &&
+    val.budget_min > val.budget_max
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "budget_min mag niet hoger zijn dan budget_max.",
+      path: ["budget_min"],
+    });
+  }
 });
 
 export const applyToJobSchema = z.object({
