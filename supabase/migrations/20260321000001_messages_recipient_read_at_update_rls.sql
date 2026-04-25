@@ -2,6 +2,7 @@
 -- INSERT policy only allows sender_id = auth.uid(); there was no UPDATE policy, so
 -- mark-as-read from the API was blocked by RLS.
 
+drop policy if exists "Recipients can update read_at on incoming messages" on public.messages;
 create policy "Recipients can update read_at on incoming messages"
   on public.messages for update
   using (

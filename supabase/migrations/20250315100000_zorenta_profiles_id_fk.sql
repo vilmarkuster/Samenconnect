@@ -1,15 +1,8 @@
--- Zorenta: fix profiles schema so id is PK and FK to auth.users(id)
--- Run this in Supabase SQL Editor if you already ran the first migration.
--- Drops and recreates profiles + role-specific profile tables.
-
--- Drop dependent tables first (they FK to profiles)
-drop table if exists public.caregiver_profiles;
-drop table if exists public.client_profiles;
-drop table if exists public.organization_profiles;
-drop table if exists public.profiles;
+-- Zorenta: ensure profiles schema (id = PK and FK to auth.users(id))
+-- Idempotent for existing databases: never drop tables that may have dependents.
 
 -- Profiles: id = auth user id (PK and FK to auth.users)
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   role text not null check (role in ('caregiver', 'client', 'organization', 'admin')),
@@ -21,7 +14,7 @@ create table public.profiles (
 create index if not exists idx_profiles_role on public.profiles(role);
 
 -- Caregiver profiles
-create table public.caregiver_profiles (
+create table if not exists public.caregiver_profiles (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null unique references public.profiles(id) on delete cascade,
   headline text,
@@ -38,11 +31,11 @@ create table public.caregiver_profiles (
   updated_at timestamptz not null default now()
 );
 
-create index idx_caregiver_profiles_profile_id on public.caregiver_profiles(profile_id);
-create index idx_caregiver_profiles_city on public.caregiver_profiles(city);
+create index if not exists idx_caregiver_profiles_profile_id on public.caregiver_profiles(profile_id);
+create index if not exists idx_caregiver_profiles_city on public.caregiver_profiles(city);
 
 -- Client profiles
-create table public.client_profiles (
+create table if not exists public.client_profiles (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null unique references public.profiles(id) on delete cascade,
   care_needs text,
@@ -56,10 +49,10 @@ create table public.client_profiles (
   updated_at timestamptz not null default now()
 );
 
-create index idx_client_profiles_profile_id on public.client_profiles(profile_id);
+create index if not exists idx_client_profiles_profile_id on public.client_profiles(profile_id);
 
 -- Organization profiles
-create table public.organization_profiles (
+create table if not exists public.organization_profiles (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null unique references public.profiles(id) on delete cascade,
   name text not null,
@@ -74,7 +67,7 @@ create table public.organization_profiles (
   updated_at timestamptz not null default now()
 );
 
-create index idx_organization_profiles_profile_id on public.organization_profiles(profile_id);
+create index if not exists idx_organization_profiles_profile_id on public.organization_profiles(profile_id);
 
 -- RLS
 alter table public.profiles enable row level security;
@@ -82,47 +75,5 @@ alter table public.caregiver_profiles enable row level security;
 alter table public.client_profiles enable row level security;
 alter table public.organization_profiles enable row level security;
 
-create policy "Users can read own profile"
-  on public.profiles for select using (id = auth.uid());
-
-create policy "Users can update own profile"
-  on public.profiles for update using (id = auth.uid());
-
-create policy "Users can insert own profile"
-  on public.profiles for insert with check (id = auth.uid());
-
-create policy "Users can read own caregiver profile"
-  on public.caregiver_profiles for select
-  using (profile_id = auth.uid());
-
-create policy "Users can insert own caregiver profile"
-  on public.caregiver_profiles for insert
-  with check (profile_id = auth.uid());
-
-create policy "Users can update own caregiver profile"
-  on public.caregiver_profiles for update
-  using (profile_id = auth.uid());
-
-create policy "Users can read own client profile"
-  on public.client_profiles for select
-  using (profile_id = auth.uid());
-
-create policy "Users can insert own client profile"
-  on public.client_profiles for insert
-  with check (profile_id = auth.uid());
-
-create policy "Users can update own client profile"
-  on public.client_profiles for update
-  using (profile_id = auth.uid());
-
-create policy "Users can read own organization profile"
-  on public.organization_profiles for select
-  using (profile_id = auth.uid());
-
-create policy "Users can insert own organization profile"
-  on public.organization_profiles for insert
-  with check (profile_id = auth.uid());
-
-create policy "Users can update own organization profile"
-  on public.organization_profiles for update
-  using (profile_id = auth.uid());
+-- RLS policies are created in 20250315000000_zorenta_phase1.sql. Do not repeat CREATE POLICY here:
+-- a second create fails on remotes that already applied phase1 ("policy ... already exists").

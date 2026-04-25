@@ -32,6 +32,7 @@ create index if not exists idx_care_jobs_featured_until on public.care_jobs(feat
 create index if not exists idx_caregiver_profiles_featured_until on public.caregiver_profiles(featured_until) where featured_until is not null;
 
 -- Allow admin users to read all profiles (for future admin panel billing visibility)
+drop policy if exists "Admin can read all profiles" on public.profiles;
 create policy "Admin can read all profiles"
   on public.profiles for select
   using (

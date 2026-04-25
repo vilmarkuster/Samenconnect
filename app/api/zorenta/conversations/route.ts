@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const convIds = (convos ?? []).map((c) => c.id);
   let lastMessages: Record<string, { body: string; created_at: string }> = {};
   let unreadCounts: Record<string, number> = {};
+  /** conversation_id -> profile_id -> last_seen_at ISO */
+  const activityByConversation: Record<string, Record<string, string>> = {};
   if (convIds.length > 0) {
     // Latest message per conversation (global desc order). Use a high limit so we are not
     // truncated by PostgREST default max rows when many conversations exist.
@@ -48,6 +50,21 @@ export async function GET(req: NextRequest) {
     (unreadRows ?? []).forEach((m: { id: string; conversation_id: string; sender_id: string | null }) => {
       unreadCounts[m.conversation_id] = (unreadCounts[m.conversation_id] ?? 0) + 1;
     });
+
+    // Last-seen heartbeat per participant in each conversation.
+    const { data: activityRows } = await supabase
+      .from("conversation_participant_activity")
+      .select("conversation_id, profile_id, last_seen_at")
+      .in("conversation_id", convIds);
+    (activityRows ?? []).forEach(
+      (r: { conversation_id: string; profile_id: string; last_seen_at: string | null }) => {
+        if (!r.last_seen_at) return;
+        if (!activityByConversation[r.conversation_id]) {
+          activityByConversation[r.conversation_id] = {};
+        }
+        activityByConversation[r.conversation_id][r.profile_id] = r.last_seen_at;
+      }
+    );
   }
   const appIds = [...new Set((convos ?? []).map((c) => c.application_id).filter(Boolean))] as string[];
   let applicationMap: Record<string, { id: string; status: string; job_id: string }> = {};
@@ -130,6 +147,10 @@ export async function GET(req: NextRequest) {
 
   const list = (convos ?? []).map((c) => ({
     ...c,
+    other_last_seen_in_conversation: (() => {
+      const oid = c.participant_1 === userId ? c.participant_2 : c.participant_1;
+      return activityByConversation[c.id]?.[oid] ?? null;
+    })(),
     other: (() => {
       const oid = c.participant_1 === userId ? c.participant_2 : c.participant_1;
       const p = profileMap[oid];

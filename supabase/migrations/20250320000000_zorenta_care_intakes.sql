@@ -25,6 +25,7 @@ create index if not exists idx_care_intakes_status on public.care_intakes(status
 
 alter table public.care_intakes enable row level security;
 
+drop policy if exists "Users can manage own intakes" on public.care_intakes;
 create policy "Users can manage own intakes"
   on public.care_intakes for all
   using (user_id = auth.uid())

@@ -17,6 +17,7 @@ import {
   isNormalizedCaregiverProfilePayload,
 } from "@/lib/zorenta/normalize-caregiver-profile-display";
 import { cn } from "@/lib/utils";
+import { formatOrganizationOrgTypeLabel } from "@/lib/zorenta/organization-org-type-label";
 
 type PageProps = {
   params: { id: string };
@@ -69,6 +70,20 @@ function initials(name: string) {
 
 function isOrganisation(cg: ResolvedCaregiver) {
   return cg.role === "Organisatie";
+}
+
+function uniqueLabels(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const label = String(raw ?? "").trim();
+    if (!label) continue;
+    const normalized = label.toLocaleLowerCase("nl-NL");
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(label);
+  }
+  return out;
 }
 
 function CaregiverProfilePageContent({ params }: PageProps) {
@@ -176,6 +191,12 @@ function CaregiverProfilePageContent({ params }: PageProps) {
   }, [params.id]);
 
   const caregiver = useMemo(() => resolved?.caregiver ?? null, [resolved]);
+  const displayTags = useMemo(() => uniqueLabels(caregiver?.tags ?? []), [caregiver?.tags]);
+  const displaySkills = useMemo(() => uniqueLabels(caregiver?.skills ?? []), [caregiver?.skills]);
+  const displayCertifications = useMemo(
+    () => uniqueLabels(caregiver?.certifications ?? []),
+    [caregiver?.certifications]
+  );
 
   const messageTargetProfileId = useMemo(() => {
     if (!resolved?.caregiver) return null;
@@ -414,7 +435,7 @@ function CaregiverProfilePageContent({ params }: PageProps) {
                       : "Zorgtypes & diensten"}
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
-                    {caregiver.tags.map((tag) => (
+                    {displayTags.map((tag) => (
                       <span
                         key={tag}
                         className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-700"
@@ -433,7 +454,7 @@ function CaregiverProfilePageContent({ params }: PageProps) {
                       : "Vaardigheden & ervaring"}
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
-                    {caregiver.skills.map((skill) => (
+                    {displaySkills.map((skill) => (
                       <span
                         key={skill}
                         className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-700"
@@ -513,7 +534,7 @@ function CaregiverProfilePageContent({ params }: PageProps) {
                     resolved.organization.org_type.trim() !== "" && (
                       <p>
                         <span className="font-medium">Type aanbieder: </span>
-                        {String(resolved.organization.org_type)}
+                        {formatOrganizationOrgTypeLabel(resolved.organization.org_type)}
                       </p>
                     )}
                   {!isLinkedOrg && !isOrganisation(caregiver) && (
@@ -551,15 +572,15 @@ function CaregiverProfilePageContent({ params }: PageProps) {
                       {isLinkedOrg || isOrganisation(caregiver) ? "Aanbod: " : "Vaardigheden: "}
                     </span>
                     {(isLinkedOrg || isOrganisation(caregiver)
-                      ? caregiver.tags.slice(0, 3)
-                      : caregiver.skills.slice(0, 3)
+                      ? displayTags.slice(0, 3)
+                      : displaySkills.slice(0, 3)
                     ).join(", ") || "Zorg en begeleiding"}
                     .
                   </p>
                   <p>
                     <span className="font-medium">Certificaten: </span>
-                    {caregiver.certifications.length
-                      ? caregiver.certifications.slice(0, 5).join(", ")
+                    {displayCertifications.length
+                      ? displayCertifications.slice(0, 5).join(", ")
                       : "Informatie niet beschikbaar."}
                   </p>
                   <p>

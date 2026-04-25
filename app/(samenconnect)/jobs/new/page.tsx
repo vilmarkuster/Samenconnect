@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Camera, CheckCircle2, X } from "lucide-react";
+import { Camera, CheckCircle2, Sparkles, X } from "lucide-react";
 import { getZorentaAccessToken, zorentaHeaders } from "@/lib/zorenta/client";
 import { trackZorentaEvent } from "@/lib/zorenta/analytics";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,7 @@ export default function NewJobPage() {
   const [error, setError] = useState<string | null>(null);
   const [improvingDescription, setImprovingDescription] = useState(false);
   const [improveDescriptionError, setImproveDescriptionError] = useState<string | null>(null);
+  const [descriptionSuggestion, setDescriptionSuggestion] = useState<string | null>(null);
   const [roleCheckDone, setRoleCheckDone] = useState(false);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
@@ -233,20 +234,13 @@ export default function NewJobPage() {
         return;
       }
 
-      const nextTitle = typeof data?.title === "string" ? data.title.trim() : "";
       const nextDescription = typeof data?.description === "string" ? data.description.trim() : "";
-      const nextExperience = typeof data?.experience === "string" ? data.experience.trim() : "";
-      const nextRequirements =
-        typeof data?.requirements === "string" ? data.requirements.trim() : "";
-      if (!nextTitle && !nextDescription && !nextExperience && !nextRequirements) {
+      if (!nextDescription) {
         setImproveDescriptionError("Geen verbeterde tekst ontvangen.");
         return;
       }
 
-      if (nextTitle) setTitle(nextTitle);
-      if (nextDescription) setDescription(nextDescription);
-      if (nextExperience) setExperienceRequirements(nextExperience);
-      if (nextRequirements) setCertificatesRequirements(nextRequirements);
+      setDescriptionSuggestion(nextDescription);
     } catch {
       setImproveDescriptionError("Verbeteren is niet gelukt. Probeer het opnieuw.");
     } finally {
@@ -377,6 +371,7 @@ export default function NewJobPage() {
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
+                  setDescriptionSuggestion(null);
                   if (improveDescriptionError) setImproveDescriptionError(null);
                 }}
                 rows={5}
@@ -395,7 +390,7 @@ export default function NewJobPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="primary"
                   size="sm"
                   onClick={() => void handleImproveDescription()}
                   disabled={
@@ -406,14 +401,49 @@ export default function NewJobPage() {
                       !experienceRequirements.trim() &&
                       !certificatesRequirements.trim())
                   }
-                  className="border-slate-200 text-xs"
+                  className="gap-1.5 bg-[#40ada8] text-xs font-semibold text-white shadow-sm hover:bg-[#369e9a]"
                 >
-                  {improvingDescription ? "Bezig met verbeteren..." : "Verbeter beschrijving"}
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {improvingDescription ? "Bezig met verbeteren..." : "✨ Verbeter met AI"}
                 </Button>
                 <p className="text-[11px] text-slate-500">
                   AI herschrijft alleen je tekst duidelijker en vult niets aan dat je niet noemde.
                 </p>
               </div>
+              {descriptionSuggestion ? (
+                <div className="space-y-3 rounded-xl border border-[#40ada8]/25 bg-[#40ada8]/5 p-3">
+                  <p className="text-xs font-semibold text-slate-800">Voorstel van AI (preview)</p>
+                  <Textarea
+                    value={descriptionSuggestion}
+                    onChange={(e) => setDescriptionSuggestion(e.target.value)}
+                    rows={6}
+                    className="resize-y rounded-lg border-slate-200 bg-white focus:border-[#40ada8] focus:ring-[#40ada8]/20"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-[#40ada8] text-white hover:bg-[#369e9a]"
+                      onClick={() => {
+                        if (!descriptionSuggestion) return;
+                        setDescription(descriptionSuggestion.trim());
+                        setDescriptionSuggestion(null);
+                      }}
+                    >
+                      Gebruik deze tekst
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-200"
+                      onClick={() => setDescriptionSuggestion(null)}
+                    >
+                      Annuleren
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {improveDescriptionError ? (
                 <p className="text-xs text-red-600" role="status">
                   {improveDescriptionError}
@@ -548,7 +578,15 @@ export default function NewJobPage() {
         >
           <div className="grid gap-4 sm:grid-cols-3">
             <ZorentaFormField label="Stad" hint="Begin met typen voor suggesties.">
-              <CityAutocomplete value={city} onChange={setCity} placeholder="Bijv. Amsterdam" />
+              <CityAutocomplete
+                value={city}
+                onChange={setCity}
+                onLocationPick={(h) => {
+                  if (h.province?.trim()) setRegion(h.province.trim());
+                }}
+                onProvinceGuess={(p) => setRegion(p)}
+                placeholder="Bijv. Amsterdam"
+              />
             </ZorentaFormField>
             <ZorentaFormField label="Provincie">
               <select value={region} onChange={(e) => setRegion(e.target.value)} className={SELECT_CLASS}>

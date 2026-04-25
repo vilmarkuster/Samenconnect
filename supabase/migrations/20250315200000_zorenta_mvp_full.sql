@@ -64,6 +64,71 @@ create table if not exists public.conversations (
   constraint conv_ordered check (participant_1 < participant_2)
 );
 
+-- Merge duplicate (participant_1, participant_2) rows before unique index (idempotent).
+-- Canonical: oldest created_at, then smallest id. Repoint messages; merge participant activity; delete dup rows only.
+do $merge_conversations$
+declare
+  p1 uuid;
+  p2 uuid;
+  keep_id uuid;
+  rid uuid;
+begin
+  if to_regclass('public.conversations') is null then
+    return;
+  end if;
+
+  loop
+    select c.participant_1, c.participant_2
+    into p1, p2
+    from public.conversations c
+    group by c.participant_1, c.participant_2
+    having count(*) > 1
+    limit 1;
+
+    exit when not found;
+
+    select c.id
+    into keep_id
+    from public.conversations c
+    where c.participant_1 = p1
+      and c.participant_2 = p2
+    order by c.created_at asc nulls first, c.id asc
+    limit 1;
+
+    for rid in
+      select c.id
+      from public.conversations c
+      where c.participant_1 = p1
+        and c.participant_2 = p2
+        and c.id <> keep_id
+      order by c.created_at asc nulls first, c.id asc
+    loop
+      if to_regclass('public.messages') is not null then
+        update public.messages m
+        set conversation_id = keep_id
+        where m.conversation_id = rid;
+      end if;
+
+      if to_regclass('public.conversation_participant_activity') is not null then
+        insert into public.conversation_participant_activity (conversation_id, profile_id, last_seen_at)
+        select keep_id, a.profile_id, a.last_seen_at
+        from public.conversation_participant_activity a
+        where a.conversation_id = rid
+        on conflict (conversation_id, profile_id) do update
+        set last_seen_at = greatest(
+          conversation_participant_activity.last_seen_at,
+          excluded.last_seen_at
+        );
+        delete from public.conversation_participant_activity a
+        where a.conversation_id = rid;
+      end if;
+
+      delete from public.conversations c where c.id = rid;
+    end loop;
+  end loop;
+end
+$merge_conversations$;
+
 create unique index if not exists idx_conversations_pair on public.conversations(participant_1, participant_2);
 create index if not exists idx_conversations_job_id on public.conversations(job_id);
 
@@ -113,10 +178,12 @@ create index if not exists idx_notifications_created_at on public.notifications(
 -- RLS: care_jobs
 alter table public.care_jobs enable row level security;
 
+drop policy if exists "Anyone can read open care_jobs" on public.care_jobs;
 create policy "Anyone can read open care_jobs"
   on public.care_jobs for select
   using (true);
 
+drop policy if exists "Poster can manage own care_jobs" on public.care_jobs;
 create policy "Poster can manage own care_jobs"
   on public.care_jobs for all
   using (poster_id = auth.uid())
@@ -125,24 +192,29 @@ create policy "Poster can manage own care_jobs"
 -- RLS: job_applications
 alter table public.job_applications enable row level security;
 
+drop policy if exists "Applicant can read own applications" on public.job_applications;
 create policy "Applicant can read own applications"
   on public.job_applications for select
   using (applicant_id = auth.uid());
 
+drop policy if exists "Job poster can read applications to their jobs" on public.job_applications;
 create policy "Job poster can read applications to their jobs"
   on public.job_applications for select
   using (exists (
     select 1 from public.care_jobs j where j.id = job_applications.job_id and j.poster_id = auth.uid()
   ));
 
+drop policy if exists "Caregiver can insert own application" on public.job_applications;
 create policy "Caregiver can insert own application"
   on public.job_applications for insert
   with check (applicant_id = auth.uid());
 
+drop policy if exists "Applicant can update own application (withdraw)" on public.job_applications;
 create policy "Applicant can update own application (withdraw)"
   on public.job_applications for update
   using (applicant_id = auth.uid());
 
+drop policy if exists "Job poster can update application status" on public.job_applications;
 create policy "Job poster can update application status"
   on public.job_applications for update
   using (exists (
@@ -152,10 +224,12 @@ create policy "Job poster can update application status"
 -- RLS: conversations
 alter table public.conversations enable row level security;
 
+drop policy if exists "Participants can read conversation" on public.conversations;
 create policy "Participants can read conversation"
   on public.conversations for select
   using (participant_1 = auth.uid() or participant_2 = auth.uid());
 
+drop policy if exists "Participants can insert conversation" on public.conversations;
 create policy "Participants can insert conversation"
   on public.conversations for insert
   with check (participant_1 = auth.uid() or participant_2 = auth.uid());
@@ -163,6 +237,7 @@ create policy "Participants can insert conversation"
 -- RLS: messages
 alter table public.messages enable row level security;
 
+drop policy if exists "Conversation participants can read messages" on public.messages;
 create policy "Conversation participants can read messages"
   on public.messages for select
   using (exists (
@@ -170,6 +245,7 @@ create policy "Conversation participants can read messages"
     where c.id = messages.conversation_id and (c.participant_1 = auth.uid() or c.participant_2 = auth.uid())
   ));
 
+drop policy if exists "Conversation participants can insert messages" on public.messages;
 create policy "Conversation participants can insert messages"
   on public.messages for insert
   with check (
@@ -182,9 +258,11 @@ create policy "Conversation participants can insert messages"
 -- RLS: reviews
 alter table public.reviews enable row level security;
 
+drop policy if exists "Anyone can read reviews" on public.reviews;
 create policy "Anyone can read reviews"
   on public.reviews for select using (true);
 
+drop policy if exists "Reviewer can insert own review" on public.reviews;
 create policy "Reviewer can insert own review"
   on public.reviews for insert
   with check (reviewer_id = auth.uid());
@@ -192,10 +270,12 @@ create policy "Reviewer can insert own review"
 -- RLS: notifications
 alter table public.notifications enable row level security;
 
+drop policy if exists "User can read own notifications" on public.notifications;
 create policy "User can read own notifications"
   on public.notifications for select
   using (user_id = auth.uid());
 
+drop policy if exists "User can update own notifications (mark read)" on public.notifications;
 create policy "User can update own notifications (mark read)"
   on public.notifications for update
   using (user_id = auth.uid());
@@ -214,6 +294,7 @@ begin
 end;
 $$;
 
+drop trigger if exists job_application_notify on public.job_applications;
 create trigger job_application_notify
   after insert on public.job_applications
   for each row execute function public.notify_job_application();
@@ -237,6 +318,7 @@ begin
 end;
 $$;
 
+drop trigger if exists application_status_notify on public.job_applications;
 create trigger application_status_notify
   after update on public.job_applications
   for each row execute function public.notify_application_status();

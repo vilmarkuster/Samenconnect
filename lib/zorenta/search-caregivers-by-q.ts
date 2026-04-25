@@ -32,7 +32,9 @@ async function profileIdsMatchingToken(supabase: SupabaseClient, token: string):
   const { data: cps } = await supabase
     .from("caregiver_profiles")
     .select("profile_id")
-    .or(`headline.ilike.%${safe}%,bio.ilike.%${safe}%,city.ilike.%${safe}%`)
+    .or(
+      `headline.ilike.%${safe}%,bio.ilike.%${safe}%,city.ilike.%${safe}%,skills_search.ilike.%${safe}%,care_types_search.ilike.%${safe}%`
+    )
     .limit(150);
   (cps ?? []).forEach((r) => ids.add(String((r as { profile_id: string }).profile_id)));
   return ids;

@@ -18,6 +18,7 @@ begin
 end;
 $$;
 
+drop trigger if exists message_notify on public.messages;
 create trigger message_notify
   after insert on public.messages
   for each row execute function public.notify_new_message();

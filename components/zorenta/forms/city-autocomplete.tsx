@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { searchNlLocations } from "@/lib/locations/search-client";
 import type { LocationSearchHit } from "@/lib/locations/types";
+import { provinceFromDutchCityName } from "@/lib/zorenta/nl-city-province";
 
 export type CityAutocompleteProps = {
   value: string;
   onChange: (value: string) => void;
+  /** Fires when the user picks a row from the location index (includes province when known). */
+  onLocationPick?: (hit: LocationSearchHit) => void;
+  /** Best-effort province guess from typed city (static map); debounced. Only called when a province is known. */
+  onProvinceGuess?: (province: string) => void;
   placeholder?: string;
   id?: string;
   name?: string;
@@ -25,6 +30,8 @@ function subtitle(hit: LocationSearchHit): string | null {
 export function CityAutocomplete({
   value,
   onChange,
+  onLocationPick,
+  onProvinceGuess,
   placeholder,
   id,
   name,
@@ -42,6 +49,17 @@ export function CityAutocomplete({
   useEffect(() => {
     setQuery(value ?? "");
   }, [value]);
+
+  useEffect(() => {
+    if (!onProvinceGuess) return;
+    const v = (value ?? "").trim();
+    if (v.length < 2) return;
+    const t = window.setTimeout(() => {
+      const p = provinceFromDutchCityName(v);
+      if (p) onProvinceGuess(p);
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [value, onProvinceGuess]);
 
   useEffect(() => {
     const q = query.trim();
@@ -82,10 +100,11 @@ export function CityAutocomplete({
   const hasMatches = suggestions.length > 0;
   const showPanel = open && query.trim().length >= 2;
 
-  function selectValue(next: string) {
+  function selectValue(next: string, hit?: LocationSearchHit) {
     setQuery(next);
     onChange(next);
     setOpen(false);
+    if (hit) onLocationPick?.(hit);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -101,7 +120,7 @@ export function CityAutocomplete({
     } else if (e.key === "Enter") {
       if (open && suggestions[activeIndex]) {
         e.preventDefault();
-        selectValue(suggestions[activeIndex].name);
+        selectValue(suggestions[activeIndex].name, suggestions[activeIndex]);
       }
     } else if (e.key === "Escape") {
       if (open) {
@@ -174,7 +193,7 @@ export function CityAutocomplete({
                       window.clearTimeout(blurTimeoutRef.current);
                       blurTimeoutRef.current = null;
                     }
-                    selectValue(hit.name);
+                    selectValue(hit.name, hit);
                   }}
                   className={`flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50 ${
                     idx === activeIndex ? "bg-slate-50" : ""

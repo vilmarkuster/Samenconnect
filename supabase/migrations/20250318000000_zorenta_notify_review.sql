@@ -15,6 +15,7 @@ begin
 end;
 $$;
 
+drop trigger if exists review_notify on public.reviews;
 create trigger review_notify
   after insert on public.reviews
   for each row execute function public.notify_new_review();

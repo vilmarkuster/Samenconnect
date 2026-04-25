@@ -122,6 +122,7 @@ export default function SearchPage() {
     if (qUrl) params.set("q", qUrl);
     if (city.trim()) params.set("city", city.trim());
     if (radius) params.set("radius", radius);
+    if (region.trim()) params.set("region", region.trim());
     if (careType.trim()) params.set("care_type", careType.trim());
     try {
       const res = await fetch(`/api/zorenta/search?${params}`, {
@@ -132,7 +133,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [city, careType, radius, searchParams]);
+  }, [city, region, careType, radius, searchParams]);
 
   useEffect(() => {
     const q = (searchParams.get("q") ?? "").trim();
@@ -331,6 +332,10 @@ export default function SearchPage() {
               <CityAutocomplete
                 value={city}
                 onChange={setCity}
+                onLocationPick={(h) => {
+                  if (h.province?.trim()) setRegion(h.province.trim());
+                }}
+                onProvinceGuess={(p) => setRegion(p)}
                 placeholder="Plaats (stad)"
               />
             </div>

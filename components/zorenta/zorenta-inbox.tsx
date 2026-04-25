@@ -21,6 +21,7 @@ import {
   shouldShowMessageNotificationForIncoming,
   showIncomingMessageBrowserNotification,
 } from "@/lib/zorenta/browser-notifications";
+import { VerbeterTekstButton } from "@/components/zorenta/verbeter-tekst-button";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** `<768px` — aligned with Tailwind `md` breakpoint. */
@@ -72,6 +73,8 @@ type ApiConversation = {
   application_id?: string | null;
   application?: { id: string; status: string; job_id: string } | null;
   other?: OtherParticipantProfile | null;
+  /** Other participant’s last activity ping in this thread (server). */
+  other_last_seen_in_conversation?: string | null;
   job?: { id: string; title: string } | null;
   unread_count?: number;
   last_message?: { body: string; created_at: string } | null;
@@ -290,20 +293,16 @@ function formatConversationListTime(iso: string | null | undefined) {
   return formatListTime(iso);
 }
 
-/** Client-only relative time (presence “last seen” or conversation activity). */
-function formatRelativeNl(ms: number): string {
-  const sec = Math.floor((Date.now() - ms) / 1000);
-  if (sec < 45) return "zojuist";
-  if (sec < 3600) return `${Math.floor(sec / 60)} min geleden`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)} u geleden`;
-  return new Date(ms).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-function formatIsoRelativeNl(iso: string | undefined): string {
-  if (!iso) return "";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  return formatRelativeNl(t);
+function formatOtherActivityLabel(
+  iso: string | null | undefined
+): string {
+  if (!iso) return "Laatst actief onbekend";
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return "Laatst actief onbekend";
+  const ageMs = Date.now() - ts;
+  if (ageMs < 60_000) return "Zojuist";
+  const minutes = Math.max(1, Math.floor(ageMs / 60_000));
+  return `Laatst actief ${minutes} min geleden`;
 }
 
 /** Supabase presenceState() keys are participant presence keys (UUID strings). */
@@ -575,9 +574,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const threadOtherDisplayNameRef = useRef("Contact");
 
   /** Supabase Presence: other user online in this thread’s presence channel. */
-  const [otherPresenceOnline, setOtherPresenceOnline] = useState(false);
-  /** When we observed the other user leave presence this session (not persisted). */
-  const [otherPresenceLeftAtMs, setOtherPresenceLeftAtMs] = useState<number | null>(null);
+  const [, setOtherPresenceOnline] = useState(false);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const presencePrevOtherOnlineRef = useRef(false);
 
@@ -800,6 +797,10 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       setMessagesError(null);
       void loadConversations(token, { silent: true });
       setLoadingMessages(false);
+      void fetch(`/api/zorenta/conversations/${encodeURIComponent(conversationIdForThisFetch)}/activity`, {
+        method: "PATCH",
+        headers: zorentaHeaders(token),
+      });
 
       // Second pass after the current turn: catches the newest row if the first GET raced a just-sent batch message.
       queueMicrotask(async () => {
@@ -1135,19 +1136,13 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
         if (cancelled) return;
         const state = ch.presenceState() as Record<string, unknown>;
         const online = presenceStateHasUser(state, otherId);
-        if (presencePrevOtherOnlineRef.current && !online) {
-          setOtherPresenceLeftAtMs(Date.now());
-        }
         presencePrevOtherOnlineRef.current = online;
         setOtherPresenceOnline(online);
       };
 
       ch.on("presence", { event: "sync" }, applyPresence)
         .on("presence", { event: "join" }, applyPresence)
-        .on("presence", { event: "leave" }, ({ key }) => {
-          if (idsEqual(String(key), otherId)) {
-            setOtherPresenceLeftAtMs(Date.now());
-          }
+        .on("presence", { event: "leave" }, () => {
           applyPresence();
         });
 
@@ -1258,15 +1253,11 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     requestAnimationFrame(() => requestAnimationFrame(run));
   }, [messages, selectedId]);
 
-  const [fakeTypingAfterSend, setFakeTypingAfterSend] = useState(false);
-  useEffect(() => {
-    if (!fakeTypingAfterSend) return;
-    const t = window.setTimeout(() => setFakeTypingAfterSend(false), 2800);
-    return () => window.clearTimeout(t);
-  }, [fakeTypingAfterSend]);
+  /** Auto-clear local typing broadcast after idle (pairs with receiver-side 4s hide). */
+  const typingLocalIdleRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setFakeTypingAfterSend(false);
+    sendTypingStopBroadcast();
     setRemoteTypingName(null);
     if (remoteTypingHideTimeoutRef.current) {
       clearTimeout(remoteTypingHideTimeoutRef.current);
@@ -1274,9 +1265,51 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
     }
     lastTypingBroadcastSentRef.current = 0;
     setOtherPresenceOnline(false);
-    setOtherPresenceLeftAtMs(null);
     presencePrevOtherOnlineRef.current = false;
+    if (typingLocalIdleRef.current != null) {
+      window.clearTimeout(typingLocalIdleRef.current);
+      typingLocalIdleRef.current = null;
+    }
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!composerBody.trim()) {
+      sendTypingStopBroadcast();
+      if (typingLocalIdleRef.current != null) {
+        window.clearTimeout(typingLocalIdleRef.current);
+        typingLocalIdleRef.current = null;
+      }
+      return;
+    }
+    if (typingLocalIdleRef.current != null) window.clearTimeout(typingLocalIdleRef.current);
+    typingLocalIdleRef.current = window.setTimeout(() => {
+      typingLocalIdleRef.current = null;
+      sendTypingStopBroadcast();
+    }, 4500);
+    return () => {
+      if (typingLocalIdleRef.current != null) {
+        window.clearTimeout(typingLocalIdleRef.current);
+        typingLocalIdleRef.current = null;
+      }
+    };
+  }, [composerBody]);
+
+  useEffect(() => {
+    if (!token || !selectedId) return;
+    const authToken = token;
+    const convId = selectedId;
+    function ping() {
+      void fetch(`/api/zorenta/conversations/${encodeURIComponent(convId)}/activity`, {
+        method: "PATCH",
+        headers: zorentaHeaders(authToken),
+      }).then(() => {
+        void loadConversations(authToken, { silent: true });
+      });
+    }
+    ping();
+    const iv = window.setInterval(ping, 60_000);
+    return () => clearInterval(iv);
+  }, [token, selectedId, loadConversations]);
 
   function handleSelectConversation(id: string) {
     tryRequestNotificationPermissionOnUserGesture();
@@ -1410,7 +1443,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
       if (!canOptimistic) {
         setComposerBody("");
       }
-      setFakeTypingAfterSend(true);
       if (recentlySentClearRef.current) {
         window.clearTimeout(recentlySentClearRef.current);
       }
@@ -1445,15 +1477,8 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
   const selectedJobTitle = selectedConvo?.job?.title?.trim() || null;
   const selectedApplicationStatus = applicationStatusLabelNl(selectedConvo?.application?.status);
   const listTime = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at;
-  const convActivityIso = selectedConvo?.last_message?.created_at ?? selectedConvo?.updated_at ?? "";
-
-  const presenceStatusLine = otherPresenceOnline
-    ? { type: "online" as const }
-    : otherPresenceLeftAtMs != null
-      ? { type: "seen", rel: formatRelativeNl(otherPresenceLeftAtMs) }
-      : convActivityIso
-        ? { type: "activity", rel: formatIsoRelativeNl(convActivityIso) }
-        : { type: "offline" as const };
+  const otherSeenIso = selectedConvo?.other_last_seen_in_conversation ?? undefined;
+  const selectedOtherActivityLabel = formatOtherActivityLabel(otherSeenIso);
 
   if (!authChecked) {
     return (
@@ -1588,6 +1613,9 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                   const timeLabel = formatConversationListTime(
                     conv.last_message?.created_at ?? conv.updated_at
                   );
+                  const listActivityLabel = formatOtherActivityLabel(
+                    conv.other_last_seen_in_conversation ?? null
+                  );
                   const hasUnread = unread > 0;
                   const isFlashing = flashConversationIds.includes(conv.id);
                   const avatarTone: ConversationListAvatarTone = isActive
@@ -1713,6 +1741,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         >
                           {secondaryLine}
                         </p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{listActivityLabel}</p>
                       </div>
                       {unread > 0 ? (
                         <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#40ada8] px-1.5 text-[10px] font-semibold text-white shadow-sm">
@@ -1815,22 +1844,7 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         ) : (
                           <p className="text-sm font-semibold text-slate-900">{displayName}</p>
                         )}
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {presenceStatusLine.type === "online" ? (
-                            <span className="font-medium text-emerald-700">Online</span>
-                          ) : presenceStatusLine.type === "seen" ? (
-                            <>
-                              Laatst gezien <span className="text-slate-600">{presenceStatusLine.rel}</span>
-                            </>
-                          ) : presenceStatusLine.type === "activity" ? (
-                            <>
-                              Laatst actief in dit gesprek:{" "}
-                              <span className="text-slate-600">{presenceStatusLine.rel}</span>
-                            </>
-                          ) : (
-                            <span className="text-slate-400">Niet online</span>
-                          )}
-                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">{selectedOtherActivityLabel}</p>
                         {selectedConvo?.application?.id ? (
                           <div className="mt-1.5 space-y-0.5">
                             <p className="text-[11px] leading-tight text-slate-500">
@@ -1997,20 +2011,6 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                   </div>
                 ) : null}
 
-                {!loadingMessages && selectedId && fakeTypingAfterSend ? (
-                  <div
-                    className={cn(
-                      "shrink-0 border-t border-slate-100/80 bg-slate-50/60 px-3 py-2 sm:px-4",
-                      isMobile && mobileView === "chat" && "px-2"
-                    )}
-                  >
-                    <p className="text-xs text-slate-500">
-                      <span className="tracking-wide text-slate-400">...</span>{" "}
-                      <span className="italic">typt</span>
-                    </p>
-                  </div>
-                ) : null}
-
                 <div
                   className={cn(
                     "shrink-0 border-t border-slate-100 bg-white px-3 pb-3 pt-3 sm:px-4",
@@ -2027,6 +2027,13 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                         setComposerBody(e.target.value);
                         scheduleTypingBroadcast();
                       }}
+                      onBlur={() => {
+                        sendTypingStopBroadcast();
+                        if (typingLocalIdleRef.current != null) {
+                          window.clearTimeout(typingLocalIdleRef.current);
+                          typingLocalIdleRef.current = null;
+                        }
+                      }}
                       placeholder="Typ je bericht..."
                       className="min-h-[44px] min-w-0 flex-1 resize-none rounded-2xl border border-slate-200/90 bg-slate-50/40 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#40ada8] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#40ada8]/18 md:px-3.5"
                       onKeyDown={(e) => {
@@ -2035,6 +2042,13 @@ export function ZorentaInbox({ urlConversationId, onUrlConversationChange }: Zor
                           handleSendReply();
                         }
                       }}
+                    />
+                    <VerbeterTekstButton
+                      compact
+                      context="chat"
+                      getText={() => composerBody}
+                      onAccept={(t) => setComposerBody(t)}
+                      className="h-10 shrink-0 border-[#40ada8]/50 px-2.5 text-xs text-[#2d7f7b] hover:bg-[#40ada8]/10"
                     />
                     <Button
                       type="button"

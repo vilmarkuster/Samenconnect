@@ -37,6 +37,8 @@ import { primaryCareLabelFromTaxonomy } from "@/lib/zorenta/intake-taxonomy";
 import { formatJobPrice } from "@/lib/zorenta/job-price";
 import { cn } from "@/lib/utils";
 import { CaregiverApplicationThreadButton } from "@/components/zorenta/caregiver-application-thread-button";
+import { JobReviewPanel } from "@/components/zorenta/job-review-panel";
+import { VerbeterTekstButton } from "@/components/zorenta/verbeter-tekst-button";
 import { buildAiMatchFirstMessage } from "@/lib/zorenta/ai-match-intro-message";
 import { hasRenderablePublicCaregiverPagePayload } from "@/lib/zorenta/public-caregiver-page";
 
@@ -192,7 +194,9 @@ export default function JobDetailPage() {
     id: string;
     message: string | null;
     conversationId: string | null;
+    status?: string;
   } | null>(null);
+  const [acceptedApplicantId, setAcceptedApplicantId] = useState<string | null>(null);
   const [aiMatches, setAiMatches] = useState<CaregiverMatch[]>([]);
   const [aiMatchesLoading, setAiMatchesLoading] = useState(false);
   const [aiMatchesError, setAiMatchesError] = useState<string | null>(null);
@@ -379,6 +383,7 @@ export default function JobDetailPage() {
               id: string;
               message?: string | null;
               conversation_id?: string | null;
+              status?: string;
             }
           | undefined;
         setAlreadyApplied(Boolean(mine));
@@ -389,6 +394,7 @@ export default function JobDetailPage() {
                 message: mine.message ?? null,
                 conversationId:
                   typeof mine.conversation_id === "string" ? mine.conversation_id : null,
+                status: typeof mine.status === "string" ? mine.status : undefined,
               }
             : null
         );
@@ -400,6 +406,33 @@ export default function JobDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!job || job.status !== "filled" || !me?.profile || me.profile.id !== job.poster_id) {
+      setAcceptedApplicantId(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const token = await getZorentaAccessToken();
+      if (!token || cancelled) return;
+      const res = await fetch(`/api/zorenta/applications?job_id=${encodeURIComponent(job.id)}`, {
+        headers: zorentaHeaders(token),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (cancelled) return;
+      const apps = Array.isArray(data.applications) ? data.applications : [];
+      const acc = apps.find((a: { status?: string }) => a.status === "accepted") as
+        | { applicant_id?: string }
+        | undefined;
+      setAcceptedApplicantId(
+        typeof acc?.applicant_id === "string" && acc.applicant_id.trim() ? acc.applicant_id.trim() : null
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, job?.status, job?.poster_id, me?.profile?.id]);
 
   useEffect(() => {
     if (!id || !MATCH_AGENT_ID || !job || !me?.profile) return;
@@ -796,6 +829,16 @@ export default function JobDetailPage() {
   const roleAllows = me?.profile?.role === "caregiver";
   const statusAllows = job.status === "open";
   const canApply = roleAllows && !isPoster && statusAllows && !alreadyApplied;
+  const canReviewPanel =
+    job.status === "filled" &&
+    Boolean(me?.profile) &&
+    (Boolean(isPoster) || (me?.profile?.role === "caregiver" && myApplication?.status === "accepted"));
+  const revieweeForPanel =
+    me?.profile?.id === job.poster_id
+      ? acceptedApplicantId
+      : myApplication?.status === "accepted"
+        ? job.poster_id
+        : null;
   const topCaregiverMatches = caregiverMatches.slice(0, 5);
   const strongCaregiverMatches = topCaregiverMatches.filter((m) => m.score >= 40);
 
@@ -1443,6 +1486,21 @@ export default function JobDetailPage() {
         </section>
       )}
 
+      {canReviewPanel && me?.profile?.id ? (
+        <section id="review-section" className="scroll-mt-24 space-y-3">
+          <ZorentaSectionHeader
+            title="Samenwerking beoordelen"
+            description="Na een afgeronde opdracht kunnen opdrachtgever en zorgverlener elkaar één keer beoordelen."
+          />
+          <JobReviewPanel
+            jobId={job.id}
+            reviewerProfileId={me.profile.id}
+            revieweeId={revieweeForPanel}
+            canReview={canReviewPanel}
+          />
+        </section>
+      ) : null}
+
       {(canApply || applicationSent) && (
         <div id="apply-section" className="scroll-mt-24">
         <Card className="overflow-hidden rounded-2xl border-slate-200/80 shadow-md shadow-slate-200/25 ring-1 ring-slate-200/60">
@@ -1507,17 +1565,29 @@ export default function JobDetailPage() {
                     {applyError}
                   </p>
                 )}
-                <Textarea
-                  ref={applyTextareaRef}
-                  placeholder="Bijv. Hallo, ik ben verpleegkundige met ervaring in ..."
-                  value={applyMessage}
-                  onChange={(e) => {
-                    setApplyMessage(e.target.value);
-                    if (applyError) setApplyError(null);
-                  }}
-                  rows={4}
-                  className="resize-none rounded-xl border-slate-200 text-base focus:border-[#40ADA8] focus:ring-[#40ADA8]/20"
-                />
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <VerbeterTekstButton
+                      context="application"
+                      getText={() => applyMessage}
+                      onAccept={(t) => {
+                        setApplyMessage(t);
+                        if (applyError) setApplyError(null);
+                      }}
+                    />
+                  </div>
+                  <Textarea
+                    ref={applyTextareaRef}
+                    placeholder="Bijv. Hallo, ik ben verpleegkundige met ervaring in ..."
+                    value={applyMessage}
+                    onChange={(e) => {
+                      setApplyMessage(e.target.value);
+                      if (applyError) setApplyError(null);
+                    }}
+                    rows={4}
+                    className="resize-none rounded-xl border-slate-200 text-base focus:border-[#40ADA8] focus:ring-[#40ADA8]/20"
+                  />
+                </div>
                 <Button
                   onClick={handleApply}
                   disabled={applying}

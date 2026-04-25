@@ -76,42 +76,115 @@ alter table public.caregiver_profiles enable row level security;
 alter table public.client_profiles enable row level security;
 alter table public.organization_profiles enable row level security;
 
+-- Drop legacy policies even if catalog name casing differs from quoted identifiers below.
+do $rls$
+declare
+  r record;
+begin
+  for r in
+    select policyname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'profiles'
+      and lower(policyname) in (
+        'users can read own profile',
+        'users can update own profile',
+        'users can insert own profile'
+      )
+  loop
+    execute format('drop policy if exists %I on public.profiles', r.policyname);
+  end loop;
+end
+$rls$;
+
 -- Profiles: id = auth.uid()
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
   on public.profiles for select using (id = auth.uid());
 
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update using (id = auth.uid());
 
+drop policy if exists "Users can insert own profile" on public.profiles;
 create policy "Users can insert own profile"
   on public.profiles for insert with check (id = auth.uid());
 
 -- Caregiver profiles: profile_id = auth.uid()
+drop policy if exists "Users can read own caregiver profile" on public.caregiver_profiles;
 create policy "Users can read own caregiver profile"
   on public.caregiver_profiles for select using (profile_id = auth.uid());
 
+drop policy if exists "Users can insert own caregiver profile" on public.caregiver_profiles;
 create policy "Users can insert own caregiver profile"
   on public.caregiver_profiles for insert with check (profile_id = auth.uid());
 
+drop policy if exists "Users can update own caregiver profile" on public.caregiver_profiles;
 create policy "Users can update own caregiver profile"
   on public.caregiver_profiles for update using (profile_id = auth.uid());
 
+do $rls$
+declare
+  r record;
+begin
+  for r in
+    select policyname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'client_profiles'
+      and lower(policyname) in (
+        'users can read own client profile',
+        'users can insert own client profile',
+        'users can update own client profile'
+      )
+  loop
+    execute format('drop policy if exists %I on public.client_profiles', r.policyname);
+  end loop;
+end
+$rls$;
+
 -- Client profiles
+drop policy if exists "Users can read own client profile" on public.client_profiles;
 create policy "Users can read own client profile"
   on public.client_profiles for select using (profile_id = auth.uid());
 
+drop policy if exists "Users can insert own client profile" on public.client_profiles;
 create policy "Users can insert own client profile"
   on public.client_profiles for insert with check (profile_id = auth.uid());
 
+drop policy if exists "Users can update own client profile" on public.client_profiles;
 create policy "Users can update own client profile"
   on public.client_profiles for update using (profile_id = auth.uid());
 
+do $rls$
+declare
+  r record;
+begin
+  for r in
+    select policyname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'organization_profiles'
+      and lower(policyname) in (
+        'users can read own organization profile',
+        'users can insert own organization profile',
+        'users can update own organization profile'
+      )
+  loop
+    execute format('drop policy if exists %I on public.organization_profiles', r.policyname);
+  end loop;
+end
+$rls$;
+
 -- Organization profiles
+drop policy if exists "Users can read own organization profile" on public.organization_profiles;
 create policy "Users can read own organization profile"
   on public.organization_profiles for select using (profile_id = auth.uid());
 
+drop policy if exists "Users can insert own organization profile" on public.organization_profiles;
 create policy "Users can insert own organization profile"
   on public.organization_profiles for insert with check (profile_id = auth.uid());
 
+drop policy if exists "Users can update own organization profile" on public.organization_profiles;
 create policy "Users can update own organization profile"
   on public.organization_profiles for update using (profile_id = auth.uid());

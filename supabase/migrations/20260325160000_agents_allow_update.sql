@@ -3,6 +3,7 @@ begin;
 
 drop policy if exists "platform_agents_deny_update_as_restrictive" on public.agents;
 
+drop policy if exists "platform_agents_authenticated_update" on public.agents;
 create policy "platform_agents_authenticated_update"
   on public.agents for update
   to authenticated

@@ -16,6 +16,7 @@ import { buildCaregiverViewModel } from "@/lib/zorenta/caregiver-profile-view-mo
 import type { AvailabilitySchedule } from "@/lib/zorenta/caregiver-availability-schedule";
 import { formatDisplayName, formatLabelValue, formatLocationLine } from "@/lib/zorenta/profile-display";
 import { REGISTRATION_OPEN } from "@/lib/registration-open";
+import { formatOrganizationOrgTypeLabel } from "@/lib/zorenta/organization-org-type-label";
 
 type MeResponse = {
   profile?: { id?: string; display_name?: string | null; role?: string | null; avatar_url?: string | null };
@@ -389,7 +390,9 @@ export default function ProfilePage() {
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-base"><Briefcase className="h-4 w-4 text-[#40ada8]" /> Organisatietype</CardTitle>
                         </CardHeader>
-                        <CardContent className="text-sm text-slate-700">{organization.org_type}</CardContent>
+                        <CardContent className="text-sm text-slate-700">
+                          {formatOrganizationOrgTypeLabel(organization.org_type)}
+                        </CardContent>
                       </Card>
                     ) : null}
                   </div>

@@ -423,6 +423,10 @@ export default function CaregiverProfileEditPage() {
               <CityAutocomplete
                 value={city}
                 onChange={setCity}
+                onLocationPick={(h) => {
+                  if (h.province?.trim()) setRegion(h.province.trim());
+                }}
+                onProvinceGuess={(p) => setRegion(p)}
                 placeholder="Bijv. Amsterdam"
               />
             </ZorentaFormField>

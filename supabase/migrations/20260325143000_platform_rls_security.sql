@@ -17,6 +17,7 @@ alter table public.agents force row level security;
 -- update the API routes to run with the logged-in user's JWT, otherwise RLS will deny.
 
 -- Restrict any existing policies: only authenticated users may operate on this table.
+drop policy if exists "platform_agents_auth_required_restrictive" on public.agents;
 create policy "platform_agents_auth_required_restrictive"
   on public.agents as restrictive
   for all
@@ -24,22 +25,26 @@ create policy "platform_agents_auth_required_restrictive"
   with check (auth.uid() is not null);
 
 -- Explicitly deny UPDATE (not used by current API routes).
+drop policy if exists "platform_agents_deny_update_as_restrictive" on public.agents;
 create policy "platform_agents_deny_update_as_restrictive"
   on public.agents as restrictive
   for update
   using (false)
   with check (false);
 
+drop policy if exists "platform_agents_authenticated_select" on public.agents;
 create policy "platform_agents_authenticated_select"
   on public.agents for select
   to authenticated
   using (auth.uid() is not null);
 
+drop policy if exists "platform_agents_authenticated_insert" on public.agents;
 create policy "platform_agents_authenticated_insert"
   on public.agents for insert
   to authenticated
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_agents_authenticated_delete" on public.agents;
 create policy "platform_agents_authenticated_delete"
   on public.agents for delete
   to authenticated
@@ -51,28 +56,33 @@ create policy "platform_agents_authenticated_delete"
 alter table public.workflows enable row level security;
 alter table public.workflows force row level security;
 
+drop policy if exists "platform_workflows_auth_required_restrictive" on public.workflows;
 create policy "platform_workflows_auth_required_restrictive"
   on public.workflows as restrictive
   for all
   using (auth.uid() is not null)
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_workflows_deny_update_as_restrictive" on public.workflows;
 create policy "platform_workflows_deny_update_as_restrictive"
   on public.workflows as restrictive
   for update
   using (false)
   with check (false);
 
+drop policy if exists "platform_workflows_deny_delete_as_restrictive" on public.workflows;
 create policy "platform_workflows_deny_delete_as_restrictive"
   on public.workflows as restrictive
   for delete
   using (false);
 
+drop policy if exists "platform_workflows_authenticated_select" on public.workflows;
 create policy "platform_workflows_authenticated_select"
   on public.workflows for select
   to authenticated
   using (auth.uid() is not null);
 
+drop policy if exists "platform_workflows_authenticated_insert" on public.workflows;
 create policy "platform_workflows_authenticated_insert"
   on public.workflows for insert
   to authenticated
@@ -86,6 +96,7 @@ alter table public.tasks force row level security;
 
 -- Current UI uses mock tasks and does not read/write public.tasks.
 -- Deny direct client access by default (system/internal only).
+drop policy if exists "platform_tasks_deny_all_as_restrictive" on public.tasks;
 create policy "platform_tasks_deny_all_as_restrictive"
   on public.tasks as restrictive
   for all
@@ -101,23 +112,27 @@ alter table public.runs force row level security;
 -- Current code writes runs via POST /api/agents/run.
 -- No frontend reads runs (yet), but allow insert so agent runs can persist.
 
+drop policy if exists "platform_runs_auth_required_restrictive" on public.runs;
 create policy "platform_runs_auth_required_restrictive"
   on public.runs as restrictive
   for all
   using (auth.uid() is not null)
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_runs_deny_update_as_restrictive" on public.runs;
 create policy "platform_runs_deny_update_as_restrictive"
   on public.runs as restrictive
   for update
   using (false)
   with check (false);
 
+drop policy if exists "platform_runs_deny_delete_as_restrictive" on public.runs;
 create policy "platform_runs_deny_delete_as_restrictive"
   on public.runs as restrictive
   for delete
   using (false);
 
+drop policy if exists "platform_runs_authenticated_insert" on public.runs;
 create policy "platform_runs_authenticated_insert"
   on public.runs for insert
   to authenticated
@@ -125,6 +140,7 @@ create policy "platform_runs_authenticated_insert"
 
 -- (Optional/defensive) keep reads restricted until app needs it.
 -- If you want /api/runs GET working, add a SELECT policy for authenticated.
+drop policy if exists "platform_runs_deny_select_as_restrictive" on public.runs;
 create policy "platform_runs_deny_select_as_restrictive"
   on public.runs as restrictive
   for select
@@ -137,6 +153,7 @@ alter table public.prompts enable row level security;
 alter table public.prompts force row level security;
 
 -- Prompts are currently mock-only in the UI; deny direct client access.
+drop policy if exists "platform_prompts_deny_all_as_restrictive" on public.prompts;
 create policy "platform_prompts_deny_all_as_restrictive"
   on public.prompts as restrictive
   for all
@@ -149,28 +166,33 @@ create policy "platform_prompts_deny_all_as_restrictive"
 alter table public.app_plans enable row level security;
 alter table public.app_plans force row level security;
 
+drop policy if exists "platform_app_plans_auth_required_restrictive" on public.app_plans;
 create policy "platform_app_plans_auth_required_restrictive"
   on public.app_plans as restrictive
   for all
   using (auth.uid() is not null)
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_app_plans_deny_update_as_restrictive" on public.app_plans;
 create policy "platform_app_plans_deny_update_as_restrictive"
   on public.app_plans as restrictive
   for update
   using (false)
   with check (false);
 
+drop policy if exists "platform_app_plans_deny_delete_as_restrictive" on public.app_plans;
 create policy "platform_app_plans_deny_delete_as_restrictive"
   on public.app_plans as restrictive
   for delete
   using (false);
 
+drop policy if exists "platform_app_plans_authenticated_select" on public.app_plans;
 create policy "platform_app_plans_authenticated_select"
   on public.app_plans for select
   to authenticated
   using (auth.uid() is not null);
 
+drop policy if exists "platform_app_plans_authenticated_insert" on public.app_plans;
 create policy "platform_app_plans_authenticated_insert"
   on public.app_plans for insert
   to authenticated
@@ -184,6 +206,7 @@ alter table public.admin_users force row level security;
 
 -- admin_users is not referenced by the app's client/API routes today.
 -- Deny direct client access by default (server-only admin usage).
+drop policy if exists "platform_admin_users_deny_all_as_restrictive" on public.admin_users;
 create policy "platform_admin_users_deny_all_as_restrictive"
   on public.admin_users as restrictive
   for all

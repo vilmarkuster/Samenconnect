@@ -34,6 +34,7 @@ create index if not exists idx_caregivers_location on public.caregivers(location
 alter table public.caregivers enable row level security;
 
 -- public read for marketplace matching
+drop policy if exists "Public can read caregivers" on public.caregivers;
 create policy "Public can read caregivers"
   on public.caregivers
   for select

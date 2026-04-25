@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       if (city) q = q.ilike("city", `%${city}%`);
       if (careType) q = q.ilike("care_type", `%${careType}%`);
     }
+    if (region) q = q.ilike("region", `%${region}%`);
+    if (qText && city) q = q.ilike("city", `%${city}%`);
     const { data, error } = await q.limit(50);
     if (error) return jsonResponse({ error: error.message }, 500);
     const rows = await careJobRowsWithExistingPosters(supabase, (data ?? []) as { poster_id: string }[]);

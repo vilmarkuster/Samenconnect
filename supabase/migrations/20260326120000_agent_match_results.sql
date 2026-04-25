@@ -18,28 +18,33 @@ create index if not exists idx_agent_match_results_job_id_created_at
 alter table public.agent_match_results enable row level security;
 alter table public.agent_match_results force row level security;
 
+drop policy if exists "platform_agent_match_results_auth_required_restrictive" on public.agent_match_results;
 create policy "platform_agent_match_results_auth_required_restrictive"
   on public.agent_match_results as restrictive
   for all
   using (auth.uid() is not null)
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_agent_match_results_authenticated_select" on public.agent_match_results;
 create policy "platform_agent_match_results_authenticated_select"
   on public.agent_match_results for select
   to authenticated
   using (auth.uid() is not null);
 
+drop policy if exists "platform_agent_match_results_authenticated_insert" on public.agent_match_results;
 create policy "platform_agent_match_results_authenticated_insert"
   on public.agent_match_results for insert
   to authenticated
   with check (auth.uid() is not null);
 
+drop policy if exists "platform_agent_match_results_deny_update_as_restrictive" on public.agent_match_results;
 create policy "platform_agent_match_results_deny_update_as_restrictive"
   on public.agent_match_results as restrictive
   for update
   using (false)
   with check (false);
 
+drop policy if exists "platform_agent_match_results_deny_delete_as_restrictive" on public.agent_match_results;
 create policy "platform_agent_match_results_deny_delete_as_restrictive"
   on public.agent_match_results as restrictive
   for delete

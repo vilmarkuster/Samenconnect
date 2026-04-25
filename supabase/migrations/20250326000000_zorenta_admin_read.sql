@@ -5,6 +5,7 @@
 -- In Postgres RLS we inline: exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
 
 -- job_applications: admin can read all
+drop policy if exists "Admin can read all job_applications" on public.job_applications;
 create policy "Admin can read all job_applications"
   on public.job_applications for select
   using (
@@ -12,6 +13,7 @@ create policy "Admin can read all job_applications"
   );
 
 -- conversations: admin can read all
+drop policy if exists "Admin can read all conversations" on public.conversations;
 create policy "Admin can read all conversations"
   on public.conversations for select
   using (
@@ -19,6 +21,7 @@ create policy "Admin can read all conversations"
   );
 
 -- messages: admin can read all (for support visibility)
+drop policy if exists "Admin can read all messages" on public.messages;
 create policy "Admin can read all messages"
   on public.messages for select
   using (
@@ -26,6 +29,7 @@ create policy "Admin can read all messages"
   );
 
 -- notifications: admin can read all
+drop policy if exists "Admin can read all notifications" on public.notifications;
 create policy "Admin can read all notifications"
   on public.notifications for select
   using (
@@ -33,6 +37,7 @@ create policy "Admin can read all notifications"
   );
 
 -- caregiver_profiles: admin can read all
+drop policy if exists "Admin can read all caregiver_profiles" on public.caregiver_profiles;
 create policy "Admin can read all caregiver_profiles"
   on public.caregiver_profiles for select
   using (
@@ -40,6 +45,7 @@ create policy "Admin can read all caregiver_profiles"
   );
 
 -- client_profiles: admin can read all
+drop policy if exists "Admin can read all client_profiles" on public.client_profiles;
 create policy "Admin can read all client_profiles"
   on public.client_profiles for select
   using (
@@ -47,6 +53,7 @@ create policy "Admin can read all client_profiles"
   );
 
 -- organization_profiles: admin can read all
+drop policy if exists "Admin can read all organization_profiles" on public.organization_profiles;
 create policy "Admin can read all organization_profiles"
   on public.organization_profiles for select
   using (

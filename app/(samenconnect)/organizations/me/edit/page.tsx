@@ -14,6 +14,7 @@ import { ZorentaFormField } from "@/components/zorenta/form-field";
 import { ZorentaFormSection } from "@/components/zorenta/form-section";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
 import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
+import { canonicalOrganizationOrgTypeValue } from "@/lib/zorenta/organization-org-type-label";
 import { COUNTRIES } from "@/lib/zorenta/countries";
 
 type OrgProfile = {
@@ -27,11 +28,11 @@ type OrgProfile = {
 };
 
 const ORG_TYPES = [
-  { value: "home_care", label: "Thuiszorg" },
-  { value: "nursing_home", label: "Verpleeghuis" },
-  { value: "hospital", label: "Ziekenhuis" },
-  { value: "agency", label: "Bureau" },
-  { value: "other", label: "Overig" },
+  { value: "zorginstelling", label: "Zorginstelling" },
+  { value: "pgb", label: "PGB" },
+  { value: "bureau", label: "Bureau" },
+  { value: "zelfstandig", label: "Zelfstandig" },
+  { value: "overig", label: "Overig" },
 ];
 
 const selectClass =
@@ -77,7 +78,7 @@ export default function OrganizationProfileEditPage() {
       setProfile(p ?? "none");
       if (p) {
         setName(p.name ?? "");
-        setOrgType(p.org_type ?? "");
+        setOrgType(canonicalOrganizationOrgTypeValue(p.org_type ?? ""));
         setDescription(p.description ?? "");
         setCity(p.city ?? "");
         setRegion(p.region ?? "");
@@ -218,7 +219,15 @@ export default function OrganizationProfileEditPage() {
           <div className="rounded-lg border border-slate-200/90 bg-slate-50/40 p-3 sm:p-4">
             <div className="grid gap-4 sm:grid-cols-3">
               <ZorentaFormField label="Stad" hint="Hoofdvestiging of kerngebied.">
-                <CityAutocomplete value={city} onChange={setCity} placeholder="Bijv. Amsterdam" />
+                <CityAutocomplete
+                  value={city}
+                  onChange={setCity}
+                  onLocationPick={(h) => {
+                    if (h.province?.trim()) setRegion(h.province.trim());
+                  }}
+                  onProvinceGuess={(p) => setRegion(p)}
+                  placeholder="Bijv. Amsterdam"
+                />
               </ZorentaFormField>
               <ZorentaFormField label="Regio (provincie)" hint="Voor provincie- en regiofilters.">
                 <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectClass}>

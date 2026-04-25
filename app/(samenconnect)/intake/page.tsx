@@ -14,6 +14,7 @@ import { ZorentaFormField } from "@/components/zorenta/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DUTCH_PROVINCES } from "@/lib/zorenta/regions";
 import { CityAutocomplete } from "@/components/zorenta/forms/city-autocomplete";
+import { VerbeterTekstButton } from "@/components/zorenta/verbeter-tekst-button";
 import { FileText, ChevronRight, ChevronLeft, Save } from "lucide-react";
 import {
   FINANCIERING_REGELING_OPTIONS,
@@ -1027,6 +1028,10 @@ export default function IntakePage() {
                   <CityAutocomplete
                     value={String(form.preferred_city ?? "")}
                     onChange={(v) => update("preferred_city", v)}
+                    onLocationPick={(h) => {
+                      if (h.province?.trim()) update("preferred_region", h.province.trim());
+                    }}
+                    onProvinceGuess={(p) => update("preferred_region", p)}
                     placeholder="Bijv. Amsterdam"
                   />
                 </div>
@@ -1120,6 +1125,38 @@ export default function IntakePage() {
                     Overnemen
                   </Button>
                 </div>
+              </Card>
+
+              <Card className="rounded-xl border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Beschrijving bewerken</h3>
+                <p className="mb-3 text-xs text-slate-500">
+                  Tip: gebruik &quot;Overnemen&quot; om de gegenereerde tekst vast te leggen, pas hieronder aan of laat
+                  tekst door AI polijsten.
+                </p>
+                <div className="mb-2 flex flex-wrap justify-end gap-2">
+                  <VerbeterTekstButton
+                    context="intake"
+                    getText={() =>
+                      String(
+                        (typeof form.generated_summary === "string" &&
+                        form.generated_summary.trim().length > 0
+                          ? form.generated_summary
+                          : previewSummary) || ""
+                      )
+                    }
+                    onAccept={(t) => update("generated_summary", t)}
+                  />
+                </div>
+                <textarea
+                  value={String(
+                    typeof form.generated_summary === "string" && form.generated_summary.trim().length > 0
+                      ? form.generated_summary
+                      : previewSummary
+                  )}
+                  onChange={(e) => update("generated_summary", e.target.value)}
+                  rows={6}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                />
               </Card>
 
               <Card className="rounded-xl border-slate-200 bg-slate-100 p-4 shadow-sm">
